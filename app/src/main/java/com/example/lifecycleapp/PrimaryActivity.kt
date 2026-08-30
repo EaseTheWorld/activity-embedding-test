@@ -46,9 +46,7 @@ class PrimaryActivity : BaseLoggingActivity() {
 
         listView.setOnItemClickListener { _, _, position, _ ->
             val selectedItem = items[position]
-            val intent = Intent(this, selectedItem.targetActivity).apply {
-                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
-            }
+            val intent = Intent(this, selectedItem.targetActivity)
             startActivity(intent)
         }
     }
@@ -85,16 +83,12 @@ class PrimaryActivity : BaseLoggingActivity() {
             when (id) {
                 1 -> {
                     android.util.Log.d(tag, "[$activityName] Deeplink matched id=1 -> launching Secondary1Activity")
-                    val detailIntent = Intent(this, Secondary1Activity::class.java).apply {
-                        addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                    }
+                    val detailIntent = Intent(this, Secondary1Activity::class.java)
                     startActivity(detailIntent)
                 }
                 2 -> {
                     android.util.Log.d(tag, "[$activityName] Deeplink matched id=2 -> launching Secondary2Activity")
-                    val detailIntent = Intent(this, Secondary2Activity::class.java).apply {
-                        addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                    }
+                    val detailIntent = Intent(this, Secondary2Activity::class.java)
                     startActivity(detailIntent)
                 }
                 else -> {

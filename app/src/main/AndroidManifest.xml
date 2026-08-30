@@ -46,13 +46,11 @@
         <activity
             android:name=".Secondary1Activity"
             android:exported="false"
-            android:launchMode="singleTop"
             android:label="@string/title_secondary1" />
 
         <activity
             android:name=".Secondary2Activity"
             android:exported="false"
-            android:launchMode="singleTop"
             android:label="@string/title_secondary2" />
 
     </application>

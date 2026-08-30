@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Lifecycle App</string>
+    
+    <!-- Primary Activity Strings -->
+    <string name="title_primary">Primary Activity (List)</string>
+    <string name="primary_description">Select an item below to navigate to detail activities and observe lifecycle logs in Logcat.</string>
+    <string name="item_1_title">Item 1: Secondary1Activity</string>
+    <string name="item_1_subtitle">Tap to open Detail Screen 1</string>
+    <string name="item_2_title">Item 2: Secondary2Activity</string>
+    <string name="item_2_subtitle">Tap to open Detail Screen 2</string>
+
+    <!-- Secondary1 Activity Strings -->
+    <string name="title_secondary1">Secondary 1 Activity</string>
+    <string name="secondary1_content_title">Detail Screen 1</string>
+    <string name="secondary1_description">This is Secondary1Activity. Observe lifecycle callbacks in Logcat (Tag: LifecycleLog).</string>
+    <string name="btn_back">Back to List</string>
+    <string name="btn_go_to_secondary2">Go to Secondary 2</string>
+
+    <!-- Secondary2 Activity Strings -->
+    <string name="title_secondary2">Secondary 2 Activity</string>
+    <string name="secondary2_content_title">Detail Screen 2</string>
+    <string name="secondary2_description">This is Secondary2Activity. Observe lifecycle callbacks in Logcat (Tag: LifecycleLog).</string>
+    <string name="btn_go_to_secondary1">Go to Secondary 1</string>
+</resources>

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="category_door_title">도어 및 잠금</string>
+    <string name="category_door_subtitle">자동 잠금, 어린이 보호 잠금 및 차량 출입 제어</string>
+    
+    <string name="door_item_autolock_title">주행 시 자동 도어 잠금</string>
+    <string name="door_item_autolock_subtitle">주행 속도가 15 km/h를 초과하면 모든 도어를 자동으로 잠급니다</string>
+    
+    <string name="door_item_childlock_title">후석 어린이 보호 잠금 (차일드 락)</string>
+    <string name="door_item_childlock_subtitle">실내에서 뒷좌석 도어 및 창문 조작을 차단합니다</string>
+    
+    <string name="door_item_unlockpark_title">P단 변속 시 자동 잠금 해제</string>
+    <string name="door_item_unlockpark_subtitle">변속기를 P단으로 변경하면 모든 도어 잠금을 자동으로 해제합니다</string>
+</resources>

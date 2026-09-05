@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="category_door_title">Doors &amp; Locks</string>
+    <string name="category_door_subtitle">Automatic locking, child locks, and access controls</string>
+    
+    <string name="door_item_autolock_title">Speed-Sensitive Auto Lock</string>
+    <string name="door_item_autolock_subtitle">Automatically lock all doors when driving speed exceeds 15 km/h</string>
+    
+    <string name="door_item_childlock_title">Rear Child Safety Lock</string>
+    <string name="door_item_childlock_subtitle">Prevent opening rear doors and windows from inside</string>
+    
+    <string name="door_item_unlockpark_title">Unlock on Shift to Park</string>
+    <string name="door_item_unlockpark_subtitle">Automatically unlock doors when transmission shifts into Park (P)</string>
+</resources>

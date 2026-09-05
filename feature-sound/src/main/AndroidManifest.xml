@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application
+        android:theme="@style/Theme.Material3.DayNight.NoActionBar">
+
+        <property
+            android:name="android.window.PROPERTY_ACTIVITY_EMBEDDING_SPLITS_ENABLED"
+            android:value="true" />
+        <property
+            android:name="android.window.PROPERTY_ACTIVITY_EMBEDDING_ALLOW_SYSTEM"
+            android:value="true" />
+        <provider
+            android:name=".SoundSettingsProvider"
+            android:authorities="com.example.carsettings.provider.sound"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.example.carsettings.CATEGORY_PROVIDER" />
+            </intent-filter>
+        </provider>
+
+        <activity
+            android:name=".SoundSettingsActivity"
+            android:exported="true"
+            android:taskAffinity=""
+            android:label="Sound &amp; Audio">
+            <intent-filter>
+                <action android:name="com.example.carsettings.sound.OPEN" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>

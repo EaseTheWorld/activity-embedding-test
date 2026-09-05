@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Center Display</string>
+    <string name="category_display_title">Center Display</string>
+    <string name="category_display_subtitle">Luminance &amp; theme controls via Resource ID</string>
+</resources>

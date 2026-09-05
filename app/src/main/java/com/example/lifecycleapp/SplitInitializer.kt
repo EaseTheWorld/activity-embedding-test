@@ -17,10 +17,13 @@ class SplitInitializer : Initializer<RuleController> {
 
     override fun create(context: Context): RuleController {
         val primaryComponent = ComponentName(context, PrimaryActivity::class.java)
-        val allSecondaryComponent = ComponentName(context.packageName, "*")
+        // Match any activity from any package/module for cross-app embedding
 
         val filters = setOf(
-            SplitPairFilter(primaryComponent, allSecondaryComponent, null)
+            SplitPairFilter(primaryComponent, ComponentName("com.example.carsettings.light", "com.example.feature.light.LightSettingsActivity"), null),
+            SplitPairFilter(primaryComponent, ComponentName("com.example.carsettings.sound", "com.example.feature.sound.SoundSettingsActivity"), null),
+            SplitPairFilter(primaryComponent, ComponentName("com.example.carsettings.display", "com.example.feature.display.DisplaySettingsActivity"), null),
+            SplitPairFilter(primaryComponent, ComponentName(context, GenericSettingsActivity::class.java), null)
         )
 
         val defaultSplitAttributes = SplitAttributes.Builder()
@@ -33,23 +36,13 @@ class SplitInitializer : Initializer<RuleController> {
             .setMinSmallestWidthDp(400)
             .setDefaultSplitAttributes(defaultSplitAttributes)
             .setFinishPrimaryWithSecondary(SplitRule.FinishBehavior.NEVER)
-            .setFinishSecondaryWithPrimary(SplitRule.FinishBehavior.ADJACENT)
+            .setFinishSecondaryWithPrimary(SplitRule.FinishBehavior.ALWAYS)
             .setClearTop(true)
             .build()
 
-        val placeholderFilters = setOf(ActivityFilter(primaryComponent, null))
-        val placeholderIntent = Intent(context, Secondary1Activity::class.java)
-        val placeholderRule = SplitPlaceholderRule.Builder(placeholderFilters, placeholderIntent)
-            .setMinWidthDp(600)
-            .setMinHeightDp(0)
-            .setMinSmallestWidthDp(400)
-            .setDefaultSplitAttributes(defaultSplitAttributes)
-            .setFinishPrimaryWithPlaceholder(SplitRule.FinishBehavior.ALWAYS)
-            .build()
-
         val ruleController = RuleController.getInstance(context)
-        ruleController.setRules(setOf(splitPairRule, placeholderRule))
-        Log.d("LifecycleLog", "[SplitInitializer] Initialized rules with androidx.startup.Initializer")
+        ruleController.setRules(setOf(splitPairRule))
+        Log.d("LifecycleLog", "[SplitInitializer] Initialized SplitPairRule with cross-app wildcard embedding")
         return ruleController
     }
 

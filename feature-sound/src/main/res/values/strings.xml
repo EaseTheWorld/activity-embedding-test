@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Sound &amp; Audio</string>
+    <string name="category_sound_title">Sound &amp; Audio</string>
+    <string name="category_sound_subtitle">Volume &amp; acoustic staging via Resource ID</string>
+</resources>

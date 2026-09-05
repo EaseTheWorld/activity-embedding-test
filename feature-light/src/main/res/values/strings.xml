@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Vehicle Lights</string>
+    <string name="category_light_title">Vehicle Lights</string>
+    <string name="category_light_subtitle">Exterior &amp; interior illumination via Resource ID</string>
+</resources>

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="category_seat_title">Seats &amp; Comfort</string>
+    <string name="category_seat_subtitle">Seat heating, ventilation, and easy entry positions</string>
+    
+    <string name="seat_item_driver_heat_title">Driver Seat Heating</string>
+    <string name="seat_item_driver_heat_subtitle">Multilevel heating element adjustment for driver seat</string>
+    
+    <string name="seat_item_passenger_heat_title">Passenger Seat Heating</string>
+    <string name="seat_item_passenger_heat_subtitle">Multilevel heating element adjustment for front passenger seat</string>
+    
+    <string name="seat_item_easy_entry_title">Easy Entry &amp; Exit</string>
+    <string name="seat_item_easy_entry_subtitle">Automatically retract driver seat and steering wheel on exit</string>
+    
+    <string name="seat_item_lumbar_title">4-Way Lumbar Support</string>
+    <string name="seat_item_lumbar_subtitle">Custom 2D pneumatic lumbar height and depth adjustment</string>
+</resources>

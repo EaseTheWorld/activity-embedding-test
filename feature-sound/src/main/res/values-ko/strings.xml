@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">사운드 및 오디오</string>
+    <string name="category_sound_title">사운드 및 오디오</string>
+    <string name="category_sound_subtitle">미디어 음량, 내비게이션 안내 및 서라운드 입체 음향</string>
+</resources>

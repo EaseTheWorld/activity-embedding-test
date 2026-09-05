@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">중앙 디스플레이</string>
+    <string name="category_display_title">중앙 디스플레이</string>
+    <string name="category_display_subtitle">콘솔 패널 밝기, 다크 테마 및 화면 청소 모드</string>
+</resources>

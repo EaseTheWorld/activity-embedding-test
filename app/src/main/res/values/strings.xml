@@ -2,8 +2,9 @@
 <resources>
     <string name="app_name">Lifecycle App</string>
     
-    <!-- Primary Activity Strings -->
     <string name="title_primary">Primary Activity (List)</string>
+    <string name="vehicle_settings_title">Vehicle Settings</string>
+    <string name="discovery_status_format">Discovered %d Independent Settings Apps (Pattern A Verified)</string>
     <string name="primary_description">Select an item below to navigate to detail activities and observe lifecycle logs in Logcat.</string>
     <string name="item_1_title">Item 1: Secondary1Activity</string>
     <string name="item_1_subtitle">Tap to open Detail Screen 1</string>

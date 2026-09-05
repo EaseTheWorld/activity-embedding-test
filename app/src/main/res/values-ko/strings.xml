@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">차량 설정</string>
+    <string name="title_primary">차량 설정 (목록)</string>
+    <string name="vehicle_settings_title">차량 설정</string>
+    <string name="discovery_status_format">%d개의 독립 설정 앱 발견됨 (Pattern A 검증됨)</string>
+</resources>

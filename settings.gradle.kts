@@ -21,3 +21,11 @@ dependencyResolutionManagement {
 
 rootProject.name = "LifecycleApp"
 include(":app")
+include(":feature-light")
+include(":feature-sound")
+include(":feature-display")
+include(":core-item-contract")
+include(":common-ui-settings")
+include(":feature-door")
+include(":feature-seat")
+

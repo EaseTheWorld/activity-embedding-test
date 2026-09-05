@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="category_seat_title">시트 및 편의</string>
+    <string name="category_seat_subtitle">시트 열선, 통풍 및 이지 억세스 승하차 보조 설정</string>
+    
+    <string name="seat_item_driver_heat_title">운전석 시트 열선</string>
+    <string name="seat_item_driver_heat_subtitle">운전석 시트 온열 단계 조절</string>
+    
+    <string name="seat_item_passenger_heat_title">동승석 시트 열선</string>
+    <string name="seat_item_passenger_heat_subtitle">동승석 시트 온열 단계 조절</string>
+    
+    <string name="seat_item_easy_entry_title">이지 억세스 승하차 편의</string>
+    <string name="seat_item_easy_entry_subtitle">하차 시 운전석 시트를 뒤로 밀어 승하차 공간을 확보합니다</string>
+    
+    <string name="seat_item_lumbar_title">4방향 럼버 서포트 (요추 지지대)</string>
+    <string name="seat_item_lumbar_subtitle">공압식 2D 요추 지지대 높이 및 돌출 강도 조절</string>
+</resources>

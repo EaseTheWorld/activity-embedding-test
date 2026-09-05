@@ -2,6 +2,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <queries>
+        <intent>
+            <action android:name="com.example.carsettings.CATEGORY_PROVIDER" />
+        </intent>
+    </queries>
+
     <application
         android:name=".LifecycleApp"
         android:allowBackup="true"
@@ -17,6 +23,9 @@
         <property
             android:name="android.window.PROPERTY_ACTIVITY_EMBEDDING_SPLITS_ENABLED"
             android:value="true" />
+        <property
+            android:name="android.window.PROPERTY_ACTIVITY_EMBEDDING_ALLOW_SYSTEM"
+            android:value="true" />
 
         <provider
             android:name="androidx.startup.InitializationProvider"
@@ -31,7 +40,6 @@
         <activity
             android:name=".PrimaryActivity"
             android:exported="true"
-            android:launchMode="singleTask"
             android:label="@string/title_primary">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -52,6 +60,17 @@
             android:name=".Secondary2Activity"
             android:exported="false"
             android:label="@string/title_secondary2" />
+
+        <activity
+            android:name=".GenericSettingsActivity"
+            android:exported="true"
+            android:label="Settings">
+            <intent-filter>
+                <action android:name="com.example.carsettings.door.OPEN" />
+                <action android:name="com.example.carsettings.seat.OPEN" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
 
     </application>
 

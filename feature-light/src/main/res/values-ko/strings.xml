@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">차량 조명</string>
+    <string name="category_light_title">차량 조명</string>
+    <string name="category_light_subtitle">전조등, 실내 무드등 및 트렁크 조명 제어</string>
+</resources>

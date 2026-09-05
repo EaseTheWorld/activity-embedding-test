@@ -1,17 +1,16 @@
 package com.example.lifecycleapp
 
-import android.content.Intent
+import android.content.res.Configuration
 import android.os.Bundle
 import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
+import androidx.window.layout.WindowMetricsCalculator
 
 abstract class BaseLoggingActivity : AppCompatActivity() {
 
-    protected val tag: String
-        get() = "LifecycleLog"
-
+    protected val tag: String = "LifecycleLog"
     protected val activityName: String
-        get() = this.javaClass.simpleName
+        get() = this::class.java.simpleName
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -25,12 +24,13 @@ abstract class BaseLoggingActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        val metrics = WindowMetricsCalculator.getOrCreate().computeCurrentWindowMetrics(this)
         val isEmbedded = try {
             androidx.window.embedding.ActivityEmbeddingController.getInstance(this).isActivityEmbedded(this)
         } catch (e: Exception) {
             false
         }
-        Log.d(tag, "[$activityName] onResume() (isActivityEmbedded = $isEmbedded)")
+        Log.d(tag, "[$activityName] onResume() (isActivityEmbedded = $isEmbedded, bounds = ${metrics.bounds})")
     }
 
     override fun onPause() {
@@ -41,11 +41,6 @@ abstract class BaseLoggingActivity : AppCompatActivity() {
     override fun onStop() {
         super.onStop()
         Log.d(tag, "[$activityName] onStop()")
-    }
-
-    override fun onRestart() {
-        super.onRestart()
-        Log.d(tag, "[$activityName] onRestart()")
     }
 
     override fun onDestroy() {
@@ -63,8 +58,8 @@ abstract class BaseLoggingActivity : AppCompatActivity() {
         Log.d(tag, "[$activityName] onRestoreInstanceState(savedInstanceState = $savedInstanceState)")
     }
 
-    override fun onNewIntent(intent: Intent?) {
-        super.onNewIntent(intent)
-        Log.d(tag, "[$activityName] onNewIntent(intent = $intent)")
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        Log.d(tag, "[$activityName] onConfigurationChanged(newConfig = $newConfig)")
     }
 }

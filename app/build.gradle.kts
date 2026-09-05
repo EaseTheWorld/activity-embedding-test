@@ -33,6 +33,12 @@ android {
     kotlinOptions {
         jvmTarget = "1.8"
     }
+    buildFeatures {
+        compose = true
+    }
+    composeOptions {
+        kotlinCompilerExtensionVersion = libs.versions.composeCompiler.get()
+    }
 }
 
 dependencies {
@@ -42,4 +48,18 @@ dependencies {
     implementation(libs.androidx.constraintlayout)
     implementation(libs.androidx.window)
     implementation(libs.androidx.startup)
+
+    // Jetpack Compose
+    implementation(libs.androidx.activity.compose)
+    implementation(platform(libs.androidx.compose.bom))
+    implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.ui.graphics)
+    implementation(libs.androidx.compose.ui.tooling.preview)
+    implementation(libs.androidx.compose.material3)
+
+    // Internal Common UI & Feature Libraries (Item architecture)
+    implementation(project(":core-item-contract"))
+    implementation(project(":common-ui-settings"))
+    implementation(project(":feature-door"))
+    implementation(project(":feature-seat"))
 }

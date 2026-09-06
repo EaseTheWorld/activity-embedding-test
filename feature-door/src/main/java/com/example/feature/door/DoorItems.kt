@@ -63,7 +63,7 @@ object DoorItemRegistry : com.example.core.item.CategoryItemProvider {
     val childLock = ChildLockItem()
     val unlockOnPark = UnlockOnParkItem()
 
-    override val items: List<Item<*>> = listOf(
+    override val items: List<Item> = listOf(
         autoDoorLock,
         childLock,
         unlockOnPark

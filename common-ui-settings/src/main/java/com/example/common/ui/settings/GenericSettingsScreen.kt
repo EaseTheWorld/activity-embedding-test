@@ -32,7 +32,7 @@ import com.example.core.item.Item
 fun GenericSettingsScreen(
     title: String,
     subtitle: String,
-    items: List<Item<*>>
+    items: List<Item>
 ) {
     Surface(
         modifier = Modifier.fillMaxSize(),

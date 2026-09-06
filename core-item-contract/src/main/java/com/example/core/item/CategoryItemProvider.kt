@@ -8,7 +8,22 @@ interface CategoryItemProvider {
     val categoryId: String
     val authority: String
     val titleKey: String
-    val items: List<Item<*>>
+    val items: List<Item>
 
-    fun findItem(key: String): Item<*>? = items.find { it.key == key }
+    /**
+     * Finds an item by its key. Supports recursive searching into [ContainerItem.children].
+     */
+    fun findItem(key: String): Item? {
+        fun search(list: List<Item>): Item? {
+            for (item in list) {
+                if (item.key == key) return item
+                if (item is ContainerItem) {
+                    val nested = search(item.children)
+                    if (nested != null) return nested
+                }
+            }
+            return null
+        }
+        return search(items)
+    }
 }

@@ -47,12 +47,17 @@ class CoreContractInvariantsTest {
             override val valueFlow = kotlinx.coroutines.flow.MutableStateFlow(50)
             override fun onValueChanged(newValue: Int) {}
         }
+        var actionClicked = false
         val actionItem = object : ActionItem {
             override val key = "action"
-            override val valueFlow = kotlinx.coroutines.flow.MutableStateFlow(Unit)
-            override fun onValueChanged(newValue: Unit) {}
+            override fun onClick() {
+                actionClicked = true
+            }
         }
-        val customItem = object : Item<String> {
+        val containerItem = object : ContainerItem {
+            override val key = "container"
+        }
+        val customItem = object : ValueItem<String> {
             override val key = "custom"
             override val valueFlow = kotlinx.coroutines.flow.MutableStateFlow("custom")
             override fun onValueChanged(newValue: String) {}
@@ -63,36 +68,45 @@ class CoreContractInvariantsTest {
         assertEquals(ItemType.CHOICE, choiceItem.type)
         assertEquals(ItemType.SLIDER, sliderItem.type)
         assertEquals(ItemType.ACTION, actionItem.type)
+        assertEquals(ItemType.CONTAINER, containerItem.type)
         assertEquals(ItemType.CUSTOM, customItem.type)
+
+        actionItem.onClick()
+        assertEquals(true, actionClicked)
     }
 
     // ========================================================================
-    // Protection 2: CategoryItemProvider.findItem default implementation
+    // Protection 2: CategoryItemProvider.findItem default implementation (Hierarchical)
     // ========================================================================
 
     @Test
-    fun `verify CategoryItemProvider_findItem default implementation correctly retrieves matching item`() {
-        val item1 = object : Item<String> {
+    fun `verify CategoryItemProvider_findItem default implementation correctly retrieves matching item including nested children`() {
+        val item1 = object : ValueItem<String> {
             override val key = "key_1"
             override val valueFlow = kotlinx.coroutines.flow.MutableStateFlow("v1")
             override fun onValueChanged(newValue: String) {}
         }
-        val item2 = object : Item<String> {
-            override val key = "key_2"
-            override val valueFlow = kotlinx.coroutines.flow.MutableStateFlow("v2")
+        val nestedChild = object : ValueItem<String> {
+            override val key = "nested_child"
+            override val valueFlow = kotlinx.coroutines.flow.MutableStateFlow("nested")
             override fun onValueChanged(newValue: String) {}
+        }
+        val container = object : ContainerItem {
+            override val key = "container_key"
+            override val children: List<Item> = listOf(nestedChild)
         }
 
         val provider = object : CategoryItemProvider {
             override val categoryId = "test_cat"
             override val authority = "com.test.provider"
             override val titleKey = "title_key"
-            override val items = listOf(item1, item2)
+            override val items = listOf(item1, container)
         }
 
         // Protects against: breaking findItem default resolution or NoSuchElementException
         assertEquals(item1, provider.findItem("key_1"))
-        assertEquals(item2, provider.findItem("key_2"))
+        assertEquals(container, provider.findItem("container_key"))
+        assertEquals(nestedChild, provider.findItem("nested_child"))
         assertNull(provider.findItem("non_existent_key"))
     }
 
@@ -106,7 +120,7 @@ class CoreContractInvariantsTest {
             override val categoryId = "Vehicle_Light"
             override val authority = "com.example.light"
             override val titleKey = "title"
-            override val items = emptyList<Item<*>>()
+            override val items = emptyList<Item>()
         }
 
         CategoryItemRegistry.register(provider)

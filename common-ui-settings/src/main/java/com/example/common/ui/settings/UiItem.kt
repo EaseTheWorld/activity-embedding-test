@@ -5,10 +5,12 @@ import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
 import com.example.core.item.ActionItem
 import com.example.core.item.ChoiceItem
+import com.example.core.item.ContainerItem
 import com.example.core.item.HasVhalBinding
 import com.example.core.item.Item
 import com.example.core.item.SliderItem
 import com.example.core.item.ToggleItem
+import com.example.core.item.ValueItem
 import com.example.core.item.VhalBinding
 import com.example.core.item.VhalPropertyBinder
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -87,13 +89,19 @@ open class CarUiOption<T, V>(
 }
 
 /**
- * Unified UI Contract extending [Item] with presentation metadata and rendering capabilities.
+ * Unified Root UI Contract extending [Item] with presentation metadata and rendering capabilities.
+ * Free of state requirements, enabling non-state items (Containers, Actions, Static Headers).
  */
-interface UiItem<T> : Item<T>, ComposableItemRenderer {
+interface UiItem : Item, ComposableItemRenderer {
     @get:StringRes val titleRes: Int
     @get:StringRes val subtitleRes: Int? get() = null
     @get:DrawableRes val iconRes: Int? get() = null
+}
 
+/**
+ * Stateful UI Contract extending [UiItem] and [ValueItem] with visual data mapping for state values [T].
+ */
+interface UiValueItem<T> : UiItem, ValueItem<T> {
     /**
      * Unified visual data representation for a state value [T].
      */
@@ -114,11 +122,14 @@ interface UiItem<T> : Item<T>, ComposableItemRenderer {
     fun getValueIconRes(value: T): Int? = getValueVisual(value)?.iconRes
 }
 
+// Backward-compatibility alias
+typealias UiItemT<T> = UiValueItem<T>
+
 /**
  * Standard Toggle UI Item.
  * Supports optional badge, toggle-specific on/off icons, and default Switch row rendering.
  */
-interface UiToggleItem : ToggleItem, UiItem<Boolean> {
+interface UiToggleItem : ToggleItem, UiValueItem<Boolean> {
     val badgeKey: String? get() = null
     @get:DrawableRes val onIconRes: Int? get() = null
     @get:DrawableRes val offIconRes: Int? get() = null
@@ -145,7 +156,7 @@ typealias OptionSlot<T> = @Composable (option: UiOption<T>, isSelected: Boolean,
  * Encapsulates options as [UiOption]s and delegates rendering to [optionSlot].
  * Derives the core contract's [options] automatically from [choiceOptions].
  */
-interface UiChoiceItem : ChoiceItem, UiItem<String> {
+interface UiChoiceItem : ChoiceItem, UiValueItem<String> {
     val choiceOptions: List<UiOption<String>>
 
     override val options: List<String>
@@ -175,7 +186,7 @@ interface UiChoiceItem : ChoiceItem, UiItem<String> {
 /**
  * Standard Slider UI Item.
  */
-interface UiSliderItem : SliderItem, UiItem<Int> {
+interface UiSliderItem : SliderItem, UiValueItem<Int> {
     @get:StringRes val unitRes: Int? get() = null
 
     @Composable
@@ -187,8 +198,15 @@ interface UiSliderItem : SliderItem, UiItem<Int> {
 /**
  * Standard Action (Button) UI Item.
  */
-interface UiActionItem : ActionItem, UiItem<Unit> {
+interface UiActionItem : ActionItem, UiItem {
     @get:StringRes val buttonLabelRes: Int? get() = null
+}
+
+/**
+ * Composite UI Container Item.
+ */
+interface UiContainerItem : ContainerItem, UiItem {
+    override val children: List<UiItem> get() = emptyList()
 }
 
 // Backward-compatibility aliases

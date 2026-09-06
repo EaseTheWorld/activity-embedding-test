@@ -4,8 +4,10 @@ import com.example.common.ui.settings.BaseUiToggleItem
 import com.example.common.ui.settings.CarUiOption
 import com.example.common.ui.settings.ChoiceOptionSlots
 import com.example.common.ui.settings.UiItem
+import com.example.common.ui.settings.UiValueItem
 import com.example.common.ui.settings.VhalChoiceItem
 import com.example.core.item.Item
+import com.example.core.item.ValueItem
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -127,10 +129,10 @@ data class SeatLumbarSupport(
 
 /**
  * Setting Item using the Custom DataType.
- * Implements UiItem so it can draw itself polymorphically
+ * Implements UiValueItem so it can draw itself polymorphically
  * without GenericSettingsActivity needing to know its concrete class.
  */
-class SeatLumbarSupportItem : Item<SeatLumbarSupport>, UiItem<SeatLumbarSupport> {
+class SeatLumbarSupportItem : ValueItem<SeatLumbarSupport>, UiValueItem<SeatLumbarSupport> {
     override val key: String = "seat_lumbar"
     override val titleRes: Int = R.string.seat_item_lumbar_title
     override val subtitleRes: Int = R.string.seat_item_lumbar_subtitle
@@ -177,7 +179,7 @@ object SeatItemRegistry : com.example.core.item.CategoryItemProvider {
     val easyEntryExit = EasyEntryExitItem()
     val seatLumbar = SeatLumbarSupportItem()
 
-    override val items: List<Item<*>> = listOf(
+    override val items: List<Item> = listOf(
         driverSeatHeat,
         driverSeatVent,
         seatMassage,

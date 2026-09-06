@@ -14,7 +14,9 @@ import kotlinx.coroutines.flow.asStateFlow
 // 1. Standard VHAL Choice Items (VhalChoiceItem<Int> : BaseUiChoiceItem, VhalBoundItem<String, Int>)
 // ============================================================================
 
-class DriverSeatHeatingItem : VhalChoiceItem<Int>(
+class DriverSeatHeatingItem(
+    repository: SeatPropertyRepository = SeatPropertyRepositoryImpl.shared
+) : VhalChoiceItem<Int>(
     key = "driver_seat_heat",
     titleRes = R.string.seat_item_driver_heat_title,
     subtitleRes = R.string.seat_item_driver_heat_subtitle,
@@ -27,10 +29,13 @@ class DriverSeatHeatingItem : VhalChoiceItem<Int>(
         CarUiOption("LEVEL 2", R.string.seat_heat_level_2, vhalValue = 2),
         CarUiOption("LEVEL 3", R.string.seat_heat_level_3, vhalValue = 3)
     ),
-    initialValue = "OFF"
+    initialValue = "OFF",
+    binder = repository
 )
 
-class PassengerSeatHeatingItem : VhalChoiceItem<Int>(
+class PassengerSeatHeatingItem(
+    repository: SeatPropertyRepository = SeatPropertyRepositoryImpl.shared
+) : VhalChoiceItem<Int>(
     key = "passenger_seat_heat",
     titleRes = R.string.seat_item_passenger_heat_title,
     subtitleRes = R.string.seat_item_passenger_heat_subtitle,
@@ -43,14 +48,17 @@ class PassengerSeatHeatingItem : VhalChoiceItem<Int>(
         CarUiOption("LEVEL 2", R.string.seat_heat_level_2, vhalValue = 2),
         CarUiOption("LEVEL 3", R.string.seat_heat_level_3, vhalValue = 3)
     ),
-    initialValue = "OFF"
+    initialValue = "OFF",
+    binder = repository
 )
 
 /**
  * Variant 1: Icon-Only Slot ([ChoiceOptionSlots.IconOnly])
  * Compact, icon-centric airflow buttons without text labels inside buttons.
  */
-class DriverSeatVentilationItem : VhalChoiceItem<Int>(
+class DriverSeatVentilationItem(
+    repository: SeatPropertyRepository = SeatPropertyRepositoryImpl.shared
+) : VhalChoiceItem<Int>(
     key = "driver_seat_vent",
     titleRes = R.string.seat_item_driver_vent_title,
     subtitleRes = R.string.seat_item_driver_vent_subtitle,
@@ -64,14 +72,17 @@ class DriverSeatVentilationItem : VhalChoiceItem<Int>(
         CarUiOption("LEVEL 3", R.string.seat_vent_3, iconRes = R.drawable.ic_seat_ventilation, vhalValue = 3)
     ),
     initialValue = "OFF",
-    optionSlot = ChoiceOptionSlots.IconOnly
+    optionSlot = ChoiceOptionSlots.IconOnly,
+    binder = repository
 )
 
 /**
  * Variant 2: Chip Slot ([ChoiceOptionSlots.Chip])
  * Compact filter chip buttons with optional badges.
  */
-class SeatMassageModeItem : VhalChoiceItem<Int>(
+class SeatMassageModeItem(
+    repository: SeatPropertyRepository = SeatPropertyRepositoryImpl.shared
+) : VhalChoiceItem<Int>(
     key = "seat_massage",
     titleRes = R.string.seat_item_massage_title,
     subtitleRes = R.string.seat_item_massage_subtitle,
@@ -85,7 +96,8 @@ class SeatMassageModeItem : VhalChoiceItem<Int>(
         CarUiOption("STRETCH", R.string.massage_stretch, vhalValue = 3)
     ),
     initialValue = "OFF",
-    optionSlot = ChoiceOptionSlots.Chip
+    optionSlot = ChoiceOptionSlots.Chip,
+    binder = repository
 )
 
 // ============================================================================

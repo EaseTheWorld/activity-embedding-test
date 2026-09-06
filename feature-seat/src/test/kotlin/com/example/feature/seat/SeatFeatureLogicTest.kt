@@ -178,18 +178,28 @@ class SeatFeatureLogicTest {
     @Test
     fun `SeatPropertyRepository connects seamlessly with VhalBoundItem without breaking domain invariants`() {
         val repository = SeatPropertyRepositoryImpl()
-        val massage = SeatMassageModeItem()
+        val massage = SeatMassageModeItem(repository)
+        val heating = DriverSeatHeatingItem(repository)
 
-        val liveFlow = repository.getPropertyFlow(massage)
-        assertEquals("OFF", liveFlow.value)
+        // 1. Initial State
+        assertEquals("OFF", massage.valueFlow.value)
+        assertEquals("OFF", heating.valueFlow.value)
 
-        // Set value via repository
-        repository.setPropertyValue(massage, "WAVE")
-        assertEquals("WAVE", liveFlow.value)
+        // 2. UI Action Flow (User clicks UI -> Item calls repository.setProperty(this, "WAVE"))
+        massage.onValueChanged("WAVE")
         assertEquals("WAVE", massage.valueFlow.value)
 
-        repository.setPropertyValue(massage, "STRETCH")
-        assertEquals("STRETCH", liveFlow.value)
+        // 3. Hardware Event Flow (Vehicle ECU / Knob sends raw VHAL event -> Repository translates & emits)
+        // Massage hardware sends raw 3 (STRETCH)
+        repository.onVhalHardwareEvent(propertyId = 0x11400F00, areaId = 1, rawHardwareValue = 3)
         assertEquals("STRETCH", massage.valueFlow.value)
+
+        // Heating hardware sends raw 2 (LEVEL 2)
+        repository.onVhalHardwareEvent(propertyId = 0x11400503, areaId = 1, rawHardwareValue = 2)
+        assertEquals("LEVEL 2", heating.valueFlow.value)
+
+        // Heating hardware sends raw 0 (OFF)
+        repository.onVhalHardwareEvent(propertyId = 0x11400503, areaId = 1, rawHardwareValue = 0)
+        assertEquals("OFF", heating.valueFlow.value)
     }
 }

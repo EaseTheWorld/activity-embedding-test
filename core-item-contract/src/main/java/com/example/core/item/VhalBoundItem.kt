@@ -1,5 +1,7 @@
 package com.example.core.item
 
+import kotlinx.coroutines.flow.StateFlow
+
 /**
  * Capability interface for an [Item] that binds to a Vehicle HAL (VHAL) property.
  *
@@ -17,4 +19,23 @@ interface VhalBoundItem<T, V> : Item<T> {
 
     fun toItemValue(vhalValue: V): T
     fun toVhalValue(itemValue: T): V
+}
+
+/**
+ * Universal binder contract connecting a [VhalBoundItem] to the hardware/VHAL layer.
+ *
+ * Enables inversion of control: the [VhalBoundItem] passes `this` to [bind],
+ * allowing the Data Layer repository to manage VHAL subscription and hardware dispatch
+ * without coupling the Item or UI to Android Automotive OS APIs.
+ */
+interface VhalPropertyBinder {
+    /**
+     * Binds the given [item] to the VHAL hardware layer and returns a reactive [StateFlow].
+     */
+    fun <T, V> bind(item: VhalBoundItem<T, V>, initialValue: T): StateFlow<T>
+
+    /**
+     * Dispatches a new domain [newValue] for the [item] down to the VHAL layer.
+     */
+    fun <T, V> setProperty(item: VhalBoundItem<T, V>, newValue: T)
 }

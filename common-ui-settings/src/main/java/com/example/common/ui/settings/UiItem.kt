@@ -9,6 +9,7 @@ import com.example.core.item.Item
 import com.example.core.item.SliderItem
 import com.example.core.item.ToggleItem
 import com.example.core.item.VhalBoundItem
+import com.example.core.item.VhalPropertyBinder
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -224,10 +225,35 @@ abstract class BaseUiChoiceItem(
 }
 
 /**
+ * Fallback in-memory VHAL property binder for preview and testing environments.
+ */
+class InMemoryVhalBinder : VhalPropertyBinder {
+    private val flows = mutableMapOf<Pair<Int, Int>, MutableStateFlow<Any?>>()
+
+    @Suppress("UNCHECKED_CAST")
+    override fun <T, V> bind(item: VhalBoundItem<T, V>, initialValue: T): StateFlow<T> {
+        val key = item.propertyId to item.areaId
+        val flow = flows.getOrPut(key) {
+            MutableStateFlow(initialValue)
+        }
+        return flow as StateFlow<T>
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    override fun <T, V> setProperty(item: VhalBoundItem<T, V>, newValue: T) {
+        val key = item.propertyId to item.areaId
+        val flow = flows[key] as? MutableStateFlow<T>
+        flow?.value = newValue
+    }
+}
+
+/**
  * Bridge abstract class unifying UI presentation ([BaseUiChoiceItem]) with hardware
  * VHAL binding ([VhalBoundItem]).
  *
- * Automatically provides bidirectional value conversion using [carOptions]:
+ * Automatically delegates state to [binder] by passing `this`:
+ * - [valueFlow]: Bound via `binder.bind(this, initialValue)`.
+ * - [onValueChanged]: Dispatches new value via `binder.setProperty(this, newValue)`.
  * - [toItemValue]: Maps raw hardware [vhalValue] to domain [String] value.
  * - [toVhalValue]: Maps domain [String] value to raw hardware [vhalValue].
  */
@@ -240,7 +266,8 @@ abstract class VhalChoiceItem<V>(
     initialValue: String = carOptions.firstOrNull()?.value ?: "",
     subtitleRes: Int? = null,
     iconRes: Int? = null,
-    optionSlot: OptionSlot<String> = ChoiceOptionSlots.Segmented
+    optionSlot: OptionSlot<String> = ChoiceOptionSlots.Segmented,
+    private val binder: VhalPropertyBinder = InMemoryVhalBinder()
 ) : BaseUiChoiceItem(
     key = key,
     titleRes = titleRes,
@@ -250,6 +277,17 @@ abstract class VhalChoiceItem<V>(
     iconRes = iconRes,
     optionSlot = optionSlot
 ), VhalBoundItem<String, V> {
+
+    // ★ Repository/Binder에 VhalBoundItem(this)을 전달하여 하드웨어/VHAL과 양방향 연동!
+    override val valueFlow: StateFlow<String> by lazy {
+        binder.bind(this, choiceOptions.firstOrNull()?.value ?: "")
+    }
+
+    override fun onValueChanged(newValue: String) {
+        if (options.contains(newValue)) {
+            binder.setProperty(this, newValue)
+        }
+    }
 
     override fun toItemValue(vhalValue: V): String {
         return carOptions.firstOrNull { it.vhalValue == vhalValue }?.value ?: valueFlow.value
@@ -298,7 +336,8 @@ abstract class VhalToggleItem<V>(
     iconRes: Int? = null,
     badgeKey: String? = null,
     onIconRes: Int? = null,
-    offIconRes: Int? = null
+    offIconRes: Int? = null,
+    private val binder: VhalPropertyBinder = InMemoryVhalBinder()
 ) : BaseUiToggleItem(
     key = key,
     titleRes = titleRes,
@@ -309,6 +348,15 @@ abstract class VhalToggleItem<V>(
     onIconRes = onIconRes,
     offIconRes = offIconRes
 ), VhalBoundItem<Boolean, V> {
+
+    // ★ Repository/Binder에 VhalBoundItem(this)을 전달하여 하드웨어/VHAL과 양방향 연동!
+    override val valueFlow: StateFlow<Boolean> by lazy {
+        binder.bind(this, false)
+    }
+
+    override fun onValueChanged(newValue: Boolean) {
+        binder.setProperty(this, newValue)
+    }
 
     override fun toItemValue(vhalValue: V): Boolean {
         return vhalValue == onVhalValue

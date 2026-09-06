@@ -10,15 +10,28 @@ import com.example.core.item.SliderItem
 import com.example.core.item.ToggleItem
 
 /**
+ * Visual presentation metadata for an individual value or state.
+ * Encapsulates localized string and icon resources in a single cohesive object.
+ */
+data class UiVisualData(
+    @StringRes val textRes: Int? = null,
+    val text: String? = null,
+    @DrawableRes val iconRes: Int? = null
+)
+
+/**
+ * Cohesive option model binding value, localized label, icon, and optional badge in a single definition.
+ * Eliminates the need to maintain separate value lists and resource mapping tables.
+ */
+data class UiOption<T>(
+    val value: T,
+    @StringRes val labelRes: Int,
+    @DrawableRes val iconRes: Int? = null,
+    val badge: String? = null
+)
+
+/**
  * Unified UI Contract extending [Item] with presentation metadata and rendering capabilities.
- *
- * Extensibility features:
- * - [titleRes]: Mandatory @StringRes for compile-time safety and instant rendering.
- * - [subtitleRes]: Optional @StringRes (defaults to null).
- * - [iconRes]: Optional @DrawableRes (defaults to null).
- * - [getValueTextRes]: Dynamic mapping from state value [T] to localized @StringRes (e.g. option labels).
- * - [getValueIconRes]: Dynamic mapping from state value [T] to @DrawableRes (e.g. dynamic state icons).
- * - [Draw]: Polymorphic Composable renderer with ZERO 'when' branching in the host screen.
  */
 interface UiItem<T> : Item<T>, ComposableItemRenderer {
     @get:StringRes val titleRes: Int
@@ -26,16 +39,23 @@ interface UiItem<T> : Item<T>, ComposableItemRenderer {
     @get:DrawableRes val iconRes: Int? get() = null
 
     /**
+     * Unified visual data representation for a state value [T].
+     */
+    fun getValueVisual(value: T): UiVisualData? = null
+
+    /**
      * Dynamic value-to-string mapping for current state or discrete options.
+     * Delegates to [getValueVisual].
      */
     @StringRes
-    fun getValueTextRes(value: T): Int? = null
+    fun getValueTextRes(value: T): Int? = getValueVisual(value)?.textRes
 
     /**
      * Dynamic value-to-icon mapping for current state or discrete options.
+     * Delegates to [getValueVisual].
      */
     @DrawableRes
-    fun getValueIconRes(value: T): Int? = null
+    fun getValueIconRes(value: T): Int? = getValueVisual(value)?.iconRes
 }
 
 /**
@@ -47,7 +67,10 @@ interface UiToggleItem : ToggleItem, UiItem<Boolean> {
     @get:DrawableRes val onIconRes: Int? get() = null
     @get:DrawableRes val offIconRes: Int? get() = null
 
-    override fun getValueIconRes(value: Boolean): Int? = if (value) onIconRes else offIconRes
+    override fun getValueVisual(value: Boolean): UiVisualData? {
+        val icon = if (value) onIconRes else offIconRes
+        return if (icon != null) UiVisualData(iconRes = icon) else null
+    }
 
     @Composable
     override fun Draw() {
@@ -56,18 +79,36 @@ interface UiToggleItem : ToggleItem, UiItem<Boolean> {
 }
 
 /**
+ * Composable slot type for rendering an individual option in a ChoiceItem.
+ */
+typealias OptionSlot<T> = @Composable (option: UiOption<T>, isSelected: Boolean, onClick: () -> Unit) -> Unit
+
+/**
  * Standard Choice UI Item (SegmentedButton, Multi-option).
- * Supports option label mappings and option icon mappings.
+ *
+ * Encapsulates options as [UiOption]s and delegates rendering to [optionSlot].
+ * Derives the core contract's [options] automatically from [choiceOptions].
  */
 interface UiChoiceItem : ChoiceItem, UiItem<String> {
-    val optionLabels: Map<String, Int> get() = emptyMap()
-    val optionIcons: Map<String, Int> get() = emptyMap()
+    val choiceOptions: List<UiOption<String>>
 
-    @StringRes
-    override fun getValueTextRes(value: String): Int? = optionLabels[value]
+    override val options: List<String>
+        get() = choiceOptions.map { it.value }
 
-    @DrawableRes
-    override fun getValueIconRes(value: String): Int? = optionIcons[value]
+    fun getOption(value: String): UiOption<String>? =
+        choiceOptions.firstOrNull { it.value == value }
+
+    override fun getValueVisual(value: String): UiVisualData? {
+        val opt = getOption(value) ?: return null
+        return UiVisualData(textRes = opt.labelRes, iconRes = opt.iconRes)
+    }
+
+    /**
+     * Composable slot for rendering an individual option button.
+     * Defaults to [ChoiceOptionSlots.Segmented]. Subclasses can override with predefined slots or custom lambdas.
+     */
+    val optionSlot: OptionSlot<String>
+        get() = ChoiceOptionSlots.Segmented
 
     @Composable
     override fun Draw() {

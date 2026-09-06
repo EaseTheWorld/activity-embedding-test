@@ -2,6 +2,7 @@ package com.example.feature.seat
 
 import com.example.common.ui.settings.UiChoiceItem
 import com.example.common.ui.settings.UiItem
+import com.example.common.ui.settings.UiOption
 import com.example.common.ui.settings.UiToggleItem
 import com.example.core.item.Item
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -17,13 +18,12 @@ class DriverSeatHeatingItem : UiChoiceItem {
     override val titleRes: Int = R.string.seat_item_driver_heat_title
     override val subtitleRes: Int = R.string.seat_item_driver_heat_subtitle
     override val iconRes: Int = R.drawable.ic_feature_seat
-    override val options: List<String> = listOf("OFF", "LEVEL 1", "LEVEL 2", "LEVEL 3")
 
-    override val optionLabels: Map<String, Int> = mapOf(
-        "OFF" to R.string.seat_heat_off,
-        "LEVEL 1" to R.string.seat_heat_level_1,
-        "LEVEL 2" to R.string.seat_heat_level_2,
-        "LEVEL 3" to R.string.seat_heat_level_3
+    override val choiceOptions: List<UiOption<String>> = listOf(
+        UiOption("OFF", R.string.seat_heat_off),
+        UiOption("LEVEL 1", R.string.seat_heat_level_1),
+        UiOption("LEVEL 2", R.string.seat_heat_level_2),
+        UiOption("LEVEL 3", R.string.seat_heat_level_3)
     )
 
     private val _value = MutableStateFlow("OFF")
@@ -41,13 +41,12 @@ class PassengerSeatHeatingItem : UiChoiceItem {
     override val titleRes: Int = R.string.seat_item_passenger_heat_title
     override val subtitleRes: Int = R.string.seat_item_passenger_heat_subtitle
     override val iconRes: Int = R.drawable.ic_feature_seat
-    override val options: List<String> = listOf("OFF", "LEVEL 1", "LEVEL 2", "LEVEL 3")
 
-    override val optionLabels: Map<String, Int> = mapOf(
-        "OFF" to R.string.seat_heat_off,
-        "LEVEL 1" to R.string.seat_heat_level_1,
-        "LEVEL 2" to R.string.seat_heat_level_2,
-        "LEVEL 3" to R.string.seat_heat_level_3
+    override val choiceOptions: List<UiOption<String>> = listOf(
+        UiOption("OFF", R.string.seat_heat_off),
+        UiOption("LEVEL 1", R.string.seat_heat_level_1),
+        UiOption("LEVEL 2", R.string.seat_heat_level_2),
+        UiOption("LEVEL 3", R.string.seat_heat_level_3)
     )
 
     private val _value = MutableStateFlow("OFF")

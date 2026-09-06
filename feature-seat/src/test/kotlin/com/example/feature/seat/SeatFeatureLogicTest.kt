@@ -131,7 +131,11 @@ class SeatFeatureLogicTest {
         assertEquals(R.string.seat_item_driver_heat_subtitle, heating.subtitleRes)
         assertEquals(R.drawable.ic_feature_seat, heating.iconRes)
 
-        // 2. Value -> String mapping verification
+        // 2. Choice options SSOT & auto-derived options list
+        assertEquals(4, heating.choiceOptions.size)
+        assertEquals(listOf("OFF", "LEVEL 1", "LEVEL 2", "LEVEL 3"), heating.options)
+
+        // 3. Value -> String mapping verification via getValueVisual / getValueTextRes
         assertEquals(R.string.seat_heat_off, heating.getValueTextRes("OFF"))
         assertEquals(R.string.seat_heat_level_1, heating.getValueTextRes("LEVEL 1"))
         assertEquals(R.string.seat_heat_level_2, heating.getValueTextRes("LEVEL 2"))

@@ -162,50 +162,14 @@ fun ChoiceItemRow(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            item.options.forEach { option ->
-                val isSelected = (option == selectedOption)
-                val optionLabel = item.getValueTextRes(option)?.let { stringResource(it) } ?: option
-                val optionIcon = item.getValueIconRes(option)
-
-                if (isSelected) {
-                    Button(
-                        onClick = { /* already selected */ },
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6750A4)),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            if (optionIcon != null) {
-                                Icon(
-                                    painter = painterResource(optionIcon),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                            }
-                            Text(text = optionLabel, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                } else {
-                    OutlinedButton(
-                        onClick = {
-                            item.onValueChanged(option)
-                        },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            if (optionIcon != null) {
-                                Icon(
-                                    painter = painterResource(optionIcon),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                            }
-                            Text(text = optionLabel, fontSize = 13.sp, color = Color(0xFF49454F))
-                        }
-                    }
+            item.choiceOptions.forEach { option ->
+                val isSelected = (option.value == selectedOption)
+                androidx.compose.foundation.layout.Box(modifier = Modifier.weight(1f)) {
+                    item.optionSlot(
+                        option,
+                        isSelected,
+                        { item.onValueChanged(option.value) }
+                    )
                 }
             }
         }

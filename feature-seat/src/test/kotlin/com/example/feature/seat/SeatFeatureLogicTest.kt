@@ -117,4 +117,25 @@ class SeatFeatureLogicTest {
         assertEquals(ItemType.TOGGLE, SeatItemRegistry.easyEntryExit.type)
         assertEquals(ItemType.CUSTOM, SeatItemRegistry.seatLumbar.type)
     }
+
+    // ========================================================================
+    // Protection 4: UiItem Presentation Metadata & Value-to-String Mappings
+    // ========================================================================
+
+    @Test
+    fun `DriverSeatHeatingItem provides compile-time safe UI metadata and dynamic value-to-string mappings`() {
+        val heating = DriverSeatHeatingItem()
+
+        // 1. Resource bindings
+        assertEquals(R.string.seat_item_driver_heat_title, heating.titleRes)
+        assertEquals(R.string.seat_item_driver_heat_subtitle, heating.subtitleRes)
+        assertEquals(R.drawable.ic_feature_seat, heating.iconRes)
+
+        // 2. Value -> String mapping verification
+        assertEquals(R.string.seat_heat_off, heating.getValueTextRes("OFF"))
+        assertEquals(R.string.seat_heat_level_1, heating.getValueTextRes("LEVEL 1"))
+        assertEquals(R.string.seat_heat_level_2, heating.getValueTextRes("LEVEL 2"))
+        assertEquals(R.string.seat_heat_level_3, heating.getValueTextRes("LEVEL 3"))
+        org.junit.Assert.assertNull(heating.getValueTextRes("UNKNOWN_LEVEL"))
+    }
 }

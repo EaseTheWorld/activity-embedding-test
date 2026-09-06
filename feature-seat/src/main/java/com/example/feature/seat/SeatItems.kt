@@ -1,23 +1,30 @@
 package com.example.feature.seat
 
-import com.example.common.ui.settings.ComposableChoiceItem
-import com.example.common.ui.settings.ComposableItemRenderer
-import com.example.common.ui.settings.ComposableToggleItem
+import com.example.common.ui.settings.UiChoiceItem
+import com.example.common.ui.settings.UiItem
+import com.example.common.ui.settings.UiToggleItem
 import com.example.core.item.Item
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 // ============================================================================
-// 1. Standard Choice Items (ComposableChoiceItem : ChoiceItem, ComposableItemRenderer)
+// 1. Standard Choice Items (UiChoiceItem : ChoiceItem, UiItem<String>)
 // ============================================================================
 
-class DriverSeatHeatingItem : ComposableChoiceItem {
+class DriverSeatHeatingItem : UiChoiceItem {
     override val key: String = "driver_seat_heat"
-    override val titleKey: String = "seat_item_driver_heat_title"
-    override val subtitleKey: String = "seat_item_driver_heat_subtitle"
-    override val iconKey: String = "ic_feature_seat"
+    override val titleRes: Int = R.string.seat_item_driver_heat_title
+    override val subtitleRes: Int = R.string.seat_item_driver_heat_subtitle
+    override val iconRes: Int = R.drawable.ic_feature_seat
     override val options: List<String> = listOf("OFF", "LEVEL 1", "LEVEL 2", "LEVEL 3")
+
+    override val optionLabels: Map<String, Int> = mapOf(
+        "OFF" to R.string.seat_heat_off,
+        "LEVEL 1" to R.string.seat_heat_level_1,
+        "LEVEL 2" to R.string.seat_heat_level_2,
+        "LEVEL 3" to R.string.seat_heat_level_3
+    )
 
     private val _value = MutableStateFlow("OFF")
     override val valueFlow: StateFlow<String> = _value.asStateFlow()
@@ -29,12 +36,19 @@ class DriverSeatHeatingItem : ComposableChoiceItem {
     }
 }
 
-class PassengerSeatHeatingItem : ComposableChoiceItem {
+class PassengerSeatHeatingItem : UiChoiceItem {
     override val key: String = "passenger_seat_heat"
-    override val titleKey: String = "seat_item_passenger_heat_title"
-    override val subtitleKey: String = "seat_item_passenger_heat_subtitle"
-    override val iconKey: String = "ic_feature_seat"
+    override val titleRes: Int = R.string.seat_item_passenger_heat_title
+    override val subtitleRes: Int = R.string.seat_item_passenger_heat_subtitle
+    override val iconRes: Int = R.drawable.ic_feature_seat
     override val options: List<String> = listOf("OFF", "LEVEL 1", "LEVEL 2", "LEVEL 3")
+
+    override val optionLabels: Map<String, Int> = mapOf(
+        "OFF" to R.string.seat_heat_off,
+        "LEVEL 1" to R.string.seat_heat_level_1,
+        "LEVEL 2" to R.string.seat_heat_level_2,
+        "LEVEL 3" to R.string.seat_heat_level_3
+    )
 
     private val _value = MutableStateFlow("OFF")
     override val valueFlow: StateFlow<String> = _value.asStateFlow()
@@ -47,14 +61,14 @@ class PassengerSeatHeatingItem : ComposableChoiceItem {
 }
 
 // ============================================================================
-// 2. Standard Toggle Item (ComposableToggleItem : ToggleItem, ComposableItemRenderer)
+// 2. Standard Toggle Item (UiToggleItem : ToggleItem, UiItem<Boolean>)
 // ============================================================================
 
-class EasyEntryExitItem : ComposableToggleItem {
+class EasyEntryExitItem : UiToggleItem {
     override val key: String = "easy_entry_exit"
-    override val titleKey: String = "seat_item_easy_entry_title"
-    override val subtitleKey: String = "seat_item_easy_entry_subtitle"
-    override val iconKey: String = "ic_feature_seat"
+    override val titleRes: Int = R.string.seat_item_easy_entry_title
+    override val subtitleRes: Int = R.string.seat_item_easy_entry_subtitle
+    override val iconRes: Int = R.drawable.ic_feature_seat
 
     private val _value = MutableStateFlow(true)
     override val valueFlow: StateFlow<Boolean> = _value.asStateFlow()
@@ -65,7 +79,7 @@ class EasyEntryExitItem : ComposableToggleItem {
 }
 
 // ============================================================================
-// 3. Custom DataType (Item<SeatLumbarSupport>)
+// 3. Custom DataType (Item<SeatLumbarSupport>, UiItem<SeatLumbarSupport>)
 // ============================================================================
 
 /**
@@ -79,14 +93,14 @@ data class SeatLumbarSupport(
 
 /**
  * Setting Item using the Custom DataType.
- * Implements ComposableItemRenderer so it can draw itself polymorphically
+ * Implements UiItem so it can draw itself polymorphically
  * without GenericSettingsActivity needing to know its concrete class.
  */
-class SeatLumbarSupportItem : Item<SeatLumbarSupport>, ComposableItemRenderer {
+class SeatLumbarSupportItem : Item<SeatLumbarSupport>, UiItem<SeatLumbarSupport> {
     override val key: String = "seat_lumbar"
-    override val titleKey: String = "seat_item_lumbar_title"
-    override val subtitleKey: String = "seat_item_lumbar_subtitle"
-    override val iconKey: String = "ic_feature_seat"
+    override val titleRes: Int = R.string.seat_item_lumbar_title
+    override val subtitleRes: Int = R.string.seat_item_lumbar_subtitle
+    override val iconRes: Int = R.drawable.ic_feature_seat
 
     private val _value = MutableStateFlow(SeatLumbarSupport(heightPercent = 50, depthPercent = 30))
     override val valueFlow: StateFlow<SeatLumbarSupport> = _value.asStateFlow()

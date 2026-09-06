@@ -125,10 +125,11 @@ class DoorSettingsProvider : ContentProvider() {
                 )
                 // Dynamically iterate over DoorItemRegistry.items (List<Item> SSOT)
                 DoorItemRegistry.items.forEachIndexed { index, item ->
-                    val titleResId = ctx.resources.getIdentifier(item.titleKey, "string", ctx.packageName)
-                    val subtitleResId = item.subtitleKey?.let { ctx.resources.getIdentifier(it, "string", ctx.packageName) } ?: 0
-                    val title = if (titleResId != 0) ctx.getString(titleResId) else item.titleKey
-                    val subtitle = if (subtitleResId != 0) ctx.getString(subtitleResId) else (item.subtitleKey ?: "")
+                    val uiItem = item as? com.example.common.ui.settings.UiItem<*>
+                    val titleResId = uiItem?.titleRes ?: 0
+                    val subtitleResId = uiItem?.subtitleRes ?: 0
+                    val title = if (titleResId != 0) ctx.getString(titleResId) else item.key
+                    val subtitle = if (subtitleResId != 0) ctx.getString(subtitleResId) else ""
 
                     cursor.addRow(
                         arrayOf(

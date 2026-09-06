@@ -28,14 +28,10 @@ import androidx.compose.ui.unit.sp
 fun SeatLumbarRow(
     item: SeatLumbarSupportItem
 ) {
-    val context = LocalContext.current
     val lumbar by item.valueFlow.collectAsState()
 
-    val titleRes = context.resources.getIdentifier(item.titleKey, "string", context.packageName)
-    val title = if (titleRes != 0) context.getString(titleRes) else item.titleKey
-
-    val subRes = item.subtitleKey?.let { context.resources.getIdentifier(it, "string", context.packageName) } ?: 0
-    val subtitle = if (subRes != 0) context.getString(subRes) else (item.subtitleKey ?: "")
+    val title = androidx.compose.ui.res.stringResource(item.titleRes)
+    val subtitle = androidx.compose.ui.res.stringResource(item.subtitleRes)
 
     Column(
         modifier = Modifier

@@ -21,10 +21,6 @@ enum class ItemType {
  */
 interface Item<T> {
     val key: String
-    val titleKey: String
-    val subtitleKey: String? get() = null
-    val iconKey: String? get() = null
-
     val type: ItemType get() = ItemType.CUSTOM
 
     val isVisible: Flow<Boolean> get() = flowOf(true)
@@ -41,7 +37,6 @@ interface Item<T> {
 
 interface ToggleItem : Item<Boolean> {
     override val type: ItemType get() = ItemType.TOGGLE
-    val badgeKey: String? get() = null
 }
 
 interface ChoiceItem : Item<String> {

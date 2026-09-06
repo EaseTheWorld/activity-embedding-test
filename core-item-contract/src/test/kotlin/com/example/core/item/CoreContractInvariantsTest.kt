@@ -31,20 +31,17 @@ class CoreContractInvariantsTest {
     fun `verify Item_type default implementations map every sub-interface correctly to ItemType`() {
         val toggleItem = object : ToggleItem {
             override val key = "toggle"
-            override val titleKey = "title"
             override val valueFlow = kotlinx.coroutines.flow.MutableStateFlow(true)
             override fun onValueChanged(newValue: Boolean) {}
         }
         val choiceItem = object : ChoiceItem {
             override val key = "choice"
-            override val titleKey = "title"
             override val options = listOf("A", "B")
             override val valueFlow = kotlinx.coroutines.flow.MutableStateFlow("A")
             override fun onValueChanged(newValue: String) {}
         }
         val sliderItem = object : SliderItem {
             override val key = "slider"
-            override val titleKey = "title"
             override val min = 0
             override val max = 100
             override val valueFlow = kotlinx.coroutines.flow.MutableStateFlow(50)
@@ -52,13 +49,11 @@ class CoreContractInvariantsTest {
         }
         val actionItem = object : ActionItem {
             override val key = "action"
-            override val titleKey = "title"
             override val valueFlow = kotlinx.coroutines.flow.MutableStateFlow(Unit)
             override fun onValueChanged(newValue: Unit) {}
         }
         val customItem = object : Item<String> {
             override val key = "custom"
-            override val titleKey = "title"
             override val valueFlow = kotlinx.coroutines.flow.MutableStateFlow("custom")
             override fun onValueChanged(newValue: String) {}
         }
@@ -79,13 +74,11 @@ class CoreContractInvariantsTest {
     fun `verify CategoryItemProvider_findItem default implementation correctly retrieves matching item`() {
         val item1 = object : Item<String> {
             override val key = "key_1"
-            override val titleKey = "title"
             override val valueFlow = kotlinx.coroutines.flow.MutableStateFlow("v1")
             override fun onValueChanged(newValue: String) {}
         }
         val item2 = object : Item<String> {
             override val key = "key_2"
-            override val titleKey = "title"
             override val valueFlow = kotlinx.coroutines.flow.MutableStateFlow("v2")
             override fun onValueChanged(newValue: String) {}
         }

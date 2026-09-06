@@ -7,11 +7,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
@@ -22,29 +24,24 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.core.item.ChoiceItem
-import com.example.core.item.ToggleItem
 
 /**
- * Standard Toggle Row: Renders a Switch with optional Badge based on item.badgeKey.
- * Pure reactive interaction: triggers item.onValueChanged(nextValue).
+ * Standard Toggle Row: Renders a Switch with compile-time @StringRes title,
+ * optional subtitle, optional leading icon, and optional Badge based on item.badgeKey.
  */
 @Composable
 fun ToggleItemRow(
-    item: ToggleItem
+    item: UiToggleItem
 ) {
-    val context = LocalContext.current
     val isChecked by item.valueFlow.collectAsState()
-
-    val titleRes = context.resources.getIdentifier(item.titleKey, "string", context.packageName)
-    val title = if (titleRes != 0) context.getString(titleRes) else item.titleKey
-
-    val subRes = item.subtitleKey?.let { context.resources.getIdentifier(it, "string", context.packageName) } ?: 0
-    val subtitle = if (subRes != 0) context.getString(subRes) else (item.subtitleKey ?: "")
+    val title = stringResource(item.titleRes)
+    val subtitle = item.subtitleRes?.let { stringResource(it) }
+    val iconRes = item.getValueIconRes(isChecked) ?: item.iconRes
 
     Row(
         modifier = Modifier
@@ -52,6 +49,17 @@ fun ToggleItemRow(
             .padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        if (iconRes != null) {
+            Icon(
+                painter = painterResource(iconRes),
+                contentDescription = null,
+                modifier = Modifier
+                    .size(32.dp)
+                    .padding(end = 10.dp),
+                tint = Color(0xFF6750A4)
+            )
+        }
+
         Column(modifier = Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -71,7 +79,7 @@ fun ToggleItemRow(
                     }
                 }
             }
-            if (subtitle.isNotEmpty()) {
+            if (subtitle != null && subtitle.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = subtitle,
@@ -92,42 +100,54 @@ fun ToggleItemRow(
 }
 
 /**
- * Standard Choice Row: Renders Segmented Buttons for ChoiceItem.
- * Pure reactive interaction: triggers item.onValueChanged(option).
+ * Standard Choice Row: Renders Segmented Buttons with compile-time @StringRes title,
+ * optional subtitle, and localized option labels/icons.
  */
 @Composable
 fun ChoiceItemRow(
-    item: ChoiceItem
+    item: UiChoiceItem
 ) {
-    val context = LocalContext.current
     val selectedOption by item.valueFlow.collectAsState()
-
-    val titleRes = context.resources.getIdentifier(item.titleKey, "string", context.packageName)
-    val title = if (titleRes != 0) context.getString(titleRes) else item.titleKey
-
-    val subRes = item.subtitleKey?.let { context.resources.getIdentifier(it, "string", context.packageName) } ?: 0
-    val subtitle = if (subRes != 0) context.getString(subRes) else (item.subtitleKey ?: "")
+    val title = stringResource(item.titleRes)
+    val subtitle = item.subtitleRes?.let { stringResource(it) }
+    val iconRes = item.iconRes
+    val currentLabel = item.getValueTextRes(selectedOption)?.let { stringResource(it) } ?: selectedOption
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 6.dp)
     ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium.copy(
-                fontWeight = FontWeight.SemiBold,
-                color = Color(0xFF1E1E2E)
-            )
-        )
-        Text(
-            text = "Current: $selectedOption",
-            style = MaterialTheme.typography.labelMedium.copy(
-                color = Color(0xFF6750A4),
-                fontWeight = FontWeight.Medium
-            )
-        )
-        if (subtitle.isNotEmpty()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (iconRes != null) {
+                Icon(
+                    painter = painterResource(iconRes),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(32.dp)
+                        .padding(end = 10.dp),
+                    tint = Color(0xFF6750A4)
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFF1E1E2E)
+                    )
+                )
+                Text(
+                    text = "Current: $currentLabel",
+                    style = MaterialTheme.typography.labelMedium.copy(
+                        color = Color(0xFF6750A4),
+                        fontWeight = FontWeight.Medium
+                    )
+                )
+            }
+        }
+
+        if (subtitle != null && subtitle.isNotEmpty()) {
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = subtitle,
@@ -144,6 +164,9 @@ fun ChoiceItemRow(
         ) {
             item.options.forEach { option ->
                 val isSelected = (option == selectedOption)
+                val optionLabel = item.getValueTextRes(option)?.let { stringResource(it) } ?: option
+                val optionIcon = item.getValueIconRes(option)
+
                 if (isSelected) {
                     Button(
                         onClick = { /* already selected */ },
@@ -151,7 +174,17 @@ fun ChoiceItemRow(
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6750A4)),
                         shape = RoundedCornerShape(8.dp)
                     ) {
-                        Text(text = option, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (optionIcon != null) {
+                                Icon(
+                                    painter = painterResource(optionIcon),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                            }
+                            Text(text = optionLabel, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        }
                     }
                 } else {
                     OutlinedButton(
@@ -161,10 +194,74 @@ fun ChoiceItemRow(
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(8.dp)
                     ) {
-                        Text(text = option, fontSize = 13.sp, color = Color(0xFF49454F))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (optionIcon != null) {
+                                Icon(
+                                    painter = painterResource(optionIcon),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                            }
+                            Text(text = optionLabel, fontSize = 13.sp, color = Color(0xFF49454F))
+                        }
                     }
                 }
             }
         }
+    }
+}
+
+/**
+ * Standard Slider Row: Renders a Slider for UiSliderItem.
+ */
+@Composable
+fun SliderItemRow(
+    item: UiSliderItem
+) {
+    val value by item.valueFlow.collectAsState()
+    val title = stringResource(item.titleRes)
+    val subtitle = item.subtitleRes?.let { stringResource(it) }
+    val unit = item.unitRes?.let { stringResource(it) } ?: ""
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFF1E1E2E)
+                    )
+                )
+                if (subtitle != null && subtitle.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            color = Color(0xFF757575)
+                        )
+                    )
+                }
+            }
+            Text(
+                text = "$value$unit",
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF6750A4)
+                )
+            )
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        androidx.compose.material3.Slider(
+            value = value.toFloat(),
+            onValueChange = { item.onValueChanged(it.toInt()) },
+            valueRange = item.min.toFloat()..item.max.toFloat(),
+            modifier = Modifier.fillMaxWidth()
+        )
     }
 }

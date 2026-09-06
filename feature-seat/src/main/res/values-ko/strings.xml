@@ -14,4 +14,9 @@
     
     <string name="seat_item_lumbar_title">4방향 럼버 서포트 (요추 지지대)</string>
     <string name="seat_item_lumbar_subtitle">공압식 2D 요추 지지대 높이 및 돌출 강도 조절</string>
+
+    <string name="seat_heat_off">꺼짐</string>
+    <string name="seat_heat_level_1">1단</string>
+    <string name="seat_heat_level_2">2단</string>
+    <string name="seat_heat_level_3">3단</string>
 </resources>

@@ -14,4 +14,9 @@
     
     <string name="seat_item_lumbar_title">4-Way Lumbar Support</string>
     <string name="seat_item_lumbar_subtitle">Custom 2D pneumatic lumbar height and depth adjustment</string>
+
+    <string name="seat_heat_off">Off</string>
+    <string name="seat_heat_level_1">Level 1</string>
+    <string name="seat_heat_level_2">Level 2</string>
+    <string name="seat_heat_level_3">Level 3</string>
 </resources>

@@ -146,8 +146,8 @@ class SeatLumbarSupportItem : ValueItem<SeatLumbarSupport>, UiValueItem<SeatLumb
     }
 
     @androidx.compose.runtime.Composable
-    override fun Draw() {
-        SeatLumbarRow(item = this)
+    override fun Draw(modifier: androidx.compose.ui.Modifier) {
+        SeatLumbarRow(item = this, modifier = modifier)
     }
 
     override val serializedValue: String

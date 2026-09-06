@@ -26,7 +26,8 @@ import androidx.compose.ui.unit.sp
  */
 @Composable
 fun SeatLumbarRow(
-    item: SeatLumbarSupportItem
+    item: SeatLumbarSupportItem,
+    modifier: Modifier = Modifier
 ) {
     val lumbar by item.valueFlow.collectAsState()
 
@@ -34,7 +35,7 @@ fun SeatLumbarRow(
     val subtitle = androidx.compose.ui.res.stringResource(item.subtitleRes)
 
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(vertical = 6.dp)
     ) {

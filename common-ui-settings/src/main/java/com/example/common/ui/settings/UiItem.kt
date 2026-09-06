@@ -2,7 +2,11 @@ package com.example.common.ui.settings
 
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import com.example.core.item.ActionItem
 import com.example.core.item.ChoiceItem
 import com.example.core.item.ContainerItem
@@ -13,6 +17,7 @@ import com.example.core.item.ToggleItem
 import com.example.core.item.ValueItem
 import com.example.core.item.VhalBinding
 import com.example.core.item.VhalPropertyBinder
+import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -140,8 +145,8 @@ interface UiToggleItem : ToggleItem, UiValueItem<Boolean> {
     }
 
     @Composable
-    override fun Draw() {
-        ToggleItemRow(item = this)
+    override fun Draw(modifier: Modifier) {
+        ToggleItemRow(item = this, modifier = modifier)
     }
 }
 
@@ -178,8 +183,8 @@ interface UiChoiceItem : ChoiceItem, UiValueItem<String> {
         get() = ChoiceOptionSlots.Segmented
 
     @Composable
-    override fun Draw() {
-        ChoiceItemRow(item = this)
+    override fun Draw(modifier: Modifier) {
+        ChoiceItemRow(item = this, modifier = modifier)
     }
 }
 
@@ -190,8 +195,8 @@ interface UiSliderItem : SliderItem, UiValueItem<Int> {
     @get:StringRes val unitRes: Int? get() = null
 
     @Composable
-    override fun Draw() {
-        SliderItemRow(item = this)
+    override fun Draw(modifier: Modifier) {
+        SliderItemRow(item = this, modifier = modifier)
     }
 }
 
@@ -208,6 +213,34 @@ interface UiActionItem : ActionItem, UiItem {
 interface UiContainerItem : ContainerItem, UiItem {
     override val children: List<UiItem> get() = emptyList()
 }
+
+private val spacerCounter = AtomicInteger(0)
+
+/**
+ * Structural Spacer Item for data-driven layout margins.
+ *
+ * Exposes an automatic unique key sequence by default (`"spacer_${counter}"`)
+ * or allows an explicit, deterministic key when needed.
+ */
+class SpacerItem(
+    val heightDp: Int = 16,
+    override val key: String = "spacer_${spacerCounter.incrementAndGet()}"
+) : UiItem {
+    override val titleRes: Int = 0
+
+    @Composable
+    override fun Draw(modifier: Modifier) {
+        Spacer(modifier = modifier.height(heightDp.dp))
+    }
+}
+
+/**
+ * Convenience extension appending a [SpacerItem] tied deterministically to this item's key.
+ */
+fun Item.withSpacer(heightDp: Int = 16): List<Item> = listOf(
+    this,
+    SpacerItem(heightDp = heightDp, key = "${this.key}_spacer")
+)
 
 // Backward-compatibility aliases
 typealias ComposableToggleItem = UiToggleItem

@@ -73,7 +73,7 @@ fun GenericSettingsScreen(
                     items(items, key = { it.key }) { item ->
                         // Pure polymorphic self-drawing! ZERO 'when' statements!
                         if (item is ComposableItemRenderer) {
-                            item.Draw()
+                            item.Draw(modifier = Modifier.fillMaxWidth())
                         } else {
                             Text(
                                 text = "Unsupported Item: ${item.key}",
@@ -81,10 +81,12 @@ fun GenericSettingsScreen(
                                 color = MaterialTheme.colorScheme.error
                             )
                         }
-                        HorizontalDivider(
-                            modifier = Modifier.padding(vertical = 12.dp),
-                            color = Color(0xFFF1F2F6)
-                        )
+                        if (item !is SpacerItem) {
+                            HorizontalDivider(
+                                modifier = Modifier.padding(vertical = 12.dp),
+                                color = Color(0xFFF1F2F6)
+                            )
+                        }
                     }
                 }
             }

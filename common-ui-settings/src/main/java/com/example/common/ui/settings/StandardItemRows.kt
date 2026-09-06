@@ -36,7 +36,8 @@ import androidx.compose.ui.unit.sp
  */
 @Composable
 fun ToggleItemRow(
-    item: UiToggleItem
+    item: UiToggleItem,
+    modifier: Modifier = Modifier
 ) {
     val isChecked by item.valueFlow.collectAsState()
     val title = stringResource(item.titleRes)
@@ -44,7 +45,7 @@ fun ToggleItemRow(
     val iconRes = item.getValueIconRes(isChecked) ?: item.iconRes
 
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -105,7 +106,8 @@ fun ToggleItemRow(
  */
 @Composable
 fun ChoiceItemRow(
-    item: UiChoiceItem
+    item: UiChoiceItem,
+    modifier: Modifier = Modifier
 ) {
     val selectedOption by item.valueFlow.collectAsState()
     val title = stringResource(item.titleRes)
@@ -114,7 +116,7 @@ fun ChoiceItemRow(
     val currentLabel = item.getValueTextRes(selectedOption)?.let { stringResource(it) } ?: selectedOption
 
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(vertical = 6.dp)
     ) {
@@ -181,7 +183,8 @@ fun ChoiceItemRow(
  */
 @Composable
 fun SliderItemRow(
-    item: UiSliderItem
+    item: UiSliderItem,
+    modifier: Modifier = Modifier
 ) {
     val value by item.valueFlow.collectAsState()
     val title = stringResource(item.titleRes)
@@ -189,7 +192,7 @@ fun SliderItemRow(
     val unit = item.unitRes?.let { stringResource(it) } ?: ""
 
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(vertical = 6.dp)
     ) {

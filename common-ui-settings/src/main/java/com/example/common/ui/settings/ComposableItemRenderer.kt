@@ -1,6 +1,7 @@
 package com.example.common.ui.settings
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 
 /**
  * Polymorphic Composable renderer interface.
@@ -10,5 +11,13 @@ import androidx.compose.runtime.Composable
  */
 interface ComposableItemRenderer {
     @Composable
-    fun Draw()
+    fun Draw(modifier: Modifier)
+}
+
+/**
+ * Convenience extension providing default [Modifier] for callers desiring a parameterless invocation.
+ */
+@Composable
+fun ComposableItemRenderer.Draw() {
+    Draw(Modifier)
 }

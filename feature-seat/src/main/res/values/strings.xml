@@ -19,4 +19,20 @@
     <string name="seat_heat_level_1">Level 1</string>
     <string name="seat_heat_level_2">Level 2</string>
     <string name="seat_heat_level_3">Level 3</string>
+
+    <!-- Ventilation (IconOnly Slot Variant) -->
+    <string name="seat_item_driver_vent_title">Driver Seat Ventilation</string>
+    <string name="seat_item_driver_vent_subtitle">Cooling airflow ventilation for driver seat</string>
+    <string name="seat_vent_off">Vent Off</string>
+    <string name="seat_vent_1">Vent 1</string>
+    <string name="seat_vent_2">Vent 2</string>
+    <string name="seat_vent_3">Vent 3</string>
+
+    <!-- Massage (Chip Slot Variant) -->
+    <string name="seat_item_massage_title">Ergo-Motion Massage</string>
+    <string name="seat_item_massage_subtitle">Pneumatic pressure massage mode selection</string>
+    <string name="massage_off">Off</string>
+    <string name="massage_wave">Wave</string>
+    <string name="massage_lumbar">Lumbar</string>
+    <string name="massage_stretch">Stretch</string>
 </resources>

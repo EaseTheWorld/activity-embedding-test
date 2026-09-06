@@ -1,5 +1,6 @@
 package com.example.feature.seat
 
+import com.example.common.ui.settings.ChoiceOptionSlots
 import com.example.common.ui.settings.UiChoiceItem
 import com.example.common.ui.settings.UiItem
 import com.example.common.ui.settings.UiOption
@@ -48,6 +49,66 @@ class PassengerSeatHeatingItem : UiChoiceItem {
         UiOption("LEVEL 2", R.string.seat_heat_level_2),
         UiOption("LEVEL 3", R.string.seat_heat_level_3)
     )
+
+    private val _value = MutableStateFlow("OFF")
+    override val valueFlow: StateFlow<String> = _value.asStateFlow()
+
+    override fun onValueChanged(newValue: String) {
+        if (options.contains(newValue)) {
+            _value.value = newValue
+        }
+    }
+}
+
+/**
+ * Variant 1: Icon-Only Slot ([ChoiceOptionSlots.IconOnly])
+ * Compact, icon-centric airflow buttons without text labels inside buttons.
+ */
+class DriverSeatVentilationItem : UiChoiceItem {
+    override val key: String = "driver_seat_vent"
+    override val titleRes: Int = R.string.seat_item_driver_vent_title
+    override val subtitleRes: Int = R.string.seat_item_driver_vent_subtitle
+    override val iconRes: Int = R.drawable.ic_seat_ventilation
+
+    override val choiceOptions: List<UiOption<String>> = listOf(
+        UiOption("OFF", R.string.seat_vent_off, iconRes = R.drawable.ic_seat_ventilation),
+        UiOption("LEVEL 1", R.string.seat_vent_1, iconRes = R.drawable.ic_seat_ventilation),
+        UiOption("LEVEL 2", R.string.seat_vent_2, iconRes = R.drawable.ic_seat_ventilation),
+        UiOption("LEVEL 3", R.string.seat_vent_3, iconRes = R.drawable.ic_seat_ventilation)
+    )
+
+    // ⭐ Reusable Built-in Slot Variant: IconOnly
+    override val optionSlot = ChoiceOptionSlots.IconOnly
+
+    private val _value = MutableStateFlow("OFF")
+    override val valueFlow: StateFlow<String> = _value.asStateFlow()
+
+    override fun onValueChanged(newValue: String) {
+        if (options.contains(newValue)) {
+            _value.value = newValue
+        }
+    }
+}
+
+/**
+ * Variant 2: Chip Slot ([ChoiceOptionSlots.Chip])
+ * Compact filter chip buttons with optional badges.
+ */
+class SeatMassageModeItem : UiChoiceItem {
+    override val key: String = "seat_massage"
+    override val titleRes: Int = R.string.seat_item_massage_title
+    override val subtitleRes: Int = R.string.seat_item_massage_subtitle
+    override val iconRes: Int = R.drawable.ic_feature_seat
+
+    override val choiceOptions: List<UiOption<String>> = listOf(
+        UiOption("OFF", R.string.massage_off),
+        UiOption("WAVE", R.string.massage_wave, badge = "추천"),
+        UiOption("LUMBAR", R.string.massage_lumbar),
+        UiOption("STRETCH", R.string.massage_stretch)
+    )
+
+    // ⭐ Reusable Built-in Slot Variant: Chip
+    override val optionSlot = ChoiceOptionSlots.Chip
 
     private val _value = MutableStateFlow("OFF")
     override val valueFlow: StateFlow<String> = _value.asStateFlow()
@@ -136,12 +197,16 @@ object SeatItemRegistry : com.example.core.item.CategoryItemProvider {
     override val titleKey: String = "category_seat_title"
 
     val driverSeatHeat = DriverSeatHeatingItem()
+    val driverSeatVent = DriverSeatVentilationItem()
+    val seatMassage = SeatMassageModeItem()
     val passengerSeatHeat = PassengerSeatHeatingItem()
     val easyEntryExit = EasyEntryExitItem()
     val seatLumbar = SeatLumbarSupportItem()
 
     override val items: List<Item<*>> = listOf(
         driverSeatHeat,
+        driverSeatVent,
+        seatMassage,
         passengerSeatHeat,
         easyEntryExit,
         seatLumbar

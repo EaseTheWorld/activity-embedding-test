@@ -105,14 +105,18 @@ class SeatFeatureLogicTest {
         val uniqueKeys = keys.toSet()
         assertEquals("Every setting item in SeatItemRegistry must have a distinct unique key", uniqueKeys.size, keys.size)
 
-        // Verify all 4 required items exist in registry
+        // Verify all items exist in registry
         assertNotNull(SeatItemRegistry.findItem("driver_seat_heat"))
+        assertNotNull(SeatItemRegistry.findItem("driver_seat_vent"))
+        assertNotNull(SeatItemRegistry.findItem("seat_massage"))
         assertNotNull(SeatItemRegistry.findItem("passenger_seat_heat"))
         assertNotNull(SeatItemRegistry.findItem("easy_entry_exit"))
         assertNotNull(SeatItemRegistry.findItem("seat_lumbar"))
 
         // Verify correct polymorphic ItemType derivation
         assertEquals(ItemType.CHOICE, SeatItemRegistry.driverSeatHeat.type)
+        assertEquals(ItemType.CHOICE, SeatItemRegistry.driverSeatVent.type)
+        assertEquals(ItemType.CHOICE, SeatItemRegistry.seatMassage.type)
         assertEquals(ItemType.CHOICE, SeatItemRegistry.passengerSeatHeat.type)
         assertEquals(ItemType.TOGGLE, SeatItemRegistry.easyEntryExit.type)
         assertEquals(ItemType.CUSTOM, SeatItemRegistry.seatLumbar.type)

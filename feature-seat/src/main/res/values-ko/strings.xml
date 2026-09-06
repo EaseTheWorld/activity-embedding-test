@@ -19,4 +19,20 @@
     <string name="seat_heat_level_1">1단</string>
     <string name="seat_heat_level_2">2단</string>
     <string name="seat_heat_level_3">3단</string>
+
+    <!-- Ventilation (IconOnly Slot Variant) -->
+    <string name="seat_item_driver_vent_title">운전석 시트 통풍</string>
+    <string name="seat_item_driver_vent_subtitle">운전석 시트 통풍 바람 세기 조절</string>
+    <string name="seat_vent_off">통풍 꺼짐</string>
+    <string name="seat_vent_1">통풍 1단</string>
+    <string name="seat_vent_2">통풍 2단</string>
+    <string name="seat_vent_3">통풍 3단</string>
+
+    <!-- Massage (Chip Slot Variant) -->
+    <string name="seat_item_massage_title">에르고 모션 마사지</string>
+    <string name="seat_item_massage_subtitle">공압 마사지 모드 선택</string>
+    <string name="massage_off">꺼짐</string>
+    <string name="massage_wave">골반/웨이브</string>
+    <string name="massage_lumbar">허리 집중</string>
+    <string name="massage_stretch">전신 스트레칭</string>
 </resources>

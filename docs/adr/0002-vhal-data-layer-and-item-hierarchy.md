@@ -119,12 +119,62 @@ Settings screens strictly require deterministic visual display order. Therefore:
 
 ---
 
+---
+
+### 5. Favoring Composition over Inheritance for Data Source Binding (`VhalBinding`)
+
+Initially, we considered having the Item implement a capability interface `VhalBoundItem<T, V>` directly. However, architectural evaluation revealed two critical flaws with the inheritance approach:
+1. **Multiple Inheritance Ambiguity (Data Source Collision)**:
+   If capabilities are interfaces, a developer can accidentally write `class MyItem : VhalBoundItem, PreferenceBoundItem`. It becomes ambiguous which layer owns `valueFlow` and `onValueChanged`.
+2. **Escaping `this` during Initialization**:
+   The Item had to pass `this` to `repository.bind(this)` during property initialization, leaking an incomplete object reference before constructor completion.
+
+#### The Composition Solution
+We decided that **an Item *has-a* `VhalBinding`, rather than *is-a* `VhalBoundItem`**:
+
+```kotlin
+// 1. Pure immutable data class representing the VHAL hardware contract
+data class VhalBinding<T, V>(
+    val propertyId: Int,
+    val areaId: Int = 0,
+    val toItemValue: (V) -> T,
+    val toVhalValue: (T) -> V
+)
+
+// 2. Item has a VhalBinding composition field
+abstract class VhalChoiceItem<V>(...) : BaseUiChoiceItem(...) {
+    val vhalBinding = VhalBinding(
+        propertyId = propertyId,
+        areaId = areaId,
+        toItemValue = { raw -> carOptions.firstOrNull { it.vhalValue == raw }?.value ?: initialValue },
+        toVhalValue = { domain -> carOptions.first { it.value == domain }.vhalValue }
+    )
+
+    // Repository operates strictly on vhalBinding, NEVER on `this`!
+    override val valueFlow: StateFlow<String> by lazy {
+        binder.bind(vhalBinding, initialValue)
+    }
+
+    override fun onValueChanged(newValue: String) {
+        binder.setProperty(vhalBinding, newValue)
+    }
+}
+```
+
+This ensures:
+- **Mutual Exclusivity**: An item can only have one primary binding/data source at a time.
+- **Zero Leaky `this`**: The repository interacts strictly with the pure data class `VhalBinding`, eliminating escaping references.
+- **Decoupled Repositories**: The repository does not even need to know what an `Item` or `Composable` is; it only binds `VhalBinding` instances.
+
+---
+
 ## Consequences
 
 ### Positive
 - **Drastic Boilerplate Reduction**: Concrete items shrink from ~35 lines of repetitive `override val` and `MutableStateFlow` logic to ~10 lines of declarative specification.
 - **Single Source of Truth**: Adding a choice option requires modifying exactly 1 line of code for Domain, UI, and VHAL simultaneously.
-- **Zero Framework Leakage in Core**: `VhalBoundItem` uses primitive `Int`s and pure Kotlin, keeping `:core-item-contract` 100% Android-free.
+- **Zero Framework Leakage in Core**: `VhalBinding` uses primitive `Int`s and pure Kotlin, keeping `:core-item-contract` 100% Android-free.
+- **Safe & Leaky-Free Initialization**: Passing pure immutable `VhalBinding` to `Repository` eliminates JVM escaping `this` issues.
 - **Seamless Testability**: `toItemValue` and `toVhalValue` are unit-testable without Android Automotive OS emulator or Car Service mocks.
 
 ### Trade-offs

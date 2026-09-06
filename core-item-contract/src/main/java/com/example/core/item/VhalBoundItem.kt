@@ -3,39 +3,47 @@ package com.example.core.item
 import kotlinx.coroutines.flow.StateFlow
 
 /**
- * Capability interface for an [Item] that binds to a Vehicle HAL (VHAL) property.
+ * Pure, immutable Data Binding representation for a Vehicle HAL (VHAL) property.
  *
- * Designed as a pure Kotlin interface with ZERO Android framework or Car SDK dependencies:
- * - [propertyId] and [areaId] use primitive [Int] representations.
- * - [toItemValue] and [toVhalValue] provide bidirectional mapping between
- *   the high-level item domain value [T] and low-level hardware representation [V].
+ * Implements Field Composition (has-a) rather than Interface Inheritance (is-a):
+ * - Guarantees single-source-of-truth without multiple-inheritance collisions (e.g. VHAL vs Preferences).
+ * - Eliminates escaping `this` issues during object initialization.
+ * - Pure Kotlin with ZERO Android framework or Car SDK dependencies.
  *
  * @param T The domain state type of the Item (e.g. String, Int, Boolean).
  * @param V The raw VHAL hardware value type (e.g. Int, Float, Boolean).
  */
-interface VhalBoundItem<T, V> : Item<T> {
-    val propertyId: Int
-    val areaId: Int get() = 0
-
-    fun toItemValue(vhalValue: V): T
-    fun toVhalValue(itemValue: T): V
-}
+data class VhalBinding<T, V>(
+    val propertyId: Int,
+    val areaId: Int = 0,
+    val toItemValue: (V) -> T,
+    val toVhalValue: (T) -> V
+)
 
 /**
- * Universal binder contract connecting a [VhalBoundItem] to the hardware/VHAL layer.
+ * Capability interface for items that expose a [VhalBinding] via composition.
+ */
+interface HasVhalBinding<T, V> {
+    val vhalBinding: VhalBinding<T, V>
+}
+
+// Backward-compatibility alias
+typealias VhalBoundItem<T, V> = HasVhalBinding<T, V>
+
+/**
+ * Universal binder contract connecting a [VhalBinding] to the hardware/VHAL layer.
  *
- * Enables inversion of control: the [VhalBoundItem] passes `this` to [bind],
- * allowing the Data Layer repository to manage VHAL subscription and hardware dispatch
- * without coupling the Item or UI to Android Automotive OS APIs.
+ * Notice that the binder operates strictly on the pure [VhalBinding] data class,
+ * completely decoupled from UI widgets, Composables, or `this` references.
  */
 interface VhalPropertyBinder {
     /**
-     * Binds the given [item] to the VHAL hardware layer and returns a reactive [StateFlow].
+     * Binds the given [binding] to the VHAL hardware layer and returns a reactive [StateFlow].
      */
-    fun <T, V> bind(item: VhalBoundItem<T, V>, initialValue: T): StateFlow<T>
+    fun <T, V> bind(binding: VhalBinding<T, V>, initialValue: T): StateFlow<T>
 
     /**
-     * Dispatches a new domain [newValue] for the [item] down to the VHAL layer.
+     * Dispatches a new domain [newValue] for the [binding] down to the VHAL layer.
      */
-    fun <T, V> setProperty(item: VhalBoundItem<T, V>, newValue: T)
+    fun <T, V> setProperty(binding: VhalBinding<T, V>, newValue: T)
 }

@@ -156,23 +156,27 @@ class SeatFeatureLogicTest {
         val heating = DriverSeatHeatingItem()
         val massage = SeatMassageModeItem()
 
-        // 1. Property and Area ID correctness
-        assertEquals(0x11400503, heating.propertyId)
-        assertEquals(1, heating.areaId)
+        // 1. Composition Property and Area ID correctness via vhalBinding
+        assertEquals(0x11400503, heating.vhalBinding.propertyId)
+        assertEquals(1, heating.vhalBinding.areaId)
 
-        assertEquals(0x11400F00, massage.propertyId)
-        assertEquals(1, massage.areaId)
+        assertEquals(0x11400F00, massage.vhalBinding.propertyId)
+        assertEquals(1, massage.vhalBinding.areaId)
 
-        // 2. Bidirectional Mapping for Massage (String <-> Int)
-        assertEquals(0, massage.toVhalValue("OFF"))
-        assertEquals(1, massage.toVhalValue("WAVE"))
-        assertEquals(2, massage.toVhalValue("LUMBAR"))
-        assertEquals(3, massage.toVhalValue("STRETCH"))
+        // 2. Bidirectional Mapping for Massage (String <-> Int) via vhalBinding
+        assertEquals(0, massage.vhalBinding.toVhalValue("OFF"))
+        assertEquals(1, massage.vhalBinding.toVhalValue("WAVE"))
+        assertEquals(2, massage.vhalBinding.toVhalValue("LUMBAR"))
+        assertEquals(3, massage.vhalBinding.toVhalValue("STRETCH"))
 
-        assertEquals("OFF", massage.toItemValue(0))
+        assertEquals("OFF", massage.vhalBinding.toItemValue(0))
+        assertEquals("WAVE", massage.vhalBinding.toItemValue(1))
+        assertEquals("LUMBAR", massage.vhalBinding.toItemValue(2))
+        assertEquals("STRETCH", massage.vhalBinding.toItemValue(3))
+
+        // Also accessible via convenience methods
         assertEquals("WAVE", massage.toItemValue(1))
-        assertEquals("LUMBAR", massage.toItemValue(2))
-        assertEquals("STRETCH", massage.toItemValue(3))
+        assertEquals(1, massage.toVhalValue("WAVE"))
     }
 
     @Test

@@ -5,10 +5,11 @@ import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
 import com.example.core.item.ActionItem
 import com.example.core.item.ChoiceItem
+import com.example.core.item.HasVhalBinding
 import com.example.core.item.Item
 import com.example.core.item.SliderItem
 import com.example.core.item.ToggleItem
-import com.example.core.item.VhalBoundItem
+import com.example.core.item.VhalBinding
 import com.example.core.item.VhalPropertyBinder
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -231,8 +232,8 @@ class InMemoryVhalBinder : VhalPropertyBinder {
     private val flows = mutableMapOf<Pair<Int, Int>, MutableStateFlow<Any?>>()
 
     @Suppress("UNCHECKED_CAST")
-    override fun <T, V> bind(item: VhalBoundItem<T, V>, initialValue: T): StateFlow<T> {
-        val key = item.propertyId to item.areaId
+    override fun <T, V> bind(binding: VhalBinding<T, V>, initialValue: T): StateFlow<T> {
+        val key = binding.propertyId to binding.areaId
         val flow = flows.getOrPut(key) {
             MutableStateFlow(initialValue)
         }
@@ -240,8 +241,8 @@ class InMemoryVhalBinder : VhalPropertyBinder {
     }
 
     @Suppress("UNCHECKED_CAST")
-    override fun <T, V> setProperty(item: VhalBoundItem<T, V>, newValue: T) {
-        val key = item.propertyId to item.areaId
+    override fun <T, V> setProperty(binding: VhalBinding<T, V>, newValue: T) {
+        val key = binding.propertyId to binding.areaId
         val flow = flows[key] as? MutableStateFlow<T>
         flow?.value = newValue
     }
@@ -249,19 +250,18 @@ class InMemoryVhalBinder : VhalPropertyBinder {
 
 /**
  * Bridge abstract class unifying UI presentation ([BaseUiChoiceItem]) with hardware
- * VHAL binding ([VhalBoundItem]).
+ * VHAL binding via composition ([VhalBinding]).
  *
- * Automatically delegates state to [binder] by passing `this`:
- * - [valueFlow]: Bound via `binder.bind(this, initialValue)`.
- * - [onValueChanged]: Dispatches new value via `binder.setProperty(this, newValue)`.
- * - [toItemValue]: Maps raw hardware [vhalValue] to domain [String] value.
- * - [toVhalValue]: Maps domain [String] value to raw hardware [vhalValue].
+ * Implements Field Composition (has-a) instead of Interface Inheritance (is-a):
+ * - Holds a pure [vhalBinding] field.
+ * - Passes only [vhalBinding] (never `this`) to [binder].
+ * - Eliminates multiple-inheritance data source ambiguity and constructor `this` leakage.
  */
 abstract class VhalChoiceItem<V>(
     key: String,
     titleRes: Int,
-    override val propertyId: Int,
-    override val areaId: Int = 0,
+    val propertyId: Int,
+    val areaId: Int = 0,
     val carOptions: List<CarUiOption<String, V>>,
     initialValue: String = carOptions.firstOrNull()?.value ?: "",
     subtitleRes: Int? = null,
@@ -276,27 +276,29 @@ abstract class VhalChoiceItem<V>(
     subtitleRes = subtitleRes,
     iconRes = iconRes,
     optionSlot = optionSlot
-), VhalBoundItem<String, V> {
+), HasVhalBinding<String, V> {
 
-    // ★ Repository/Binder에 VhalBoundItem(this)을 전달하여 하드웨어/VHAL과 양방향 연동!
+    // ★ VhalBinding을 필드로 합성(has-a)
+    override val vhalBinding: VhalBinding<String, V> = VhalBinding(
+        propertyId = propertyId,
+        areaId = areaId,
+        toItemValue = { raw -> carOptions.firstOrNull { it.vhalValue == raw }?.value ?: initialValue },
+        toVhalValue = { domain -> carOptions.firstOrNull { it.value == domain }?.vhalValue ?: carOptions.first().vhalValue }
+    )
+
+    // ★ this가 아닌 순수 데이터 객체 vhalBinding만 바인더에 전달! (No leaky this!)
     override val valueFlow: StateFlow<String> by lazy {
-        binder.bind(this, choiceOptions.firstOrNull()?.value ?: "")
+        binder.bind(vhalBinding, choiceOptions.firstOrNull()?.value ?: "")
     }
 
     override fun onValueChanged(newValue: String) {
         if (options.contains(newValue)) {
-            binder.setProperty(this, newValue)
+            binder.setProperty(vhalBinding, newValue)
         }
     }
 
-    override fun toItemValue(vhalValue: V): String {
-        return carOptions.firstOrNull { it.vhalValue == vhalValue }?.value ?: valueFlow.value
-    }
-
-    override fun toVhalValue(itemValue: String): V {
-        return carOptions.firstOrNull { it.value == itemValue }?.vhalValue
-            ?: carOptions.first().vhalValue
-    }
+    fun toItemValue(vhalValue: V): String = vhalBinding.toItemValue(vhalValue)
+    fun toVhalValue(itemValue: String): V = vhalBinding.toVhalValue(itemValue)
 }
 
 /**
@@ -322,13 +324,13 @@ abstract class BaseUiToggleItem(
 }
 
 /**
- * Bridge abstract class unifying Toggle UI with VHAL binding.
+ * Bridge abstract class unifying Toggle UI with VHAL binding via composition ([VhalBinding]).
  */
 abstract class VhalToggleItem<V>(
     key: String,
     titleRes: Int,
-    override val propertyId: Int,
-    override val areaId: Int = 0,
+    val propertyId: Int,
+    val areaId: Int = 0,
     val onVhalValue: V,
     val offVhalValue: V,
     initialValue: Boolean = false,
@@ -347,22 +349,25 @@ abstract class VhalToggleItem<V>(
     badgeKey = badgeKey,
     onIconRes = onIconRes,
     offIconRes = offIconRes
-), VhalBoundItem<Boolean, V> {
+), HasVhalBinding<Boolean, V> {
 
-    // ★ Repository/Binder에 VhalBoundItem(this)을 전달하여 하드웨어/VHAL과 양방향 연동!
+    // ★ VhalBinding을 필드로 합성(has-a)
+    override val vhalBinding: VhalBinding<Boolean, V> = VhalBinding(
+        propertyId = propertyId,
+        areaId = areaId,
+        toItemValue = { raw -> raw == onVhalValue },
+        toVhalValue = { domain -> if (domain) onVhalValue else offVhalValue }
+    )
+
+    // ★ this가 아닌 순수 데이터 객체 vhalBinding만 바인더에 전달!
     override val valueFlow: StateFlow<Boolean> by lazy {
-        binder.bind(this, false)
+        binder.bind(vhalBinding, initialValue)
     }
 
     override fun onValueChanged(newValue: Boolean) {
-        binder.setProperty(this, newValue)
+        binder.setProperty(vhalBinding, newValue)
     }
 
-    override fun toItemValue(vhalValue: V): Boolean {
-        return vhalValue == onVhalValue
-    }
-
-    override fun toVhalValue(itemValue: Boolean): V {
-        return if (itemValue) onVhalValue else offVhalValue
-    }
+    fun toItemValue(vhalValue: V): Boolean = vhalBinding.toItemValue(vhalValue)
+    fun toVhalValue(itemValue: Boolean): V = vhalBinding.toVhalValue(itemValue)
 }

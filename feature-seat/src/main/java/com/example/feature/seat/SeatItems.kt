@@ -1,142 +1,104 @@
 package com.example.feature.seat
 
+import com.example.common.ui.settings.BaseUiToggleItem
+import com.example.common.ui.settings.CarUiOption
 import com.example.common.ui.settings.ChoiceOptionSlots
-import com.example.common.ui.settings.UiChoiceItem
 import com.example.common.ui.settings.UiItem
-import com.example.common.ui.settings.UiOption
-import com.example.common.ui.settings.UiToggleItem
+import com.example.common.ui.settings.VhalChoiceItem
 import com.example.core.item.Item
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 // ============================================================================
-// 1. Standard Choice Items (UiChoiceItem : ChoiceItem, UiItem<String>)
+// 1. Standard VHAL Choice Items (VhalChoiceItem<Int> : BaseUiChoiceItem, VhalBoundItem<String, Int>)
 // ============================================================================
 
-class DriverSeatHeatingItem : UiChoiceItem {
-    override val key: String = "driver_seat_heat"
-    override val titleRes: Int = R.string.seat_item_driver_heat_title
-    override val subtitleRes: Int = R.string.seat_item_driver_heat_subtitle
-    override val iconRes: Int = R.drawable.ic_feature_seat
+class DriverSeatHeatingItem : VhalChoiceItem<Int>(
+    key = "driver_seat_heat",
+    titleRes = R.string.seat_item_driver_heat_title,
+    subtitleRes = R.string.seat_item_driver_heat_subtitle,
+    iconRes = R.drawable.ic_feature_seat,
+    propertyId = 0x11400503, // HVAC_SEAT_TEMPERATURE
+    areaId = 1,              // SEAT_ROW_1_LEFT
+    carOptions = listOf(
+        CarUiOption("OFF", R.string.seat_heat_off, vhalValue = 0),
+        CarUiOption("LEVEL 1", R.string.seat_heat_level_1, vhalValue = 1),
+        CarUiOption("LEVEL 2", R.string.seat_heat_level_2, vhalValue = 2),
+        CarUiOption("LEVEL 3", R.string.seat_heat_level_3, vhalValue = 3)
+    ),
+    initialValue = "OFF"
+)
 
-    override val choiceOptions: List<UiOption<String>> = listOf(
-        UiOption("OFF", R.string.seat_heat_off),
-        UiOption("LEVEL 1", R.string.seat_heat_level_1),
-        UiOption("LEVEL 2", R.string.seat_heat_level_2),
-        UiOption("LEVEL 3", R.string.seat_heat_level_3)
-    )
-
-    private val _value = MutableStateFlow("OFF")
-    override val valueFlow: StateFlow<String> = _value.asStateFlow()
-
-    override fun onValueChanged(newValue: String) {
-        if (options.contains(newValue)) {
-            _value.value = newValue
-        }
-    }
-}
-
-class PassengerSeatHeatingItem : UiChoiceItem {
-    override val key: String = "passenger_seat_heat"
-    override val titleRes: Int = R.string.seat_item_passenger_heat_title
-    override val subtitleRes: Int = R.string.seat_item_passenger_heat_subtitle
-    override val iconRes: Int = R.drawable.ic_feature_seat
-
-    override val choiceOptions: List<UiOption<String>> = listOf(
-        UiOption("OFF", R.string.seat_heat_off),
-        UiOption("LEVEL 1", R.string.seat_heat_level_1),
-        UiOption("LEVEL 2", R.string.seat_heat_level_2),
-        UiOption("LEVEL 3", R.string.seat_heat_level_3)
-    )
-
-    private val _value = MutableStateFlow("OFF")
-    override val valueFlow: StateFlow<String> = _value.asStateFlow()
-
-    override fun onValueChanged(newValue: String) {
-        if (options.contains(newValue)) {
-            _value.value = newValue
-        }
-    }
-}
+class PassengerSeatHeatingItem : VhalChoiceItem<Int>(
+    key = "passenger_seat_heat",
+    titleRes = R.string.seat_item_passenger_heat_title,
+    subtitleRes = R.string.seat_item_passenger_heat_subtitle,
+    iconRes = R.drawable.ic_feature_seat,
+    propertyId = 0x11400503, // HVAC_SEAT_TEMPERATURE
+    areaId = 2,              // SEAT_ROW_1_RIGHT
+    carOptions = listOf(
+        CarUiOption("OFF", R.string.seat_heat_off, vhalValue = 0),
+        CarUiOption("LEVEL 1", R.string.seat_heat_level_1, vhalValue = 1),
+        CarUiOption("LEVEL 2", R.string.seat_heat_level_2, vhalValue = 2),
+        CarUiOption("LEVEL 3", R.string.seat_heat_level_3, vhalValue = 3)
+    ),
+    initialValue = "OFF"
+)
 
 /**
  * Variant 1: Icon-Only Slot ([ChoiceOptionSlots.IconOnly])
  * Compact, icon-centric airflow buttons without text labels inside buttons.
  */
-class DriverSeatVentilationItem : UiChoiceItem {
-    override val key: String = "driver_seat_vent"
-    override val titleRes: Int = R.string.seat_item_driver_vent_title
-    override val subtitleRes: Int = R.string.seat_item_driver_vent_subtitle
-    override val iconRes: Int = R.drawable.ic_seat_ventilation
-
-    override val choiceOptions: List<UiOption<String>> = listOf(
-        UiOption("OFF", R.string.seat_vent_off, iconRes = R.drawable.ic_seat_ventilation),
-        UiOption("LEVEL 1", R.string.seat_vent_1, iconRes = R.drawable.ic_seat_ventilation),
-        UiOption("LEVEL 2", R.string.seat_vent_2, iconRes = R.drawable.ic_seat_ventilation),
-        UiOption("LEVEL 3", R.string.seat_vent_3, iconRes = R.drawable.ic_seat_ventilation)
-    )
-
-    // ⭐ Reusable Built-in Slot Variant: IconOnly
-    override val optionSlot = ChoiceOptionSlots.IconOnly
-
-    private val _value = MutableStateFlow("OFF")
-    override val valueFlow: StateFlow<String> = _value.asStateFlow()
-
-    override fun onValueChanged(newValue: String) {
-        if (options.contains(newValue)) {
-            _value.value = newValue
-        }
-    }
-}
+class DriverSeatVentilationItem : VhalChoiceItem<Int>(
+    key = "driver_seat_vent",
+    titleRes = R.string.seat_item_driver_vent_title,
+    subtitleRes = R.string.seat_item_driver_vent_subtitle,
+    iconRes = R.drawable.ic_seat_ventilation,
+    propertyId = 0x11400504, // HVAC_SEAT_VENTILATION
+    areaId = 1,              // SEAT_ROW_1_LEFT
+    carOptions = listOf(
+        CarUiOption("OFF", R.string.seat_vent_off, iconRes = R.drawable.ic_seat_ventilation, vhalValue = 0),
+        CarUiOption("LEVEL 1", R.string.seat_vent_1, iconRes = R.drawable.ic_seat_ventilation, vhalValue = 1),
+        CarUiOption("LEVEL 2", R.string.seat_vent_2, iconRes = R.drawable.ic_seat_ventilation, vhalValue = 2),
+        CarUiOption("LEVEL 3", R.string.seat_vent_3, iconRes = R.drawable.ic_seat_ventilation, vhalValue = 3)
+    ),
+    initialValue = "OFF",
+    optionSlot = ChoiceOptionSlots.IconOnly
+)
 
 /**
  * Variant 2: Chip Slot ([ChoiceOptionSlots.Chip])
  * Compact filter chip buttons with optional badges.
  */
-class SeatMassageModeItem : UiChoiceItem {
-    override val key: String = "seat_massage"
-    override val titleRes: Int = R.string.seat_item_massage_title
-    override val subtitleRes: Int = R.string.seat_item_massage_subtitle
-    override val iconRes: Int = R.drawable.ic_feature_seat
-
-    override val choiceOptions: List<UiOption<String>> = listOf(
-        UiOption("OFF", R.string.massage_off),
-        UiOption("WAVE", R.string.massage_wave, badge = "추천"),
-        UiOption("LUMBAR", R.string.massage_lumbar),
-        UiOption("STRETCH", R.string.massage_stretch)
-    )
-
-    // ⭐ Reusable Built-in Slot Variant: Chip
-    override val optionSlot = ChoiceOptionSlots.Chip
-
-    private val _value = MutableStateFlow("OFF")
-    override val valueFlow: StateFlow<String> = _value.asStateFlow()
-
-    override fun onValueChanged(newValue: String) {
-        if (options.contains(newValue)) {
-            _value.value = newValue
-        }
-    }
-}
+class SeatMassageModeItem : VhalChoiceItem<Int>(
+    key = "seat_massage",
+    titleRes = R.string.seat_item_massage_title,
+    subtitleRes = R.string.seat_item_massage_subtitle,
+    iconRes = R.drawable.ic_feature_seat,
+    propertyId = 0x11400F00, // SEAT_MASSAGE_MODE
+    areaId = 1,              // SEAT_ROW_1_LEFT
+    carOptions = listOf(
+        CarUiOption("OFF", R.string.massage_off, vhalValue = 0),
+        CarUiOption("WAVE", R.string.massage_wave, badge = "추천", vhalValue = 1),
+        CarUiOption("LUMBAR", R.string.massage_lumbar, vhalValue = 2),
+        CarUiOption("STRETCH", R.string.massage_stretch, vhalValue = 3)
+    ),
+    initialValue = "OFF",
+    optionSlot = ChoiceOptionSlots.Chip
+)
 
 // ============================================================================
-// 2. Standard Toggle Item (UiToggleItem : ToggleItem, UiItem<Boolean>)
+// 2. Standard Toggle Item (BaseUiToggleItem : UiToggleItem)
 // ============================================================================
 
-class EasyEntryExitItem : UiToggleItem {
-    override val key: String = "easy_entry_exit"
-    override val titleRes: Int = R.string.seat_item_easy_entry_title
-    override val subtitleRes: Int = R.string.seat_item_easy_entry_subtitle
-    override val iconRes: Int = R.drawable.ic_feature_seat
-
-    private val _value = MutableStateFlow(true)
-    override val valueFlow: StateFlow<Boolean> = _value.asStateFlow()
-
-    override fun onValueChanged(newValue: Boolean) {
-        _value.value = newValue
-    }
-}
+class EasyEntryExitItem : BaseUiToggleItem(
+    key = "easy_entry_exit",
+    titleRes = R.string.seat_item_easy_entry_title,
+    subtitleRes = R.string.seat_item_easy_entry_subtitle,
+    iconRes = R.drawable.ic_feature_seat,
+    initialValue = true
+)
 
 // ============================================================================
 // 3. Custom DataType (Item<SeatLumbarSupport>, UiItem<SeatLumbarSupport>)

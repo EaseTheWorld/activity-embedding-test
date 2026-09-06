@@ -146,4 +146,50 @@ class SeatFeatureLogicTest {
         assertEquals(R.string.seat_heat_level_3, heating.getValueTextRes("LEVEL 3"))
         org.junit.Assert.assertNull(heating.getValueTextRes("UNKNOWN_LEVEL"))
     }
+
+    // ========================================================================
+    // Protection 5: VHAL Bound Contract & Bidirectional Conversion
+    // ========================================================================
+
+    @Test
+    fun `Seat items implement VhalBoundItem with correct property IDs and bidirectional value mapping`() {
+        val heating = DriverSeatHeatingItem()
+        val massage = SeatMassageModeItem()
+
+        // 1. Property and Area ID correctness
+        assertEquals(0x11400503, heating.propertyId)
+        assertEquals(1, heating.areaId)
+
+        assertEquals(0x11400F00, massage.propertyId)
+        assertEquals(1, massage.areaId)
+
+        // 2. Bidirectional Mapping for Massage (String <-> Int)
+        assertEquals(0, massage.toVhalValue("OFF"))
+        assertEquals(1, massage.toVhalValue("WAVE"))
+        assertEquals(2, massage.toVhalValue("LUMBAR"))
+        assertEquals(3, massage.toVhalValue("STRETCH"))
+
+        assertEquals("OFF", massage.toItemValue(0))
+        assertEquals("WAVE", massage.toItemValue(1))
+        assertEquals("LUMBAR", massage.toItemValue(2))
+        assertEquals("STRETCH", massage.toItemValue(3))
+    }
+
+    @Test
+    fun `SeatPropertyRepository connects seamlessly with VhalBoundItem without breaking domain invariants`() {
+        val repository = SeatPropertyRepositoryImpl()
+        val massage = SeatMassageModeItem()
+
+        val liveFlow = repository.getPropertyFlow(massage)
+        assertEquals("OFF", liveFlow.value)
+
+        // Set value via repository
+        repository.setPropertyValue(massage, "WAVE")
+        assertEquals("WAVE", liveFlow.value)
+        assertEquals("WAVE", massage.valueFlow.value)
+
+        repository.setPropertyValue(massage, "STRETCH")
+        assertEquals("STRETCH", liveFlow.value)
+        assertEquals("STRETCH", massage.valueFlow.value)
+    }
 }

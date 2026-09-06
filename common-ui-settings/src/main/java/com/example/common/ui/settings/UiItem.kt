@@ -8,6 +8,10 @@ import com.example.core.item.ChoiceItem
 import com.example.core.item.Item
 import com.example.core.item.SliderItem
 import com.example.core.item.ToggleItem
+import com.example.core.item.VhalBoundItem
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 /**
  * Visual presentation metadata for an individual value or state.
@@ -23,12 +27,62 @@ data class UiVisualData(
  * Cohesive option model binding value, localized label, icon, and optional badge in a single definition.
  * Eliminates the need to maintain separate value lists and resource mapping tables.
  */
-data class UiOption<T>(
+open class UiOption<T>(
     val value: T,
-    @StringRes val labelRes: Int,
-    @DrawableRes val iconRes: Int? = null,
+    @get:StringRes val labelRes: Int,
+    @get:DrawableRes val iconRes: Int? = null,
     val badge: String? = null
-)
+) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is UiOption<*>) return false
+        return value == other.value && labelRes == other.labelRes && iconRes == other.iconRes && badge == other.badge
+    }
+
+    override fun hashCode(): Int {
+        var result = value?.hashCode() ?: 0
+        result = 31 * result + labelRes
+        result = 31 * result + (iconRes ?: 0)
+        result = 31 * result + (badge?.hashCode() ?: 0)
+        return result
+    }
+
+    override fun toString(): String {
+        return "UiOption(value=$value, labelRes=$labelRes, iconRes=$iconRes, badge=$badge)"
+    }
+}
+
+/**
+ * Cohesive Vehicle HAL option model extending [UiOption] with the hardware [vhalValue].
+ *
+ * Establishes a tri-directional mapping (Domain Value, UI Resource, Hardware VHAL Value)
+ * in a single, unified declaration.
+ */
+open class CarUiOption<T, V>(
+    value: T,
+    @StringRes labelRes: Int,
+    @DrawableRes iconRes: Int? = null,
+    badge: String? = null,
+    val vhalValue: V
+) : UiOption<T>(value, labelRes, iconRes, badge) {
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is CarUiOption<*, *>) return false
+        if (!super.equals(other)) return false
+        return vhalValue == other.vhalValue
+    }
+
+    override fun hashCode(): Int {
+        var result = super.hashCode()
+        result = 31 * result + (vhalValue?.hashCode() ?: 0)
+        return result
+    }
+
+    override fun toString(): String {
+        return "CarUiOption(value=$value, labelRes=$labelRes, iconRes=$iconRes, badge=$badge, vhalValue=$vhalValue)"
+    }
+}
 
 /**
  * Unified UI Contract extending [Item] with presentation metadata and rendering capabilities.
@@ -138,3 +192,129 @@ interface UiActionItem : ActionItem, UiItem<Unit> {
 // Backward-compatibility aliases
 typealias ComposableToggleItem = UiToggleItem
 typealias ComposableChoiceItem = UiChoiceItem
+
+// ============================================================================
+// Base Abstract Classes & VHAL Bridges (Constructor Delegation via super(...))
+// ============================================================================
+
+/**
+ * Base abstract class for standard Choice UI items.
+ *
+ * Implements constructor delegation (`super(...)`) and encapsulates default [MutableStateFlow]
+ * state holding, eliminating boilerplate in concrete item classes.
+ */
+abstract class BaseUiChoiceItem(
+    override val key: String,
+    @get:StringRes override val titleRes: Int,
+    override val choiceOptions: List<UiOption<String>>,
+    initialValue: String = choiceOptions.firstOrNull()?.value ?: "",
+    @get:StringRes override val subtitleRes: Int? = null,
+    @get:DrawableRes override val iconRes: Int? = null,
+    override val optionSlot: OptionSlot<String> = ChoiceOptionSlots.Segmented
+) : UiChoiceItem {
+
+    private val _valueFlow = MutableStateFlow(initialValue)
+    override val valueFlow: StateFlow<String> = _valueFlow.asStateFlow()
+
+    override fun onValueChanged(newValue: String) {
+        if (options.contains(newValue)) {
+            _valueFlow.value = newValue
+        }
+    }
+}
+
+/**
+ * Bridge abstract class unifying UI presentation ([BaseUiChoiceItem]) with hardware
+ * VHAL binding ([VhalBoundItem]).
+ *
+ * Automatically provides bidirectional value conversion using [carOptions]:
+ * - [toItemValue]: Maps raw hardware [vhalValue] to domain [String] value.
+ * - [toVhalValue]: Maps domain [String] value to raw hardware [vhalValue].
+ */
+abstract class VhalChoiceItem<V>(
+    key: String,
+    titleRes: Int,
+    override val propertyId: Int,
+    override val areaId: Int = 0,
+    val carOptions: List<CarUiOption<String, V>>,
+    initialValue: String = carOptions.firstOrNull()?.value ?: "",
+    subtitleRes: Int? = null,
+    iconRes: Int? = null,
+    optionSlot: OptionSlot<String> = ChoiceOptionSlots.Segmented
+) : BaseUiChoiceItem(
+    key = key,
+    titleRes = titleRes,
+    choiceOptions = carOptions,
+    initialValue = initialValue,
+    subtitleRes = subtitleRes,
+    iconRes = iconRes,
+    optionSlot = optionSlot
+), VhalBoundItem<String, V> {
+
+    override fun toItemValue(vhalValue: V): String {
+        return carOptions.firstOrNull { it.vhalValue == vhalValue }?.value ?: valueFlow.value
+    }
+
+    override fun toVhalValue(itemValue: String): V {
+        return carOptions.firstOrNull { it.value == itemValue }?.vhalValue
+            ?: carOptions.first().vhalValue
+    }
+}
+
+/**
+ * Base abstract class for standard Toggle UI items.
+ */
+abstract class BaseUiToggleItem(
+    override val key: String,
+    @get:StringRes override val titleRes: Int,
+    initialValue: Boolean = false,
+    @get:StringRes override val subtitleRes: Int? = null,
+    @get:DrawableRes override val iconRes: Int? = null,
+    override val badgeKey: String? = null,
+    @get:DrawableRes override val onIconRes: Int? = null,
+    @get:DrawableRes override val offIconRes: Int? = null
+) : UiToggleItem {
+
+    private val _valueFlow = MutableStateFlow(initialValue)
+    override val valueFlow: StateFlow<Boolean> = _valueFlow.asStateFlow()
+
+    override fun onValueChanged(newValue: Boolean) {
+        _valueFlow.value = newValue
+    }
+}
+
+/**
+ * Bridge abstract class unifying Toggle UI with VHAL binding.
+ */
+abstract class VhalToggleItem<V>(
+    key: String,
+    titleRes: Int,
+    override val propertyId: Int,
+    override val areaId: Int = 0,
+    val onVhalValue: V,
+    val offVhalValue: V,
+    initialValue: Boolean = false,
+    subtitleRes: Int? = null,
+    iconRes: Int? = null,
+    badgeKey: String? = null,
+    onIconRes: Int? = null,
+    offIconRes: Int? = null
+) : BaseUiToggleItem(
+    key = key,
+    titleRes = titleRes,
+    initialValue = initialValue,
+    subtitleRes = subtitleRes,
+    iconRes = iconRes,
+    badgeKey = badgeKey,
+    onIconRes = onIconRes,
+    offIconRes = offIconRes
+), VhalBoundItem<Boolean, V> {
+
+    override fun toItemValue(vhalValue: V): Boolean {
+        return vhalValue == onVhalValue
+    }
+
+    override fun toVhalValue(itemValue: Boolean): V {
+        return if (itemValue) onVhalValue else offVhalValue
+    }
+}

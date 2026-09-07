@@ -125,14 +125,15 @@ class SeatSettingsProvider : ContentProvider() {
                     )
                 )
                 // Dynamically iterate over SeatItemRegistry.items (List<Item> SSOT)
-                SeatItemRegistry.items.forEachIndexed { index, item ->
+                // Whitelist only data-bearing items (ValueItem<*>), cleanly excluding UI layout nodes (Spacers, Containers)
+                val dataItems = SeatItemRegistry.items.filterIsInstance<com.example.core.item.ValueItem<*>>()
+                dataItems.forEachIndexed { index, item ->
                     val uiItem = item as? com.example.common.ui.settings.UiItem
                     val titleResId = uiItem?.titleRes ?: 0
                     val subtitleResId = uiItem?.subtitleRes ?: 0
                     val title = if (titleResId != 0) ctx.getString(titleResId) else item.key
                     val subtitle = if (subtitleResId != 0) ctx.getString(subtitleResId) else ""
                     val options = if (item is ChoiceItem) item.options.joinToString(",") else ""
-                    val serializedValue = (item as? com.example.core.item.ValueItem<*>)?.serializedValue ?: ""
 
                     cursor.addRow(
                         arrayOf(
@@ -141,7 +142,7 @@ class SeatSettingsProvider : ContentProvider() {
                             title,
                             subtitle,
                             item.type.name,
-                            serializedValue,
+                            item.serializedValue,
                             0,
                             0,
                             options,

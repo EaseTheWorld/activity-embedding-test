@@ -47,11 +47,11 @@ class CoreContractInvariantsTest {
             override val valueFlow = kotlinx.coroutines.flow.MutableStateFlow(50)
             override fun onValueChanged(newValue: Int) {}
         }
-        var actionClicked = false
+        var actionValueChanged = false
         val actionItem = object : ActionItem {
             override val key = "action"
-            override fun onClick() {
-                actionClicked = true
+            override fun onValueChanged(newValue: Unit) {
+                actionValueChanged = true
             }
         }
         val containerItem = object : ContainerItem {
@@ -71,8 +71,12 @@ class CoreContractInvariantsTest {
         assertEquals(ItemType.CONTAINER, containerItem.type)
         assertEquals(ItemType.CUSTOM, customItem.type)
 
+        // ActionItem is a ValueItem<Unit> and onClick delegates to onValueChanged
         actionItem.onClick()
-        assertEquals(true, actionClicked)
+        assertEquals(true, actionValueChanged)
+        assertEquals("TRIGGER", actionItem.serializedValue)
+        val itemAsRoot: Item = actionItem
+        org.junit.Assert.assertTrue(itemAsRoot is ValueItem<*>)
     }
 
     // ========================================================================

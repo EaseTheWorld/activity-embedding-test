@@ -203,7 +203,7 @@ interface UiSliderItem : SliderItem, UiValueItem<Int> {
 /**
  * Standard Action (Button) UI Item.
  */
-interface UiActionItem : ActionItem, UiItem {
+interface UiActionItem : ActionItem, UiValueItem<Unit> {
     @get:StringRes val buttonLabelRes: Int? get() = null
 }
 

@@ -1,6 +1,7 @@
 package com.example.core.item
 
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flowOf
 
@@ -65,12 +66,19 @@ interface SliderItem : ValueItem<Int> {
 }
 
 /**
- * Pure action trigger item (e.g. "Reset Settings", "Calibrate Cameras").
- * Does not hold a state value or require dummy Unit StateFlows.
+ * Action trigger item (e.g. "Reset Settings", "Calibrate Cameras").
+ * Implements [ValueItem] with [Unit] payload representing write-to-trigger IPC and VHAL semantics.
+ * Calling [onClick] delegates directly to [onValueChanged] with [Unit].
  */
-interface ActionItem : Item {
+interface ActionItem : ValueItem<Unit> {
     override val type: ItemType get() = ItemType.ACTION
-    fun onClick()
+    override val valueFlow: StateFlow<Unit> get() = MutableStateFlow(Unit)
+
+    fun onClick() {
+        onValueChanged(Unit)
+    }
+
+    override val serializedValue: String get() = "TRIGGER"
 }
 
 /**

@@ -1,4 +1,4 @@
-# ADR 0003: Item Contract Segregation (ValueItem vs ContainerItem)
+# ADR 0003: Item Contract Segregation (ValueItem vs Layout Hierarchy)
 
 ## Status
 **Accepted** *(Supersedes [ADR 0001](0001-settings-item-contract-architecture.md) Section 1 regarding `Item<T>`)*
@@ -23,18 +23,54 @@ However, as the system evolved to support rich, data-driven vehicle cockpit inte
 
 ## Decisions
 
-### 1. Root Contract Segregation: `Item` vs `ValueItem<T>`
+### 1. Root Contract Segregation: Layout Hierarchy (`Item`) vs Data Model (`ValueItem<T>`)
 
 We segregated the hierarchy into a clean separation between **Layout/UI Nodes** (`Item`) and **Data/IPC Entities** (`ValueItem<T>`):
 
-```
-               Item (Root Identity, Visibility & Compose Drawing)
-              /    \                  \
-             /      \                  \
-    ValueItem<T>   SpacerItem       ContainerItem
-    (Data Model)   (Layout Spacer)  (Composite Group)
-     /   |   \         \
- Toggle Choice Slider  ActionItem<Unit>
+```mermaid
+classDiagram
+    class Item {
+        <<interface>>
+        +String key
+        +ItemType type
+        +Flow~Boolean~ isVisible
+        +Flow~Boolean~ isEnabled
+    }
+    class ValueItem~T~ {
+        <<interface>>
+        +StateFlow~T~ valueFlow
+        +onValueChanged(T newValue)
+        +String serializedValue
+    }
+    class ToggleItem {
+        <<interface>>
+    }
+    class ChoiceItem {
+        <<interface>>
+    }
+    class SliderItem {
+        <<interface>>
+    }
+    class ActionItem {
+        <<interface>>
+        +onClick()
+    }
+    class ContainerItem {
+        <<interface>>
+        +List~Item~ children
+    }
+    class SpacerItem {
+        +Int heightDp
+    }
+
+    Item <|-- ValueItem : extends
+    Item <|-- ContainerItem : extends
+    Item <|-- SpacerItem : extends
+
+    ValueItem <|-- ToggleItem : T=Boolean
+    ValueItem <|-- ChoiceItem : T=String
+    ValueItem <|-- SliderItem : T=Int
+    ValueItem <|-- ActionItem : T=Unit
 ```
 
 #### A. Root Contract (`Item`)
@@ -48,8 +84,8 @@ interface Item {
 }
 ```
 
-#### B. Stateful Data Contract (`ValueItem<T>`)
-Encapsulates reactive observation, mutation, and serialization:
+#### B. Data Model Contract (`ValueItem<T>`)
+Encapsulates reactive observation, mutation, and serialization for all data-bearing items (Toggles, Choices, Sliders, and Actions):
 ```kotlin
 interface ValueItem<T> : Item {
     val valueFlow: StateFlow<T>
@@ -57,14 +93,27 @@ interface ValueItem<T> : Item {
     val serializedValue: String get() = valueFlow.value.toString()
 }
 
-interface ToggleItem : ValueItem<Boolean>
-interface ChoiceItem : ValueItem<String>
-interface SliderItem : ValueItem<Int>
-```
+interface ToggleItem : ValueItem<Boolean> {
+    override val type: ItemType get() = ItemType.TOGGLE
+}
 
-#### C. Action Trigger Contract (`ActionItem : ValueItem<Unit>`)
-Models write-to-trigger hardware and IPC semantics:
-```kotlin
+interface ChoiceItem : ValueItem<String> {
+    override val type: ItemType get() = ItemType.CHOICE
+    val options: List<String>
+}
+
+interface SliderItem : ValueItem<Int> {
+    override val type: ItemType get() = ItemType.SLIDER
+    val min: Int
+    val max: Int
+    val unitKey: String? get() = null
+}
+
+/**
+ * Action trigger item (e.g. "Reset Settings", "Calibrate Cameras").
+ * Implements [ValueItem] with [Unit] payload representing write-to-trigger IPC and VHAL semantics.
+ * Calling [onClick] delegates directly to [onValueChanged] with [Unit].
+ */
 interface ActionItem : ValueItem<Unit> {
     override val type: ItemType get() = ItemType.ACTION
     override val valueFlow: StateFlow<Unit> get() = MutableStateFlow(Unit)
@@ -77,12 +126,31 @@ interface ActionItem : ValueItem<Unit> {
 }
 ```
 
-#### D. Composite Layout Contract (`ContainerItem`)
-Enables recursive composition of setting elements:
+#### Why `ActionItem` is a `ValueItem<Unit>` (Write-to-Trigger Semantics)
+In automotive hardware (VHAL / CAN / LIN) and IPC (`ContentProvider`), an "Action" is never an arbitrary remote RPC call; it is a write of a fixed value (e.g. `1`, `true`, `"TRIGGER"`) to a specific key/property ID.
+By implementing `ValueItem<Unit>`:
+1. **IPC & VHAL Unification**: The existing `onValueChanged(...)` and `METHOD_UPDATE_ITEM` pipelines handle actions without any special branching.
+2. **Whitelist Data Filtering**: `items.filterIsInstance<ValueItem<*>>()` in `ContentProvider` captures `ActionItem` automatically alongside `ToggleItem`, `ChoiceItem`, and `SliderItem`, while cleanly excluding UI layout nodes (`ContainerItem`, `SpacerItem`).
+3. **UI Ergonomics**: UI callers simply invoke `item.onClick()`, which internally delegates to `onValueChanged(Unit)`.
+
+#### C. Structural & Layout Contracts (`ContainerItem`, `SpacerItem`)
+Enables recursive composition of setting elements and data-driven spacing:
 ```kotlin
 interface ContainerItem : Item {
     override val type: ItemType get() = ItemType.CONTAINER
     val children: List<Item> get() = emptyList()
+}
+
+class SpacerItem(
+    val heightDp: Int = 16,
+    override val key: String = "spacer_${counter.incrementAndGet()}"
+) : UiItem {
+    override val titleRes: Int = 0
+
+    @Composable
+    override fun Draw(modifier: Modifier) {
+        Spacer(modifier = modifier.height(heightDp.dp))
+    }
 }
 ```
 
@@ -148,7 +216,7 @@ fun findItem(key: String): Item? {
 ### Positive
 - **Architectural Rigor**: Strict adherence to the Interface Segregation Principle (ISP).
 - **Clean Type System**: Elimination of `List<Item<*>>` wildcard cascades throughout repositories, screens, and registries.
-- **Write-to-Trigger Action Modeling**: `ActionItem` cleanly aligns with automotive hardware (VHAL) and IPC write semantics.
+- **Write-to-Trigger Action Modeling**: `ActionItem` cleanly aligns with automotive hardware (VHAL) and IPC write semantics as a `ValueItem<Unit>`.
 - **Complete Decoupling of Data & UI**: ContentProviders filter on `ValueItem<*>`, remaining 100% unaware of UI layout nodes (`SpacerItem`, `ContainerItem`).
 - **Compose Compliance**: Standard `Modifier` propagation and predictable `LazyColumn` keying for layout spacers.
 

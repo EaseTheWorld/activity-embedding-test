@@ -1,7 +1,7 @@
 # ADR 0003: Item Contract Segregation (ValueItem vs ContainerItem)
 
 ## Status
-**Accepted**
+**Accepted** *(Supersedes [ADR 0001](0001-settings-item-contract-architecture.md) Section 1 regarding `Item<T>`)*
 
 ## Context
 In ADR 0001, we formulated the generic `Item<T>` contract under the fundamental assumption that **every setting item in the vehicle represents a stateful property** with a reactive stream (`valueFlow: StateFlow<T>`), a value mutation entry point (`onValueChanged(newValue: T)`), and a serialized representation (`serializedValue: String`).
@@ -10,13 +10,14 @@ However, as the system evolved to support rich, data-driven vehicle cockpit inte
 1. **Composite & Spatial Layouts (`ContainerItem`)**:
    - Complex UI layouts, such as a single row hosting dual independent controls (e.g. Frunk & Trunk lighting toggles) or a 2D spatial vehicle canvas controlling 4 individual window positions, are structural grouping elements.
    - A container item aggregates child items; it does not have a single scalar state value of its own, nor can it accept a scalar `onValueChanged` event.
-2. **Pure Action Triggers (`ActionItem`)**:
-   - Push-button actions (e.g. "Reset Driving Stats", "Calibrate Cameras", "Factory Reset") represent trigger commands, not persistent states.
-   - Forcing `ActionItem` into `Item<Unit>` introduced artificial boilerplate (`valueFlow = MutableStateFlow(Unit)`, `onValueChanged(Unit)`) violating design purity.
-3. **Static Information Elements (Headers, Banners, Dividers)**:
-   - Informational and decorative elements in dynamic setting lists need identity (`key`) and visibility (`isVisible`), but possess no state.
-4. **Interface Segregation Principle (ISP) & Liskov Substitution Principle (LSP)**:
-   - Forcing non-state elements to implement dummy `valueFlow` and no-op `onValueChanged` violated ISP and created runtime traps for IPC and VHAL synchronization layers.
+2. **Action Commands as Fixed-Value Triggers (`ActionItem`)**:
+   - In automotive hardware (VHAL / CAN bus) and IPC (`ContentProvider`), actions (e.g. "Reset Trip", "Calibrate Camera") are not RPC methods; they are writes of a fixed trigger value (`1`, `true`, `"TRIGGER"`) to a specific key/property ID.
+   - While earlier thought to be non-value triggers, from the data and IPC perspective an action is fundamentally a `ValueItem<Unit>` with a fixed payload.
+3. **Layout Spacing & Decorative Elements (`SpacerItem`, Headers, Dividers)**:
+   - Elements for visual spacing or headings belong in the layout tree and need identity (`key`) and visibility (`isVisible`), but have no state and must not pollute IPC or VHAL layers.
+4. **Interface Segregation Principle (ISP) & Leaky Abstractions**:
+   - Forcing non-state elements to implement dummy `valueFlow` violated ISP.
+   - Conversely, making data providers check blacklist conditions like `it !is SpacerItem` leaked UI implementation details into the data layer.
 
 ---
 
@@ -24,16 +25,16 @@ However, as the system evolved to support rich, data-driven vehicle cockpit inte
 
 ### 1. Root Contract Segregation: `Item` vs `ValueItem<T>`
 
-We segregated the root contract into two focused interfaces:
+We segregated the hierarchy into a clean separation between **Layout/UI Nodes** (`Item`) and **Data/IPC Entities** (`ValueItem<T>`):
 
 ```
-               Item (Root Identity & Visibility)
+               Item (Root Identity, Visibility & Compose Drawing)
               /    \                  \
              /      \                  \
-    ValueItem<T>   ActionItem       ContainerItem
-   (Stateful)      (Command)        (Composite Group)
-    /    |    \
-Toggle Choice Slider
+    ValueItem<T>   SpacerItem       ContainerItem
+    (Data Model)   (Layout Spacer)  (Composite Group)
+     /   |   \         \
+ Toggle Choice Slider  ActionItem<Unit>
 ```
 
 #### A. Root Contract (`Item`)
@@ -47,7 +48,7 @@ interface Item {
 }
 ```
 
-#### B. Stateful Contract (`ValueItem<T>`)
+#### B. Stateful Data Contract (`ValueItem<T>`)
 Encapsulates reactive observation, mutation, and serialization:
 ```kotlin
 interface ValueItem<T> : Item {
@@ -61,12 +62,18 @@ interface ChoiceItem : ValueItem<String>
 interface SliderItem : ValueItem<Int>
 ```
 
-#### C. Command Trigger Contract (`ActionItem`)
-Replaces artificial `Unit` state flows with an explicit trigger:
+#### C. Action Trigger Contract (`ActionItem : ValueItem<Unit>`)
+Models write-to-trigger hardware and IPC semantics:
 ```kotlin
-interface ActionItem : Item {
+interface ActionItem : ValueItem<Unit> {
     override val type: ItemType get() = ItemType.ACTION
-    fun onClick()
+    override val valueFlow: StateFlow<Unit> get() = MutableStateFlow(Unit)
+
+    fun onClick() {
+        onValueChanged(Unit)
+    }
+
+    override val serializedValue: String get() = "TRIGGER"
 }
 ```
 
@@ -89,8 +96,35 @@ By eliminating the type parameter from `Item`, collections across `CategoryItemP
 - **Before**: `val items: List<Item<*>>`
 - **After**: `val items: List<Item>`
 
-### 3. Hierarchical Resolution in `CategoryItemProvider`
-`CategoryItemProvider.findItem(key: String)` now performs deep, recursive resolution across `ContainerItem.children`, allowing IPC layers and deep-link routers to address nested items transparently:
+---
+
+### 3. Compose Modifier Propagation & Layout Spacers
+
+To comply with Jetpack Compose component design guidelines:
+1. **`ComposableItemRenderer.Draw(modifier: Modifier)`**:
+   - The interface declares `fun Draw(modifier: Modifier)` without default arguments (adhering to Compose compiler overridable interface rules).
+   - An `@Composable fun ComposableItemRenderer.Draw()` extension function provides default `Modifier` for parameterless invocations.
+2. **`SpacerItem`**:
+   - Implements `UiItem` with an automatic unique key sequence (`"spacer_${counter}"`) and explicit key support.
+   - Convenience extension `Item.withSpacer(heightDp)` binds deterministic keys (`"${key}_spacer"`).
+   - `GenericSettingsScreen` automatically suppresses `HorizontalDivider` below `SpacerItem`s.
+
+---
+
+### 4. Data Layer Whitelist Filtering (`filterIsInstance<ValueItem<*>>()`)
+
+Rather than fragile blacklist checks (`it !is SpacerItem`) that leak UI knowledge into data providers, feature ContentProviders query:
+```kotlin
+val dataItems = registry.items.filterIsInstance<ValueItem<*>>()
+```
+- Completely decouples ContentProviders from knowing any UI layout components.
+- Guarantees compile-time type-safe access to `item.serializedValue` without safe-casts.
+- Captures all data items (Toggles, Choices, Sliders, Actions, and Custom values) in a single unified filter.
+
+---
+
+### 5. Hierarchical Resolution in `CategoryItemProvider`
+`CategoryItemProvider.findItem(key: String)` performs recursive resolution across `ContainerItem.children`, allowing IPC layers and deep-link routers to address nested items transparently:
 ```kotlin
 fun findItem(key: String): Item? {
     fun search(list: List<Item>): Item? {
@@ -107,12 +141,6 @@ fun findItem(key: String): Item? {
 }
 ```
 
-### 4. UI Layer Adaptation (`UiItem` and `UiValueItem<T>`)
-The UI contract mirrors this segregation in `:common-ui-settings`:
-- `UiItem : Item, ComposableItemRenderer`: provides `titleRes`, `subtitleRes`, `iconRes`, and `@Composable fun Draw()`.
-- `UiValueItem<T> : UiItem, ValueItem<T>`: adds `getValueVisual(value: T)`.
-- `UiContainerItem : ContainerItem, UiItem`: self-renders composite children.
-
 ---
 
 ## Consequences
@@ -120,10 +148,9 @@ The UI contract mirrors this segregation in `:common-ui-settings`:
 ### Positive
 - **Architectural Rigor**: Strict adherence to the Interface Segregation Principle (ISP).
 - **Clean Type System**: Elimination of `List<Item<*>>` wildcard cascades throughout repositories, screens, and registries.
-- **Natural Action Modeling**: `ActionItem.onClick()` cleanly represents triggers without fake `StateFlow<Unit>`.
-- **Composite Layout Support**: Native data-driven modeling of complex multi-item rows and spatial vehicle layouts.
-- **Safe VHAL & IPC Integration**: Hardware and IPC binders safely target `ValueItem<*>` without risking runtime errors on structural or action items.
+- **Write-to-Trigger Action Modeling**: `ActionItem` cleanly aligns with automotive hardware (VHAL) and IPC write semantics.
+- **Complete Decoupling of Data & UI**: ContentProviders filter on `ValueItem<*>`, remaining 100% unaware of UI layout nodes (`SpacerItem`, `ContainerItem`).
+- **Compose Compliance**: Standard `Modifier` propagation and predictable `LazyColumn` keying for layout spacers.
 
 ### Negative / Trade-offs
 - Concrete custom value items implement `ValueItem<T>` instead of `Item<T>`.
-- Existing ContentProvider query implementations use `(item as? ValueItem<*>)?.serializedValue` to handle non-state items gracefully.

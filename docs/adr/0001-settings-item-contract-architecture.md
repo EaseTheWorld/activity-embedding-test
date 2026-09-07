@@ -1,7 +1,7 @@
 # ADR 0001: Settings Item Contract Architecture (Generic DataType & Interface ViewType)
 
 ## Status
-**Accepted**
+**Accepted** *(Partially Superseded by [ADR 0003](0003-item-contract-segregation-value-and-container.md) regarding `Item<T>` segregation)*
 
 ## Context
 In our modular, multi-app/multi-module Car Settings system (Android Automotive OS / In-Vehicle Infotainment):
@@ -28,6 +28,16 @@ We needed to decide:
 ## Decisions
 
 ### 1. DataType as a Generic Parameter (`Item<T>`)
+
+> [!NOTE]
+> **Evolutionary Update (ADR 0003)**:
+> In the initial architecture, all items were modeled as `Item<T>`. When composite spatial containers (`ContainerItem`) and layout spacers (`SpacerItem`) were introduced, forcing all items to hold a state payload violated the Interface Segregation Principle (ISP).
+> As recorded in [ADR 0003](0003-item-contract-segregation-value-and-container.md), `Item<T>` was evolved into two contracts:
+> - Root identity, categorization, and visibility: non-generic `Item`
+> - Reactive state observation and value mutation: `ValueItem<T> : Item`
+>
+> The core rationale below (why generic typing avoids boxing and preserves compile-time type safety over sealed classes) remains foundational for `ValueItem<T>`.
+
 We decided to model the payload/state of an item using a generic type parameter `Item<T>`, rather than wrapping primitives in a sealed class hierarchy (`DataType.Bool`, `DataType.Number`).
 
 ```kotlin

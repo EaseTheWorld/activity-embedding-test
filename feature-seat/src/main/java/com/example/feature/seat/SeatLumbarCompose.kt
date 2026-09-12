@@ -31,7 +31,7 @@ fun SeatLumbarRow(
     val lumbar by item.valueFlow.collectAsState()
 
     val title = androidx.compose.ui.res.stringResource(item.titleRes)
-    val subtitle = androidx.compose.ui.res.stringResource(item.subtitleRes)
+    val subtitle = item.subtitleRes?.let { androidx.compose.ui.res.stringResource(it) } ?: ""
 
     Column(
         modifier = Modifier

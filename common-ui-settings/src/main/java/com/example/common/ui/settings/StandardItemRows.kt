@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -13,6 +14,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -30,21 +33,44 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
+import com.example.core.item.ItemViewModel
+
 /**
  * Standard Toggle Row: Renders a Switch with compile-time @StringRes title,
  * optional subtitle, optional leading icon, and optional Badge based on item.badgeKey.
  */
 @Composable
 fun ToggleItemRow(
-    item: UiToggleItem
+    item: UiToggleItem,
+    modifier: Modifier = Modifier
 ) {
     val isChecked by item.valueFlow.collectAsState()
+    ToggleItemRowContent(item, isChecked, { item.onValueChanged(it) }, modifier)
+}
+
+@Composable
+fun ToggleItemRow(
+    item: UiToggleItem,
+    viewModel: ItemViewModel<Boolean>,
+    modifier: Modifier = Modifier
+) {
+    val isChecked by viewModel.valueFlow.collectAsState()
+    ToggleItemRowContent(item, isChecked, { viewModel.setValue(it) }, modifier)
+}
+
+@Composable
+private fun ToggleItemRowContent(
+    item: UiToggleItem,
+    isChecked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier
+) {
     val title = stringResource(item.titleRes)
     val subtitle = item.subtitleRes?.let { stringResource(it) }
     val iconRes = item.getValueIconRes(isChecked) ?: item.iconRes
 
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -92,10 +118,69 @@ fun ToggleItemRow(
 
         Switch(
             checked = isChecked,
-            onCheckedChange = { nextValue ->
-                item.onValueChanged(nextValue)
-            }
+            onCheckedChange = onCheckedChange
         )
+    }
+}
+
+/**
+ * Compact Grid Card for Quick Controls and Recent Category screens.
+ */
+@Composable
+fun ToggleGridCard(
+    item: UiToggleItem,
+    viewModel: ItemViewModel<Boolean>,
+    modifier: Modifier = Modifier
+) {
+    val isChecked by viewModel.valueFlow.collectAsState()
+    val title = stringResource(item.titleRes)
+    val iconRes = item.getValueIconRes(isChecked) ?: item.iconRes
+
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(110.dp),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isChecked) Color(0xFFEDE7F6) else Color.White
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(12.dp),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (iconRes != null) {
+                    Icon(
+                        painter = painterResource(iconRes),
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp),
+                        tint = if (isChecked) Color(0xFF6750A4) else Color(0xFF757575)
+                    )
+                } else {
+                    Spacer(modifier = Modifier.size(24.dp))
+                }
+                Switch(
+                    checked = isChecked,
+                    onCheckedChange = { viewModel.setValue(it) }
+                )
+            }
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF1E1E2E)
+                ),
+                maxLines = 2
+            )
+        }
     }
 }
 
@@ -105,16 +190,37 @@ fun ToggleItemRow(
  */
 @Composable
 fun ChoiceItemRow(
-    item: UiChoiceItem
+    item: UiChoiceItem,
+    viewModel: ItemViewModel<String>,
+    modifier: Modifier = Modifier
+) {
+    val selectedOption by viewModel.valueFlow.collectAsState()
+    ChoiceItemRowContent(item, selectedOption, { viewModel.setValue(it) }, modifier)
+}
+
+@Composable
+fun ChoiceItemRow(
+    item: UiChoiceItem,
+    modifier: Modifier = Modifier
 ) {
     val selectedOption by item.valueFlow.collectAsState()
+    ChoiceItemRowContent(item, selectedOption, { item.onValueChanged(it) }, modifier)
+}
+
+@Composable
+private fun ChoiceItemRowContent(
+    item: UiChoiceItem,
+    selectedOption: String,
+    onOptionSelected: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
     val title = stringResource(item.titleRes)
     val subtitle = item.subtitleRes?.let { stringResource(it) }
     val iconRes = item.iconRes
     val currentLabel = item.getValueTextRes(selectedOption)?.let { stringResource(it) } ?: selectedOption
 
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(vertical = 6.dp)
     ) {
@@ -168,10 +274,67 @@ fun ChoiceItemRow(
                     item.optionSlot(
                         option,
                         isSelected,
-                        { item.onValueChanged(option.value) }
+                        { onOptionSelected(option.value) }
                     )
                 }
             }
+        }
+    }
+}
+
+/**
+ * Compact Choice Grid Card for Recent Category screens.
+ */
+@Composable
+fun ChoiceGridCard(
+    item: UiChoiceItem,
+    viewModel: ItemViewModel<String>,
+    modifier: Modifier = Modifier
+) {
+    val selectedOption by viewModel.valueFlow.collectAsState()
+    val title = stringResource(item.titleRes)
+    val currentLabel = item.getValueTextRes(selectedOption)?.let { stringResource(it) } ?: selectedOption
+
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(110.dp),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(12.dp),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                val iconRes = item.iconRes
+                if (iconRes != null) {
+                    Icon(
+                        painter = painterResource(iconRes),
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp),
+                        tint = Color(0xFF6750A4)
+                    )
+                }
+                Badge(containerColor = Color(0xFFEDE7F6), contentColor = Color(0xFF6750A4)) {
+                    Text(text = currentLabel, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF1E1E2E)
+                ),
+                maxLines = 2
+            )
         }
     }
 }
@@ -181,15 +344,36 @@ fun ChoiceItemRow(
  */
 @Composable
 fun SliderItemRow(
-    item: UiSliderItem
+    item: UiSliderItem,
+    modifier: Modifier = Modifier
 ) {
     val value by item.valueFlow.collectAsState()
+    SliderItemRowContent(item, value, { item.onValueChanged(it) }, modifier)
+}
+
+@Composable
+fun SliderItemRow(
+    item: UiSliderItem,
+    viewModel: ItemViewModel<Int>,
+    modifier: Modifier = Modifier
+) {
+    val value by viewModel.valueFlow.collectAsState()
+    SliderItemRowContent(item, value, { viewModel.setValue(it) }, modifier)
+}
+
+@Composable
+private fun SliderItemRowContent(
+    item: UiSliderItem,
+    value: Int,
+    onValueChange: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
     val title = stringResource(item.titleRes)
     val subtitle = item.subtitleRes?.let { stringResource(it) }
     val unit = item.unitRes?.let { stringResource(it) } ?: ""
 
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(vertical = 6.dp)
     ) {
@@ -223,9 +407,65 @@ fun SliderItemRow(
         Spacer(modifier = Modifier.height(4.dp))
         androidx.compose.material3.Slider(
             value = value.toFloat(),
-            onValueChange = { item.onValueChanged(it.toInt()) },
+            onValueChange = { onValueChange(it.toInt()) },
             valueRange = item.min.toFloat()..item.max.toFloat(),
             modifier = Modifier.fillMaxWidth()
         )
+    }
+}
+
+/**
+ * Compact Slider Grid Card for Recent Category screens.
+ */
+@Composable
+fun SliderGridCard(
+    item: UiSliderItem,
+    viewModel: ItemViewModel<Int>,
+    modifier: Modifier = Modifier
+) {
+    val value by viewModel.valueFlow.collectAsState()
+    val title = stringResource(item.titleRes)
+    val unit = item.unitRes?.let { stringResource(it) } ?: ""
+
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(110.dp),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(12.dp),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                    maxLines = 1,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    text = "$value$unit",
+                    style = MaterialTheme.typography.labelMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF6750A4)
+                    )
+                )
+            }
+            androidx.compose.material3.Slider(
+                value = value.toFloat(),
+                onValueChange = { viewModel.setValue(it.toInt()) },
+                valueRange = item.min.toFloat()..item.max.toFloat(),
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
     }
 }

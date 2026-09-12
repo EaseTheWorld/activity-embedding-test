@@ -126,7 +126,7 @@ class SeatSettingsProvider : ContentProvider() {
                 )
                 // Dynamically iterate over SeatItemRegistry.items (List<Item> SSOT)
                 SeatItemRegistry.items.forEachIndexed { index, item ->
-                    val uiItem = item as? com.example.common.ui.settings.UiItem<*>
+                    val uiItem = item as? com.example.common.ui.settings.UiItem
                     val titleResId = uiItem?.titleRes ?: 0
                     val subtitleResId = uiItem?.subtitleRes ?: 0
                     val title = if (titleResId != 0) ctx.getString(titleResId) else item.key

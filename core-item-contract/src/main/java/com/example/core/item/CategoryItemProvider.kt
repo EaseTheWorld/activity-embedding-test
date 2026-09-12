@@ -8,7 +8,9 @@ interface CategoryItemProvider {
     val categoryId: String
     val authority: String
     val titleKey: String
-    val items: List<Item<*>>
+    val items: List<Item>
 
-    fun findItem(key: String): Item<*>? = items.find { it.key == key }
+    val rootItem: Item get() = Item(id = categoryId, children = items.toSet())
+
+    fun findItem(key: String): Item? = rootItem.findById(key) ?: items.find { it.key == key }
 }

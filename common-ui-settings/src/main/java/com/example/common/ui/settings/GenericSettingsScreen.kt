@@ -32,7 +32,7 @@ import com.example.core.item.Item
 fun GenericSettingsScreen(
     title: String,
     subtitle: String,
-    items: List<Item<*>>
+    items: List<Item>
 ) {
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -71,15 +71,23 @@ fun GenericSettingsScreen(
                         .padding(horizontal = 20.dp, vertical = 12.dp)
                 ) {
                     items(items, key = { it.key }) { item ->
-                        // Pure polymorphic self-drawing! ZERO 'when' statements!
-                        if (item is ComposableItemRenderer) {
-                            item.Draw()
-                        } else {
-                            Text(
-                                text = "Unsupported Item: ${item.key}",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.error
-                            )
+                        when (item) {
+                            is UiToggleItem -> ToggleItemRow(item = item)
+                            is UiChoiceItem -> ChoiceItemRow(item = item)
+                            is UiSliderItem -> SliderItemRow(item = item)
+                            is UiItem -> {
+                                Text(
+                                    text = androidx.compose.ui.res.stringResource(item.nameResId),
+                                    style = MaterialTheme.typography.titleMedium
+                                )
+                            }
+                            else -> {
+                                Text(
+                                    text = "Item: ${item.id}",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
                         }
                         HorizontalDivider(
                             modifier = Modifier.padding(vertical = 12.dp),

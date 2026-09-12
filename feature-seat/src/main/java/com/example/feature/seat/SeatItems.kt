@@ -17,10 +17,10 @@ import kotlinx.coroutines.flow.asStateFlow
 class DriverSeatHeatingItem(
     repository: SeatPropertyRepository = SeatPropertyRepositoryImpl.shared
 ) : VhalChoiceItem<Int>(
-    key = "driver_seat_heat",
-    titleRes = R.string.seat_item_driver_heat_title,
-    subtitleRes = R.string.seat_item_driver_heat_subtitle,
-    iconRes = R.drawable.ic_feature_seat,
+    id = "driver_seat_heat",
+    nameResId = R.string.seat_item_driver_heat_title,
+    descriptionResId = R.string.seat_item_driver_heat_subtitle,
+    iconResId = R.drawable.ic_feature_seat,
     propertyId = 0x11400503, // HVAC_SEAT_TEMPERATURE
     areaId = 1,              // SEAT_ROW_1_LEFT
     carOptions = listOf(
@@ -36,10 +36,10 @@ class DriverSeatHeatingItem(
 class PassengerSeatHeatingItem(
     repository: SeatPropertyRepository = SeatPropertyRepositoryImpl.shared
 ) : VhalChoiceItem<Int>(
-    key = "passenger_seat_heat",
-    titleRes = R.string.seat_item_passenger_heat_title,
-    subtitleRes = R.string.seat_item_passenger_heat_subtitle,
-    iconRes = R.drawable.ic_feature_seat,
+    id = "passenger_seat_heat",
+    nameResId = R.string.seat_item_passenger_heat_title,
+    descriptionResId = R.string.seat_item_passenger_heat_subtitle,
+    iconResId = R.drawable.ic_feature_seat,
     propertyId = 0x11400503, // HVAC_SEAT_TEMPERATURE
     areaId = 2,              // SEAT_ROW_1_RIGHT
     carOptions = listOf(
@@ -59,10 +59,10 @@ class PassengerSeatHeatingItem(
 class DriverSeatVentilationItem(
     repository: SeatPropertyRepository = SeatPropertyRepositoryImpl.shared
 ) : VhalChoiceItem<Int>(
-    key = "driver_seat_vent",
-    titleRes = R.string.seat_item_driver_vent_title,
-    subtitleRes = R.string.seat_item_driver_vent_subtitle,
-    iconRes = R.drawable.ic_seat_ventilation,
+    id = "driver_seat_vent",
+    nameResId = R.string.seat_item_driver_vent_title,
+    descriptionResId = R.string.seat_item_driver_vent_subtitle,
+    iconResId = R.drawable.ic_seat_ventilation,
     propertyId = 0x11400504, // HVAC_SEAT_VENTILATION
     areaId = 1,              // SEAT_ROW_1_LEFT
     carOptions = listOf(
@@ -83,10 +83,10 @@ class DriverSeatVentilationItem(
 class SeatMassageModeItem(
     repository: SeatPropertyRepository = SeatPropertyRepositoryImpl.shared
 ) : VhalChoiceItem<Int>(
-    key = "seat_massage",
-    titleRes = R.string.seat_item_massage_title,
-    subtitleRes = R.string.seat_item_massage_subtitle,
-    iconRes = R.drawable.ic_feature_seat,
+    id = "seat_massage",
+    nameResId = R.string.seat_item_massage_title,
+    descriptionResId = R.string.seat_item_massage_subtitle,
+    iconResId = R.drawable.ic_feature_seat,
     propertyId = 0x11400F00, // SEAT_MASSAGE_MODE
     areaId = 1,              // SEAT_ROW_1_LEFT
     carOptions = listOf(
@@ -105,20 +105,19 @@ class SeatMassageModeItem(
 // ============================================================================
 
 class EasyEntryExitItem : BaseUiToggleItem(
-    key = "easy_entry_exit",
-    titleRes = R.string.seat_item_easy_entry_title,
-    subtitleRes = R.string.seat_item_easy_entry_subtitle,
-    iconRes = R.drawable.ic_feature_seat,
+    id = "easy_entry_exit",
+    nameResId = R.string.seat_item_easy_entry_title,
+    descriptionResId = R.string.seat_item_easy_entry_subtitle,
+    iconResId = R.drawable.ic_feature_seat,
     initialValue = true
 )
 
 // ============================================================================
-// 3. Custom DataType (Item<SeatLumbarSupport>, UiItem<SeatLumbarSupport>)
+// 3. Custom DataType
 // ============================================================================
 
 /**
  * Custom Data Class representing 2D Pneumatic Lumbar Support coordinates.
- * Demonstrates how complex non-primitive state integrates with Item<T>.
  */
 data class SeatLumbarSupport(
     val heightPercent: Int, // 0..100% (Vertical position)
@@ -127,25 +126,18 @@ data class SeatLumbarSupport(
 
 /**
  * Setting Item using the Custom DataType.
- * Implements UiItem so it can draw itself polymorphically
- * without GenericSettingsActivity needing to know its concrete class.
  */
-class SeatLumbarSupportItem : Item<SeatLumbarSupport>, UiItem<SeatLumbarSupport> {
-    override val key: String = "seat_lumbar"
-    override val titleRes: Int = R.string.seat_item_lumbar_title
-    override val subtitleRes: Int = R.string.seat_item_lumbar_subtitle
-    override val iconRes: Int = R.drawable.ic_feature_seat
-
+class SeatLumbarSupportItem : UiItem(
+    id = "seat_lumbar",
+    nameResId = R.string.seat_item_lumbar_title,
+    descriptionResId = R.string.seat_item_lumbar_subtitle,
+    iconResId = R.drawable.ic_feature_seat
+) {
     private val _value = MutableStateFlow(SeatLumbarSupport(heightPercent = 50, depthPercent = 30))
-    override val valueFlow: StateFlow<SeatLumbarSupport> = _value.asStateFlow()
+    val valueFlow: StateFlow<SeatLumbarSupport> = _value.asStateFlow()
 
-    override fun onValueChanged(newValue: SeatLumbarSupport) {
+    fun onValueChanged(newValue: SeatLumbarSupport) {
         _value.value = newValue
-    }
-
-    @androidx.compose.runtime.Composable
-    override fun Draw() {
-        SeatLumbarRow(item = this)
     }
 
     override val serializedValue: String
@@ -177,7 +169,7 @@ object SeatItemRegistry : com.example.core.item.CategoryItemProvider {
     val easyEntryExit = EasyEntryExitItem()
     val seatLumbar = SeatLumbarSupportItem()
 
-    override val items: List<Item<*>> = listOf(
+    override val items: List<Item> = listOf(
         driverSeatHeat,
         driverSeatVent,
         seatMassage,

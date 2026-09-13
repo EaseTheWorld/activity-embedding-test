@@ -132,6 +132,10 @@ class SeatSettingsProvider : ContentProvider() {
                     val title = if (titleResId != 0) ctx.getString(titleResId) else item.key
                     val subtitle = if (subtitleResId != 0) ctx.getString(subtitleResId) else ""
                     val options = if (item is ChoiceItem) item.options.joinToString(",") else ""
+                    val serializedValue = when (item) {
+                        is SeatLumbarSupportItem -> SeatItemRegistry.seatLumbarViewModel.valueFlow.value.toSerialized()
+                        else -> item.serializedValue
+                    }
 
                     cursor.addRow(
                         arrayOf(
@@ -140,7 +144,7 @@ class SeatSettingsProvider : ContentProvider() {
                             title,
                             subtitle,
                             item.type.name,
-                            item.serializedValue,
+                            serializedValue,
                             0,
                             0,
                             options,
@@ -166,7 +170,7 @@ class SeatSettingsProvider : ContentProvider() {
                 when (targetItem) {
                     is ChoiceItem -> targetItem.onValueChanged(value)
                     is com.example.core.item.ToggleItem -> targetItem.onValueChanged(value.toBoolean())
-                    is SeatLumbarSupportItem -> targetItem.updateFromSerialized(value)
+                    is SeatLumbarSupportItem -> SeatItemRegistry.seatLumbarViewModel.updateFromSerialized(value)
                     else -> Unit
                 }
                 context?.contentResolver?.notifyChange(Uri.parse("content://$AUTHORITY/$PATH_ITEMS"), null)

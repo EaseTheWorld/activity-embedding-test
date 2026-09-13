@@ -7,6 +7,7 @@ import androidx.compose.runtime.Immutable
 import com.example.core.item.HasVhalBinding
 import com.example.core.item.Item
 import com.example.core.item.ItemType
+import com.example.core.item.ItemViewModel
 import com.example.core.item.VhalBinding
 import com.example.core.item.VhalPropertyBinder
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -102,7 +103,7 @@ open class UiItem(
 
 /**
  * Standard Toggle UI Item.
- * Holds state and toggle metadata without embedding Composable drawing code.
+ * Pure declarative presentation metadata without reactive state holding.
  */
 @Immutable
 open class UiToggleItem(
@@ -113,8 +114,6 @@ open class UiToggleItem(
     open val badgeKey: String? = null,
     @get:DrawableRes open val onIconRes: Int? = null,
     @get:DrawableRes open val offIconRes: Int? = null,
-    open val valueFlow: StateFlow<Boolean> = MutableStateFlow(false),
-    open val onValueChanged: (Boolean) -> Unit = {},
     children: Set<Item> = emptySet()
 ) : UiItem(id, nameResId, iconResId, descriptionResId, children) {
 
@@ -135,6 +134,7 @@ typealias OptionSlot<T> = @Composable (option: UiOption<T>, isSelected: Boolean,
 
 /**
  * Standard Choice UI Item.
+ * Pure declarative presentation metadata without reactive state holding.
  */
 @Immutable
 open class UiChoiceItem(
@@ -144,14 +144,14 @@ open class UiChoiceItem(
     @DrawableRes iconResId: Int? = null,
     @StringRes descriptionResId: Int? = null,
     val optionSlot: OptionSlot<String> = ChoiceOptionSlots.Segmented,
-    open val valueFlow: StateFlow<String> = MutableStateFlow(choiceOptions.firstOrNull()?.value ?: ""),
-    open val onValueChanged: (String) -> Unit = {},
     children: Set<Item> = emptySet()
 ) : UiItem(id, nameResId, iconResId, descriptionResId, children) {
 
     override val type: ItemType get() = ItemType.CHOICE
 
     val options: List<String> get() = choiceOptions.map { it.value }
+    val possibleOptions: List<UiOption<String>> get() = choiceOptions
+    val optionIds: List<String> get() = options
 
     fun getOption(value: String): UiOption<String>? =
         choiceOptions.firstOrNull { it.value == value }
@@ -167,6 +167,7 @@ open class UiChoiceItem(
 
 /**
  * Standard Slider UI Item.
+ * Pure declarative presentation metadata without reactive state holding.
  */
 @Immutable
 open class UiSliderItem(
@@ -177,8 +178,6 @@ open class UiSliderItem(
     @StringRes val unitRes: Int? = null,
     @DrawableRes iconResId: Int? = null,
     @StringRes descriptionResId: Int? = null,
-    open val valueFlow: StateFlow<Int> = MutableStateFlow(min),
-    open val onValueChanged: (Int) -> Unit = {},
     children: Set<Item> = emptySet()
 ) : UiItem(id, nameResId, iconResId, descriptionResId, children) {
     override val type: ItemType get() = ItemType.SLIDER
@@ -186,6 +185,7 @@ open class UiSliderItem(
 
 /**
  * Standard Action (Button) UI Item.
+ * Pure declarative presentation metadata without reactive state holding.
  */
 @Immutable
 open class UiActionItem(
@@ -194,8 +194,6 @@ open class UiActionItem(
     @StringRes val buttonLabelRes: Int? = null,
     @DrawableRes iconResId: Int? = null,
     @StringRes descriptionResId: Int? = null,
-    open val valueFlow: StateFlow<Unit> = MutableStateFlow(Unit),
-    open val onValueChanged: (Unit) -> Unit = {},
     children: Set<Item> = emptySet()
 ) : UiItem(id, nameResId, iconResId, descriptionResId, children) {
     override val type: ItemType get() = ItemType.ACTION
@@ -210,13 +208,13 @@ typealias ComposableChoiceItem = UiChoiceItem
 // ============================================================================
 
 /**
- * Base abstract class for standard Choice UI items with MutableStateFlow state holding.
+ * Convenience subclass for standard Choice UI items with default parameters.
+ * Stateless pure metadata.
  */
-abstract class BaseUiChoiceItem(
+open class BaseUiChoiceItem(
     id: String,
     @StringRes nameResId: Int,
     choiceOptions: List<UiOption<String>>,
-    initialValue: String = choiceOptions.firstOrNull()?.value ?: "",
     @StringRes descriptionResId: Int? = null,
     @DrawableRes iconResId: Int? = null,
     optionSlot: OptionSlot<String> = ChoiceOptionSlots.Segmented,
@@ -229,16 +227,7 @@ abstract class BaseUiChoiceItem(
     descriptionResId = descriptionResId,
     optionSlot = optionSlot,
     children = children
-) {
-    private val _valueFlow = MutableStateFlow(initialValue)
-    override val valueFlow: StateFlow<String> = _valueFlow.asStateFlow()
-
-    override val onValueChanged: (String) -> Unit = { newValue ->
-        if (options.contains(newValue)) {
-            _valueFlow.value = newValue
-        }
-    }
-}
+)
 
 /**
  * Fallback in-memory VHAL property binder for preview and testing environments.
@@ -266,6 +255,7 @@ class InMemoryVhalBinder : VhalPropertyBinder {
 /**
  * Bridge abstract class unifying UI presentation ([BaseUiChoiceItem]) with hardware
  * VHAL binding via composition ([VhalBinding]).
+ * Implements [ItemViewModel] for legacy backwards compatibility.
  */
 abstract class VhalChoiceItem<V>(
     id: String,
@@ -273,7 +263,7 @@ abstract class VhalChoiceItem<V>(
     val propertyId: Int,
     val areaId: Int = 0,
     val carOptions: List<CarUiOption<String, V>>,
-    initialValue: String = carOptions.firstOrNull()?.value ?: "",
+    val initialValue: String = carOptions.firstOrNull()?.value ?: "",
     @StringRes descriptionResId: Int? = null,
     @DrawableRes iconResId: Int? = null,
     optionSlot: OptionSlot<String> = ChoiceOptionSlots.Segmented,
@@ -283,12 +273,11 @@ abstract class VhalChoiceItem<V>(
     id = id,
     nameResId = nameResId,
     choiceOptions = carOptions,
-    initialValue = initialValue,
     descriptionResId = descriptionResId,
     iconResId = iconResId,
     optionSlot = optionSlot,
     children = children
-), HasVhalBinding<String, V> {
+), HasVhalBinding<String, V>, ItemViewModel<String> {
 
     override val vhalBinding: VhalBinding<String, V> = VhalBinding(
         propertyId = propertyId,
@@ -298,10 +287,14 @@ abstract class VhalChoiceItem<V>(
     )
 
     override val valueFlow: StateFlow<String> by lazy {
-        binder.bind(vhalBinding, choiceOptions.firstOrNull()?.value ?: "")
+        binder.bind(vhalBinding, initialValue)
     }
 
-    override val onValueChanged: (String) -> Unit = { newValue ->
+    override fun setValue(newValue: String) {
+        onValueChanged(newValue)
+    }
+
+    open val onValueChanged: (String) -> Unit = { newValue ->
         if (options.contains(newValue)) {
             binder.setProperty(vhalBinding, newValue)
         }
@@ -312,12 +305,12 @@ abstract class VhalChoiceItem<V>(
 }
 
 /**
- * Base class for standard Toggle UI items.
+ * Convenience subclass for standard Toggle UI items with default parameters.
+ * Stateless pure metadata.
  */
 open class BaseUiToggleItem(
     id: String,
     @StringRes nameResId: Int,
-    initialValue: Boolean = false,
     @StringRes descriptionResId: Int? = null,
     @DrawableRes iconResId: Int? = null,
     badgeKey: String? = null,
@@ -333,17 +326,11 @@ open class BaseUiToggleItem(
     onIconRes = onIconRes,
     offIconRes = offIconRes,
     children = children
-) {
-    private val _valueFlow = MutableStateFlow(initialValue)
-    override val valueFlow: StateFlow<Boolean> = _valueFlow.asStateFlow()
-
-    override val onValueChanged: (Boolean) -> Unit = { newValue ->
-        _valueFlow.value = newValue
-    }
-}
+)
 
 /**
  * Bridge abstract class unifying Toggle UI with VHAL binding via composition ([VhalBinding]).
+ * Implements [ItemViewModel] for legacy backwards compatibility.
  */
 abstract class VhalToggleItem<V>(
     id: String,
@@ -352,7 +339,7 @@ abstract class VhalToggleItem<V>(
     val areaId: Int = 0,
     val onVhalValue: V,
     val offVhalValue: V,
-    initialValue: Boolean = false,
+    val initialValue: Boolean = false,
     @StringRes descriptionResId: Int? = null,
     @DrawableRes iconResId: Int? = null,
     badgeKey: String? = null,
@@ -363,14 +350,13 @@ abstract class VhalToggleItem<V>(
 ) : BaseUiToggleItem(
     id = id,
     nameResId = nameResId,
-    initialValue = initialValue,
     descriptionResId = descriptionResId,
     iconResId = iconResId,
     badgeKey = badgeKey,
     onIconRes = onIconRes,
     offIconRes = offIconRes,
     children = children
-), HasVhalBinding<Boolean, V> {
+), HasVhalBinding<Boolean, V>, ItemViewModel<Boolean> {
 
     override val vhalBinding: VhalBinding<Boolean, V> = VhalBinding(
         propertyId = propertyId,
@@ -383,7 +369,11 @@ abstract class VhalToggleItem<V>(
         binder.bind(vhalBinding, initialValue)
     }
 
-    override val onValueChanged: (Boolean) -> Unit = { newValue ->
+    override fun setValue(newValue: Boolean) {
+        onValueChanged(newValue)
+    }
+
+    open val onValueChanged: (Boolean) -> Unit = { newValue ->
         binder.setProperty(vhalBinding, newValue)
     }
 

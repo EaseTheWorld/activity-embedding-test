@@ -90,14 +90,31 @@ class InMemoryHardwareStorage : HardwarePropertyStorage {
     @Suppress("UNCHECKED_CAST")
     override fun <DomainT, RawV> observe(property: VehicleProperty<DomainT, RawV>): StateFlow<DomainT> {
         val key = property.propertyId to property.areaId
-        mappers[key] = { property.mapper.toDomain(it as RawV) }
+        mappers[key] = { raw ->
+            if (raw != null) {
+                try {
+                    property.mapper.toDomain(raw as RawV)
+                } catch (e: Exception) {
+                    property.defaultValue
+                }
+            } else {
+                property.defaultValue
+            }
+        }
 
         val flow = domainStorage.getOrPut(key) {
             val raw = rawStorage[key]?.value as? RawV
             val initial = if (raw != null) {
-                property.mapper.toDomain(raw)
+                try {
+                    property.mapper.toDomain(raw)
+                } catch (e: Exception) {
+                    property.defaultValue
+                }
             } else {
-                property.mapper.toDomain(null as RawV)
+                property.defaultValue ?: runCatching {
+                    @Suppress("UNCHECKED_CAST")
+                    property.mapper.toDomain(0 as RawV)
+                }.getOrNull()
             }
             MutableStateFlow<Any?>(initial)
         } as MutableStateFlow<DomainT>

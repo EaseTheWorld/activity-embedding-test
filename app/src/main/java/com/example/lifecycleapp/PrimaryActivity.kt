@@ -173,7 +173,19 @@ class PrimaryActivity : BaseLoggingActivity() {
                 Log.e(tag, "[$activityName] Failed to query category from $authority: $e")
             }
         }
-        val sortedCategories = discovered.sortedBy { it.order }
+        val dashboardCategory = SettingCategory(
+            id = "dashboard",
+            title = "Quick Controls & All",
+            subtitle = "Recent items and category overview",
+            order = -1,
+            targetAction = "com.example.carsettings.DASHBOARD",
+            targetPackage = packageName,
+            targetActivity = "com.example.lifecycleapp.GenericSettingsActivity",
+            iconName = null,
+            authority = "local",
+            contentUri = Uri.EMPTY
+        )
+        val sortedCategories = (listOf(dashboardCategory) + discovered).sortedBy { it.order }
 
         val ruleController = androidx.window.embedding.RuleController.getInstance(this)
         val primaryComponent = ComponentName(this, PrimaryActivity::class.java)

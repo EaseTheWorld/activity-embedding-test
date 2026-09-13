@@ -158,6 +158,16 @@ interface ItemViewModel<T> {
 }
 
 /**
+ * Specialized [ItemViewModel] contract for multi-option Choice items.
+ * Exposes rich [optionStates] for UI rendering while preserving [valueFlow] and [setValue]
+ * for backward compatibility and uniform key-value storage.
+ */
+interface ChoiceItemViewModel<T> : ItemViewModel<T> {
+    val optionStates: StateFlow<List<ValueWithState<T>>>
+}
+
+
+/**
  * Universal Registry mapping setting item IDs to their respective [ItemViewModel].
  */
 open class ItemViewModelRegistry(
@@ -187,6 +197,13 @@ open class ItemViewModelRegistry(
     }
 
     fun <T> getViewModel(item: Item): ItemViewModel<T>? = getViewModel(item.id)
+
+    @Suppress("UNCHECKED_CAST")
+    fun <T> getChoiceViewModel(itemId: String): ChoiceItemViewModel<T>? {
+        return viewModels[itemId] as? ChoiceItemViewModel<T>
+    }
+
+    fun <T> getChoiceViewModel(item: Item): ChoiceItemViewModel<T>? = getChoiceViewModel(item.id)
 
     fun hasViewModel(itemId: String): Boolean = viewModels.containsKey(itemId)
     fun hasViewModel(item: Item): Boolean = hasViewModel(item.id)

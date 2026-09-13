@@ -1,6 +1,8 @@
 package com.example.feature.seat
 
 import com.example.core.item.ItemType
+import com.example.core.item.ItemViewModelRegistry
+import com.example.common.ui.settings.UiItem
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -11,53 +13,91 @@ import org.junit.Test
  * Concrete Unit Tests directly targeting Production Feature code in :feature-seat.
  *
  * This test suite protects against specific, high-risk production bugs:
- * 1. IPC Serialization / Deserialization asymmetry in SeatLumbarSupportItem.
- * 2. Unchecked invalid value injection into DriverSeatHeatingItem.
- * 3. Key collisions or ordering regressions in SeatItemRegistry SSOT.
+ * 1. UI Item vs ViewModel separation of concerns (SeatLumbarSupportItem vs SeatLumbarViewModel).
+ * 2. IPC Serialization / Deserialization asymmetry in SeatLumbarViewModel.
+ * 3. Unchecked invalid value injection into DriverSeatHeatingItem.
+ * 4. Key collisions or ordering regressions in SeatItemRegistry SSOT.
  */
 class SeatFeatureLogicTest {
 
     // ========================================================================
-    // Protection 1: IPC Round-Trip Symmetry & Format Regression
+    // Protection 1: Separation of Concerns & IPC Round-Trip Symmetry
     // ========================================================================
 
     @Test
-    fun `SeatLumbarSupportItem preserves exact state across IPC serialization and deserialization round-trip`() {
+    fun `SeatLumbarSupportItem is a stateless UiItem and does not own valueFlow`() {
         val item = SeatLumbarSupportItem()
 
-        // 1. Initial State Check
-        assertEquals(50, item.valueFlow.value.heightPercent)
-        assertEquals(30, item.valueFlow.value.depthPercent)
-        assertEquals("50,30", item.serializedValue)
+        // 1. Pure presentation metadata check
+        assertEquals("seat_lumbar", item.id)
+        assertEquals(R.string.seat_item_lumbar_title, item.titleRes)
+        assertEquals(R.string.seat_item_lumbar_subtitle, item.subtitleRes)
+        assertEquals(R.drawable.ic_feature_seat, item.iconRes)
+        assertEquals(ItemType.CUSTOM, item.type)
+        assertEquals("", item.serializedValue)
+        assertTrue(UiItem::class.java.isAssignableFrom(item.javaClass))
 
-        // 2. State Mutation
-        item.onValueChanged(SeatLumbarSupport(heightPercent = 85, depthPercent = 70))
-        val wirePayload = item.serializedValue
+        // 2. Architectural Guard: Item must NOT declare valueFlow, onValueChanged, or initialValue
+        val declaredMethodNames = item.javaClass.declaredMethods.map { it.name }
+        assertFalse("SeatLumbarSupportItem must not declare getValueFlow()", declaredMethodNames.contains("getValueFlow"))
+        assertFalse("SeatLumbarSupportItem must not declare onValueChanged()", declaredMethodNames.contains("onValueChanged"))
+        assertFalse("SeatLumbarSupportItem must not declare updateFromSerialized()", declaredMethodNames.contains("updateFromSerialized"))
+        assertFalse("SeatLumbarSupportItem must not declare getInitialValue()", declaredMethodNames.contains("getInitialValue"))
+    }
+
+    @Test
+    fun `SeatLumbarViewModel preserves exact state across IPC serialization and deserialization round-trip`() {
+        val viewModel = SeatLumbarViewModel()
+
+        // 1. Initial State Check
+        assertEquals(50, viewModel.valueFlow.value.heightPercent)
+        assertEquals(30, viewModel.valueFlow.value.depthPercent)
+        assertEquals("50,30", viewModel.valueFlow.value.toSerialized())
+
+        // 2. State Mutation via setValue
+        viewModel.setValue(SeatLumbarSupport(heightPercent = 85, depthPercent = 70))
+        val wirePayload = viewModel.valueFlow.value.toSerialized()
 
         // Regression Guard: If someone changes the format delimiter from ',' to ':' or swaps height/depth,
         // this test catches it before breaking remote ContentProvider IPC consumers.
         assertEquals("85,70", wirePayload)
 
         // 3. Round-trip Deserialization simulation (remote client sending back mutated value via ContentProvider update)
-        val consumerItem = SeatLumbarSupportItem()
-        consumerItem.updateFromSerialized(wirePayload)
+        val consumerViewModel = SeatLumbarViewModel()
+        consumerViewModel.updateFromSerialized(wirePayload)
 
-        assertEquals(85, consumerItem.valueFlow.value.heightPercent)
-        assertEquals(70, consumerItem.valueFlow.value.depthPercent)
+        assertEquals(85, consumerViewModel.valueFlow.value.heightPercent)
+        assertEquals(70, consumerViewModel.valueFlow.value.depthPercent)
     }
 
     @Test
-    fun `SeatLumbarSupportItem gracefully falls back to defaults on corrupt IPC payloads`() {
-        val item = SeatLumbarSupportItem()
+    fun `SeatLumbarViewModel gracefully falls back to defaults on corrupt IPC payloads`() {
+        val viewModel = SeatLumbarViewModel()
 
         // Corrupt payloads from malformed IPC calls
-        item.updateFromSerialized("invalid,payload")
-        assertEquals(50, item.valueFlow.value.heightPercent)
-        assertEquals(30, item.valueFlow.value.depthPercent)
+        viewModel.updateFromSerialized("invalid,payload")
+        assertEquals(50, viewModel.valueFlow.value.heightPercent)
+        assertEquals(30, viewModel.valueFlow.value.depthPercent)
 
-        item.updateFromSerialized("not_enough_parts")
-        assertEquals(50, item.valueFlow.value.heightPercent)
-        assertEquals(30, item.valueFlow.value.depthPercent)
+        viewModel.updateFromSerialized("not_enough_parts")
+        assertEquals(50, viewModel.valueFlow.value.heightPercent)
+        assertEquals(30, viewModel.valueFlow.value.depthPercent)
+    }
+
+    @Test
+    fun `SeatViewModelBinder registers SeatCatalog seatLumbar to SeatLumbarViewModel in registry`() {
+        val registry = ItemViewModelRegistry()
+        val customLumbarVm = SeatLumbarViewModel(SeatLumbarSupport(heightPercent = 75, depthPercent = 45))
+
+        SeatViewModelBinder.bindAll(
+            registry = registry,
+            lumbarViewModel = customLumbarVm
+        )
+
+        val boundVm = registry.getViewModel<SeatLumbarSupport>(SeatCatalog.seatLumbar)
+        assertNotNull("SeatCatalog.seatLumbar must be bound in registry", boundVm)
+        assertEquals(75, boundVm?.valueFlow?.value?.heightPercent)
+        assertEquals(45, boundVm?.valueFlow?.value?.depthPercent)
     }
 
     // ========================================================================

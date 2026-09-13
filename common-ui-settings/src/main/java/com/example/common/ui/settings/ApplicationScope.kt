@@ -1,14 +1,19 @@
 package com.example.common.ui.settings
 
+import com.example.core.item.ChoiceItemViewModel
 import com.example.core.item.ItemViewModel
 import com.example.core.item.ItemViewModelRegistry
+import com.example.core.item.ValueWithState
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /**
@@ -191,6 +196,92 @@ fun <DomainT, RawV> com.example.core.item.ItemViewModelRegistry.bindStorage(
     register(itemId, viewModel)
     return viewModel
 }
+
+/**
+ * In-memory [ChoiceItemViewModel] for tests, previews, and runtime settings.
+ * Produces [optionStates] with dynamic [ValueWithState] flags (isSelected, isEnabled)
+ * while preserving SSOT (option IDs come from the Item Catalog).
+ */
+class InMemoryChoiceItemViewModel<T>(
+    val supportedOptionIds: List<T>,
+    initialSelectedId: T = supportedOptionIds.first(),
+    private val disabledOptionIdsFlow: StateFlow<Set<T>> = MutableStateFlow(emptySet()),
+    scope: CoroutineScope = AppScope.scope
+) : ChoiceItemViewModel<T> {
+    private val _selectedIdFlow = MutableStateFlow(initialSelectedId)
+    override val valueFlow: StateFlow<T> = _selectedIdFlow.asStateFlow()
+
+    private fun computeStates(selectedId: T, disabledSet: Set<T>): List<ValueWithState<T>> =
+        supportedOptionIds.map { id ->
+            ValueWithState(
+                id = id,
+                isSelected = (id == selectedId),
+                isEnabled = !disabledSet.contains(id)
+            )
+        }
+
+    override val optionStates: StateFlow<List<ValueWithState<T>>> = combine(
+        _selectedIdFlow,
+        disabledOptionIdsFlow
+    ) { selectedId, disabledSet ->
+        computeStates(selectedId, disabledSet)
+    }.stateIn(
+        scope,
+        SharingStarted.Eagerly,
+        computeStates(_selectedIdFlow.value, disabledOptionIdsFlow.value)
+    )
+
+    override fun setValue(newValue: T) {
+        if (supportedOptionIds.contains(newValue)) {
+            _selectedIdFlow.value = newValue
+        }
+    }
+}
+
+/**
+ * Hardware-backed [ChoiceItemViewModel] bridging a Choice Item to [HardwarePropertyStorage].
+ * Exposes dynamic [optionStates] with per-option [ValueWithState] (isSelected, isEnabled)
+ * while preserving SSOT (option IDs come from the Item Catalog).
+ */
+class ChoiceHardwareItemViewModel<DomainT, RawV>(
+    val property: com.example.core.item.VehicleProperty<DomainT, RawV>,
+    val supportedOptionIds: List<DomainT>,
+    private val storage: HardwarePropertyStorage,
+    private val disabledOptionIdsFlow: StateFlow<Set<DomainT>> = MutableStateFlow(emptySet()),
+    private val scope: CoroutineScope = AppScope.scope
+) : ChoiceItemViewModel<DomainT> {
+
+    override val valueFlow: StateFlow<DomainT> = storage.observe(property)
+
+    private fun computeStates(selectedId: DomainT?, disabledSet: Set<DomainT>): List<ValueWithState<DomainT>> =
+        supportedOptionIds.map { id ->
+            ValueWithState(
+                id = id,
+                isSelected = (id == selectedId),
+                isEnabled = !disabledSet.contains(id)
+            )
+        }
+
+    override val optionStates: StateFlow<List<ValueWithState<DomainT>>> = combine(
+        valueFlow,
+        disabledOptionIdsFlow
+    ) { selectedId, disabledSet ->
+        computeStates(selectedId, disabledSet)
+    }.stateIn(
+        scope,
+        SharingStarted.Eagerly,
+        computeStates(valueFlow.value, disabledOptionIdsFlow.value)
+    )
+
+    override fun setValue(newValue: DomainT) {
+        if (supportedOptionIds.contains(newValue)) {
+            scope.launch {
+                storage.write(property, newValue)
+            }
+        }
+    }
+}
+
 
 
 

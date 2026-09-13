@@ -40,7 +40,7 @@ open class UiItem(
 ) : Item(id, children)
 ```
 - **Recomposition Optimization**: Marked with `@Immutable` so the Jetpack Compose compiler treats `UiItem` as stable, enabling **Smart Recomposition Skipping**.
-- **Specialized Subclasses**: `UiToggleItem`, `UiChoiceItem`, `UiSliderItem`, and `UiActionItem` encapsulate domain state flows (`valueFlow`) and change callbacks (`onValueChanged`).
+- **Pure Presentation Metadata Subclasses**: `UiToggleItem`, `UiChoiceItem`, `UiSliderItem`, and `UiActionItem` represent purely declarative UI descriptors (strings, icons, choice options). They do NOT hold domain state (`valueFlow`) or initial values (`initialValue`); reactive state is managed externally via `ItemViewModel<T>`. (See ADR 0004 for complete ViewModel decoupling and Choice SSOT).
 
 ### 3. Decoupled Compose Rendering (No `Draw()` inside Items)
 Composables are **NOT** created from or stored inside the menu tree:

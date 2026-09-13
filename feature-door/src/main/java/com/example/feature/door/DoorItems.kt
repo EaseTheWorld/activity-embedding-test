@@ -3,7 +3,7 @@ package com.example.feature.door
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import com.example.common.ui.settings.AppScope
-import com.example.common.ui.settings.BaseUiToggleItem
+import com.example.common.ui.settings.UiToggleItem
 import com.example.common.ui.settings.HardwareItemViewModel
 import com.example.common.ui.settings.HardwarePropertyStorage
 import com.example.common.ui.settings.InMemoryHardwareStorage
@@ -37,39 +37,34 @@ object DoorCatalog : SettingCatalog("door") {
         @StringRes nameResId: Int,
         @StringRes descriptionResId: Int,
         @DrawableRes iconResId: Int = R.drawable.ic_feature_door,
-        badgeKey: String? = null,
-        initialValue: Boolean = false
-    ): BaseUiToggleItem = item(
-        BaseUiToggleItem(
+        badgeKey: String? = null
+    ): UiToggleItem = item(
+        UiToggleItem(
             id = id,
             nameResId = nameResId,
             descriptionResId = descriptionResId,
             iconResId = iconResId,
-            badgeKey = badgeKey,
-            initialValue = initialValue
+            badgeKey = badgeKey
         )
     )
 
     val autoDoorLock = createToggle(
         id = "auto_lock",
         nameResId = R.string.door_item_autolock_title,
-        descriptionResId = R.string.door_item_autolock_subtitle,
-        initialValue = true
+        descriptionResId = R.string.door_item_autolock_subtitle
     )
 
     val childLock = createToggle(
         id = "child_lock",
         nameResId = R.string.door_item_childlock_title,
-        descriptionResId = R.string.door_item_childlock_subtitle,
-        initialValue = false
+        descriptionResId = R.string.door_item_childlock_subtitle
     )
 
     val unlockOnPark = createToggle(
         id = "unlock_on_park",
         nameResId = R.string.door_item_unlockpark_title,
         descriptionResId = R.string.door_item_unlockpark_subtitle,
-        badgeKey = "SAFE",
-        initialValue = true
+        badgeKey = "SAFE"
     )
 }
 

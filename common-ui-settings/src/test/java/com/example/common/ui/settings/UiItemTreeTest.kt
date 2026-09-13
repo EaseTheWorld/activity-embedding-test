@@ -2,7 +2,6 @@ package com.example.common.ui.settings
 
 import androidx.compose.runtime.Immutable
 import com.example.core.item.Item
-import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -15,14 +14,12 @@ class UiItemTreeTest {
         val child1 = UiToggleItem(
             id = "frunk_light",
             nameResId = 1001,
-            iconResId = 2001,
-            valueFlow = MutableStateFlow(true)
+            iconResId = 2001
         )
         val child2 = UiToggleItem(
             id = "trunk_light",
             nameResId = 1002,
-            iconResId = 2002,
-            valueFlow = MutableStateFlow(false)
+            iconResId = 2002
         )
         val parentGroup = UiItem(
             id = "lights_group",
@@ -41,8 +38,7 @@ class UiItemTreeTest {
     fun `UiItem hierarchy ensures immutability with read-only properties and sets`() {
         val child = UiToggleItem(
             id = "toggle_1",
-            nameResId = 100,
-            valueFlow = MutableStateFlow(true)
+            nameResId = 100
         )
         val parent = UiItem(
             id = "parent_1",
@@ -63,8 +59,7 @@ class UiItemTreeTest {
     fun `external search manager can traverse Item tree without Compose dependencies`() {
         val child = UiToggleItem(
             id = "child_lock",
-            nameResId = 101,
-            valueFlow = MutableStateFlow(false)
+            nameResId = 101
         )
         val root = Item(
             id = "door_category",

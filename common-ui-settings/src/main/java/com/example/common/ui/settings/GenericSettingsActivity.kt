@@ -18,9 +18,16 @@ import com.example.core.item.CategoryItemRegistry
 open class GenericSettingsActivity : AppCompatActivity() {
 
     private val tag = "GenericSettingsActivity"
+    private var isDashboard by mutableStateOf(false)
     private var currentProvider by mutableStateOf<CategoryItemProvider?>(null)
     private var currentTitle by mutableStateOf("Settings")
     private var currentSubtitle by mutableStateOf("Data-driven items rendered via Jetpack Compose")
+
+    private val recentManager by lazy {
+        RecentCategoryManager(
+            initialKeys = listOf("auto_lock", "easy_entry_exit", "unlock_on_park", "driver_seat_heat")
+        )
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -28,13 +35,25 @@ open class GenericSettingsActivity : AppCompatActivity() {
         resolveCategory(intent)
 
         setContent {
-            val provider = currentProvider
-            if (provider != null) {
-                GenericSettingsScreen(
-                    title = currentTitle,
-                    subtitle = currentSubtitle,
-                    items = provider.items
+            if (isDashboard) {
+                val providers = CategoryItemRegistry.getAllProviders().toList()
+                val itemResolver: (String) -> com.example.core.item.Item? = { key ->
+                    providers.firstNotNullOfOrNull { it.findItem(key) }
+                }
+                MainSettingsDashboardScreen(
+                    recentManager = recentManager,
+                    providers = providers,
+                    itemResolver = itemResolver
                 )
+            } else {
+                val provider = currentProvider
+                if (provider != null) {
+                    GenericSettingsScreen(
+                        title = currentTitle,
+                        subtitle = currentSubtitle,
+                        items = provider.items
+                    )
+                }
             }
         }
     }
@@ -51,11 +70,21 @@ open class GenericSettingsActivity : AppCompatActivity() {
 
         val categoryId = when {
             !extraCat.isNullOrEmpty() -> extraCat
+            action == "com.example.carsettings.DASHBOARD" -> "dashboard"
             action == "com.example.carsettings.door.OPEN" -> "door"
             action == "com.example.carsettings.seat.OPEN" -> "seat"
-            else -> "door"
+            else -> "dashboard"
         }
 
+        if (categoryId.equals("dashboard", ignoreCase = true)) {
+            isDashboard = true
+            currentTitle = "Vehicle Settings"
+            currentSubtitle = "Quick Controls and Category Overview"
+            Log.d(tag, "Rendered dashboard via Compose")
+            return
+        }
+
+        isDashboard = false
         val provider = CategoryItemRegistry.getProvider(categoryId)
         if (provider == null) {
             Log.e(tag, "No CategoryItemProvider found for categoryId: $categoryId")

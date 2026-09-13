@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.core.item.Item
+import com.example.core.item.ItemViewModelRegistry
 
 /**
  * Universal Settings Screen rendered via Jetpack Compose.
@@ -32,7 +33,8 @@ import com.example.core.item.Item
 fun GenericSettingsScreen(
     title: String,
     subtitle: String,
-    items: List<Item>
+    items: List<Item>,
+    viewModelRegistry: ItemViewModelRegistry = LocalItemViewModelRegistry.current
 ) {
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -72,9 +74,9 @@ fun GenericSettingsScreen(
                 ) {
                     items(items, key = { it.key }) { item ->
                         when (item) {
-                            is UiToggleItem -> ToggleItemRow(item = item)
-                            is UiChoiceItem -> ChoiceItemRow(item = item)
-                            is UiSliderItem -> SliderItemRow(item = item)
+                            is UiToggleItem -> ToggleItemRow(item = item, viewModelRegistry = viewModelRegistry)
+                            is UiChoiceItem -> ChoiceItemRow(item = item, viewModelRegistry = viewModelRegistry)
+                            is UiSliderItem -> SliderItemRow(item = item, viewModelRegistry = viewModelRegistry)
                             is UiItem -> {
                                 Text(
                                     text = androidx.compose.ui.res.stringResource(item.nameResId),

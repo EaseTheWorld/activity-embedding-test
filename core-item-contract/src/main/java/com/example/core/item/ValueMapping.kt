@@ -29,6 +29,17 @@ data class ValueMapping<DomainT, RawV>(
             toDomain = { it },
             toRaw = { it }
         )
+
+        /**
+         * Automatically constructs a [ValueMapping] from an ordered list of option IDs.
+         * Maps positional integer index (0, 1, 2...) <-> Domain option identifier.
+         * Eliminates string re-declaration in hardware mapping layers (SSOT).
+         */
+        fun <DomainT> fromOptions(options: List<DomainT>, defaultIndex: Int = 0): ValueMapping<DomainT, Int> =
+            ValueMapping(
+                toDomain = { raw -> options.getOrElse(raw) { options[defaultIndex] } },
+                toRaw = { domain -> options.indexOf(domain).coerceAtLeast(0) }
+            )
     }
 }
 
@@ -68,7 +79,8 @@ typealias HardwareBinding<DomainT, RawV> = PropertyBinding<DomainT, RawV, Hardwa
 data class VehicleProperty<DomainT, RawV>(
     val propertyId: Int,
     val areaId: Int = 0,
-    val mapper: ValueMapping<DomainT, RawV>
+    val mapper: ValueMapping<DomainT, RawV>,
+    val defaultValue: DomainT? = null
 ) {
     val key: HardwareKey get() = HardwareKey(propertyId, areaId)
 }

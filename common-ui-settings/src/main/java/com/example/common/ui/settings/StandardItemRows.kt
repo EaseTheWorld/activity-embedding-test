@@ -33,7 +33,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
+import com.example.core.item.ChoiceItemViewModel
 import com.example.core.item.ItemViewModel
+import com.example.core.item.ItemViewModelRegistry
+import com.example.core.item.ValueWithState
 
 /**
  * Standard Toggle Row: Renders a Switch with compile-time @StringRes title,
@@ -42,20 +45,25 @@ import com.example.core.item.ItemViewModel
 @Composable
 fun ToggleItemRow(
     item: UiToggleItem,
+    viewModel: ItemViewModel<Boolean>,
     modifier: Modifier = Modifier
 ) {
-    val isChecked by item.valueFlow.collectAsState()
-    ToggleItemRowContent(item, isChecked, { item.onValueChanged(it) }, modifier)
+    val isChecked by viewModel.valueFlow.collectAsState()
+    ToggleItemRowContent(item = item, isChecked = isChecked, onCheckedChange = { viewModel.setValue(it) }, modifier = modifier)
 }
 
 @Composable
 fun ToggleItemRow(
     item: UiToggleItem,
-    viewModel: ItemViewModel<Boolean>,
+    viewModelRegistry: ItemViewModelRegistry = LocalItemViewModelRegistry.current,
     modifier: Modifier = Modifier
 ) {
-    val isChecked by viewModel.valueFlow.collectAsState()
-    ToggleItemRowContent(item, isChecked, { viewModel.setValue(it) }, modifier)
+    val viewModel = viewModelRegistry.getViewModel<Boolean>(item.id)
+    if (viewModel != null) {
+        ToggleItemRow(item = item, viewModel = viewModel, modifier = modifier)
+    } else {
+        ToggleItemRowContent(item = item, isChecked = false, onCheckedChange = {}, enabled = false, modifier = modifier)
+    }
 }
 
 @Composable
@@ -63,6 +71,7 @@ private fun ToggleItemRowContent(
     item: UiToggleItem,
     isChecked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
+    enabled: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val title = stringResource(item.titleRes)
@@ -118,7 +127,8 @@ private fun ToggleItemRowContent(
 
         Switch(
             checked = isChecked,
-            onCheckedChange = onCheckedChange
+            onCheckedChange = onCheckedChange,
+            enabled = enabled
         )
     }
 }
@@ -184,6 +194,70 @@ fun ToggleGridCard(
     }
 }
 
+@Composable
+fun ToggleGridCard(
+    item: UiToggleItem,
+    viewModelRegistry: ItemViewModelRegistry = LocalItemViewModelRegistry.current,
+    modifier: Modifier = Modifier
+) {
+    val viewModel = viewModelRegistry.getViewModel<Boolean>(item.id)
+    if (viewModel != null) {
+        ToggleGridCard(item = item, viewModel = viewModel, modifier = modifier)
+    } else {
+        val title = stringResource(item.titleRes)
+        val iconRes = item.iconRes
+
+        Card(
+            modifier = modifier
+                .fillMaxWidth()
+                .height(110.dp),
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = Color.White
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(12.dp),
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (iconRes != null) {
+                        Icon(
+                            painter = painterResource(iconRes),
+                            contentDescription = null,
+                            modifier = Modifier.size(24.dp),
+                            tint = Color(0xFF757575)
+                        )
+                    } else {
+                        Spacer(modifier = Modifier.size(24.dp))
+                    }
+                    Switch(
+                        checked = false,
+                        onCheckedChange = {},
+                        enabled = false
+                    )
+                }
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFF1E1E2E)
+                    ),
+                    maxLines = 2
+                )
+            }
+        }
+    }
+}
+
+
 /**
  * Standard Choice Row: Renders Segmented Buttons with compile-time @StringRes title,
  * optional subtitle, and localized option labels/icons.
@@ -194,17 +268,39 @@ fun ChoiceItemRow(
     viewModel: ItemViewModel<String>,
     modifier: Modifier = Modifier
 ) {
-    val selectedOption by viewModel.valueFlow.collectAsState()
-    ChoiceItemRowContent(item, selectedOption, { viewModel.setValue(it) }, modifier)
+    if (viewModel is ChoiceItemViewModel<String>) {
+        val optionStates by viewModel.optionStates.collectAsState()
+        val selectedOption by viewModel.valueFlow.collectAsState()
+        ChoiceItemRowWithStates(item, selectedOption, optionStates, { viewModel.setValue(it) }, modifier)
+    } else {
+        val selectedOption by viewModel.valueFlow.collectAsState()
+        ChoiceItemRowContent(item, selectedOption, { viewModel.setValue(it) }, modifier)
+    }
 }
 
 @Composable
 fun ChoiceItemRow(
     item: UiChoiceItem,
+    viewModel: ChoiceItemViewModel<String>,
     modifier: Modifier = Modifier
 ) {
-    val selectedOption by item.valueFlow.collectAsState()
-    ChoiceItemRowContent(item, selectedOption, { item.onValueChanged(it) }, modifier)
+    val optionStates by viewModel.optionStates.collectAsState()
+    val selectedOption by viewModel.valueFlow.collectAsState()
+    ChoiceItemRowWithStates(item, selectedOption, optionStates, { viewModel.setValue(it) }, modifier)
+}
+
+@Composable
+fun ChoiceItemRow(
+    item: UiChoiceItem,
+    viewModelRegistry: ItemViewModelRegistry = LocalItemViewModelRegistry.current,
+    modifier: Modifier = Modifier
+) {
+    val viewModel = viewModelRegistry.getViewModel<String>(item.id)
+    if (viewModel != null) {
+        ChoiceItemRow(item = item, viewModel = viewModel, modifier = modifier)
+    } else {
+        ChoiceItemRowContent(item = item, selectedOption = "", onOptionSelected = {}, modifier = modifier)
+    }
 }
 
 @Composable
@@ -217,7 +313,11 @@ private fun ChoiceItemRowContent(
     val title = stringResource(item.titleRes)
     val subtitle = item.subtitleRes?.let { stringResource(it) }
     val iconRes = item.iconRes
-    val currentLabel = item.getValueTextRes(selectedOption)?.let { stringResource(it) } ?: selectedOption
+    val currentLabel = if (selectedOption.isNotEmpty()) {
+        item.getValueTextRes(selectedOption)?.let { stringResource(it) } ?: selectedOption
+    } else {
+        "-"
+    }
 
     Column(
         modifier = modifier
@@ -282,6 +382,86 @@ private fun ChoiceItemRowContent(
     }
 }
 
+@Composable
+private fun ChoiceItemRowWithStates(
+    item: UiChoiceItem,
+    selectedOption: String,
+    optionStates: List<ValueWithState<String>>,
+    onOptionSelected: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val title = stringResource(item.titleRes)
+    val subtitle = item.subtitleRes?.let { stringResource(it) }
+    val iconRes = item.iconRes
+    val currentLabel = item.getValueTextRes(selectedOption)?.let { stringResource(it) } ?: selectedOption
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (iconRes != null) {
+                Icon(
+                    painter = painterResource(iconRes),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(32.dp)
+                        .padding(end = 10.dp),
+                    tint = Color(0xFF6750A4)
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFF1E1E2E)
+                    )
+                )
+                Text(
+                    text = "Current: $currentLabel",
+                    style = MaterialTheme.typography.labelMedium.copy(
+                        color = Color(0xFF6750A4),
+                        fontWeight = FontWeight.Medium
+                    )
+                )
+            }
+        }
+
+        if (subtitle != null && subtitle.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall.copy(
+                    color = Color(0xFF757575)
+                )
+            )
+        }
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // Options rendered dynamically from optionStates (ID-mapped to static UiOption)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            optionStates.forEach { state ->
+                val option = item.getOption(state.id)
+                if (option != null) {
+                    androidx.compose.foundation.layout.Box(modifier = Modifier.weight(1f)) {
+                        item.optionSlot(
+                            option,
+                            state.isSelected,
+                            { if (state.isEnabled) onOptionSelected(state.id) }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+
 /**
  * Compact Choice Grid Card for Recent Category screens.
  */
@@ -339,18 +519,68 @@ fun ChoiceGridCard(
     }
 }
 
+@Composable
+fun ChoiceGridCard(
+    item: UiChoiceItem,
+    viewModelRegistry: ItemViewModelRegistry = LocalItemViewModelRegistry.current,
+    modifier: Modifier = Modifier
+) {
+    val viewModel = viewModelRegistry.getViewModel<String>(item.id)
+    if (viewModel != null) {
+        ChoiceGridCard(item = item, viewModel = viewModel, modifier = modifier)
+    } else {
+        val title = stringResource(item.titleRes)
+        val currentLabel = "-"
+
+        Card(
+            modifier = modifier
+                .fillMaxWidth()
+                .height(110.dp),
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(12.dp),
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val iconRes = item.iconRes
+                    if (iconRes != null) {
+                        Icon(
+                            painter = painterResource(iconRes),
+                            contentDescription = null,
+                            modifier = Modifier.size(24.dp),
+                            tint = Color(0xFF6750A4)
+                        )
+                    }
+                    Badge(containerColor = Color(0xFFEDE7F6), contentColor = Color(0xFF6750A4)) {
+                        Text(text = currentLabel, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFF1E1E2E)
+                    ),
+                    maxLines = 2
+                )
+            }
+        }
+    }
+}
+
+
 /**
  * Standard Slider Row: Renders a Slider for UiSliderItem.
  */
-@Composable
-fun SliderItemRow(
-    item: UiSliderItem,
-    modifier: Modifier = Modifier
-) {
-    val value by item.valueFlow.collectAsState()
-    SliderItemRowContent(item, value, { item.onValueChanged(it) }, modifier)
-}
-
 @Composable
 fun SliderItemRow(
     item: UiSliderItem,
@@ -358,7 +588,21 @@ fun SliderItemRow(
     modifier: Modifier = Modifier
 ) {
     val value by viewModel.valueFlow.collectAsState()
-    SliderItemRowContent(item, value, { viewModel.setValue(it) }, modifier)
+    SliderItemRowContent(item = item, value = value, onValueChange = { viewModel.setValue(it) }, modifier = modifier)
+}
+
+@Composable
+fun SliderItemRow(
+    item: UiSliderItem,
+    viewModelRegistry: ItemViewModelRegistry = LocalItemViewModelRegistry.current,
+    modifier: Modifier = Modifier
+) {
+    val viewModel = viewModelRegistry.getViewModel<Int>(item.id)
+    if (viewModel != null) {
+        SliderItemRow(item = item, viewModel = viewModel, modifier = modifier)
+    } else {
+        SliderItemRowContent(item = item, value = item.min, onValueChange = {}, enabled = false, modifier = modifier)
+    }
 }
 
 @Composable
@@ -366,6 +610,7 @@ private fun SliderItemRowContent(
     item: UiSliderItem,
     value: Int,
     onValueChange: (Int) -> Unit,
+    enabled: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val title = stringResource(item.titleRes)
@@ -408,6 +653,7 @@ private fun SliderItemRowContent(
         androidx.compose.material3.Slider(
             value = value.toFloat(),
             onValueChange = { onValueChange(it.toInt()) },
+            enabled = enabled,
             valueRange = item.min.toFloat()..item.max.toFloat(),
             modifier = Modifier.fillMaxWidth()
         )
@@ -469,3 +715,62 @@ fun SliderGridCard(
         }
     }
 }
+
+@Composable
+fun SliderGridCard(
+    item: UiSliderItem,
+    viewModelRegistry: ItemViewModelRegistry = LocalItemViewModelRegistry.current,
+    modifier: Modifier = Modifier
+) {
+    val viewModel = viewModelRegistry.getViewModel<Int>(item.id)
+    if (viewModel != null) {
+        SliderGridCard(item = item, viewModel = viewModel, modifier = modifier)
+    } else {
+        val title = stringResource(item.titleRes)
+        val unit = item.unitRes?.let { stringResource(it) } ?: ""
+
+        Card(
+            modifier = modifier
+                .fillMaxWidth()
+                .height(110.dp),
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(12.dp),
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                        maxLines = 1,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Text(
+                        text = "-$unit",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF6750A4)
+                        )
+                    )
+                }
+                androidx.compose.material3.Slider(
+                    value = item.min.toFloat(),
+                    onValueChange = {},
+                    enabled = false,
+                    valueRange = item.min.toFloat()..item.max.toFloat(),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+    }
+}
+

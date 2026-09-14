@@ -1,6 +1,7 @@
 package com.example.feature.seat
 
 import com.example.core.item.ItemViewModel
+import com.example.core.item.MutableItemViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -40,7 +41,7 @@ data class SeatLumbarSupport(
  */
 class SeatLumbarViewModel(
     initialValue: SeatLumbarSupport = SeatLumbarSupport.DEFAULT
-) : ItemViewModel<SeatLumbarSupport> {
+) : MutableItemViewModel<SeatLumbarSupport> {
 
     private val _valueFlow = MutableStateFlow(initialValue)
     override val valueFlow: StateFlow<SeatLumbarSupport> = _valueFlow.asStateFlow()

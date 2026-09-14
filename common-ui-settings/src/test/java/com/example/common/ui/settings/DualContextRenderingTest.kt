@@ -49,7 +49,7 @@ class DualContextRenderingTest {
 
         // 2. User navigates to Recent / Quick Controls screen (Grid Card)
         // User clicks the GridCard switch to toggle it ON
-        val recentGridViewModel = viewModelRegistry.getViewModel<Boolean>("auto_lock")!!
+        val recentGridViewModel = viewModelRegistry.getMutableViewModel<Boolean>("auto_lock")!!
         recentGridViewModel.setValue(true)
         testScope.advanceUntilIdle()
 

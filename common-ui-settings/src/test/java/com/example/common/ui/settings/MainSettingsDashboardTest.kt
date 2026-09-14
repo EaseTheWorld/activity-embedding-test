@@ -83,7 +83,7 @@ class MainSettingsDashboardTest {
         assertEquals(false, autoLockVm.valueFlow.value)
 
         // 2. User toggles switch in the Top Recent Grid Card
-        val recentVm = viewModelRegistry.getViewModel<Boolean>("auto_lock")
+        val recentVm = viewModelRegistry.getMutableViewModel<Boolean>("auto_lock")
         assertNotNull(recentVm)
         recentVm!!.setValue(true)
         testScope.advanceUntilIdle()

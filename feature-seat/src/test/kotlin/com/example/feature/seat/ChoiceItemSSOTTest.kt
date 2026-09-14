@@ -105,7 +105,7 @@ class ChoiceItemSSOTTest {
             scope = testScope
         )
 
-        val choiceVm = registry.getChoiceViewModel<String>(SeatCatalog.massageMode)!!
+        val choiceVm = registry.getMutableChoiceViewModel<String>(SeatCatalog.massageMode)!!
 
         // 1. Initial State: "OFF" selected, all enabled
         val initialStates = choiceVm.optionStates.value

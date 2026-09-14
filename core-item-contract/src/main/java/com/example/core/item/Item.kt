@@ -147,24 +147,40 @@ abstract class SettingCatalog(val id: String) {
 }
 
 /**
- * Encapsulated reactive ViewModel contract for an individual setting item.
+ * Encapsulated reactive ViewModel contract for an individual setting item (Read-Only).
  * Decouples the storage mechanism (DataStore, Network, VHAL) from the UI layer.
  *
- * Exposes observable domain state via [valueFlow] and receives user mutations via [setValue].
+ * Exposes observable domain state via [valueFlow].
+ * Ideal for telemetry sensors, vehicle status gauges, and passive dashboard displays.
  */
 interface ItemViewModel<T> {
     val valueFlow: StateFlow<T>
+}
+
+/**
+ * Mutable ViewModel contract for interactive setting items supporting user input.
+ * Receives user mutations via [setValue].
+ *
+ * Adheres to the Interface Segregation Principle (ISP) by separating
+ * write capability from read-only observation ([ItemViewModel]).
+ */
+interface MutableItemViewModel<T> : ItemViewModel<T> {
     fun setValue(newValue: T)
 }
 
 /**
- * Specialized [ItemViewModel] contract for multi-option Choice items.
- * Exposes rich [optionStates] for UI rendering while preserving [valueFlow] and [setValue]
- * for backward compatibility and uniform key-value storage.
+ * Specialized [ItemViewModel] contract for multi-option Choice items (Read-Only).
+ * Exposes rich [optionStates] for UI rendering while preserving [valueFlow]
+ * for uniform key-value observation.
  */
 interface ChoiceItemViewModel<T> : ItemViewModel<T> {
     val optionStates: StateFlow<List<ValueWithState<T>>>
 }
+
+/**
+ * Mutable Choice ViewModel contract supporting both dynamic option states and user selection mutations.
+ */
+interface MutableChoiceItemViewModel<T> : ChoiceItemViewModel<T>, MutableItemViewModel<T>
 
 
 /**
@@ -199,11 +215,25 @@ open class ItemViewModelRegistry(
     fun <T> getViewModel(item: Item): ItemViewModel<T>? = getViewModel(item.id)
 
     @Suppress("UNCHECKED_CAST")
+    fun <T> getMutableViewModel(itemId: String): MutableItemViewModel<T>? {
+        return viewModels[itemId] as? MutableItemViewModel<T>
+    }
+
+    fun <T> getMutableViewModel(item: Item): MutableItemViewModel<T>? = getMutableViewModel(item.id)
+
+    @Suppress("UNCHECKED_CAST")
     fun <T> getChoiceViewModel(itemId: String): ChoiceItemViewModel<T>? {
         return viewModels[itemId] as? ChoiceItemViewModel<T>
     }
 
     fun <T> getChoiceViewModel(item: Item): ChoiceItemViewModel<T>? = getChoiceViewModel(item.id)
+
+    @Suppress("UNCHECKED_CAST")
+    fun <T> getMutableChoiceViewModel(itemId: String): MutableChoiceItemViewModel<T>? {
+        return viewModels[itemId] as? MutableChoiceItemViewModel<T>
+    }
+
+    fun <T> getMutableChoiceViewModel(item: Item): MutableChoiceItemViewModel<T>? = getMutableChoiceViewModel(item.id)
 
     fun hasViewModel(itemId: String): Boolean = viewModels.containsKey(itemId)
     fun hasViewModel(item: Item): Boolean = hasViewModel(item.id)

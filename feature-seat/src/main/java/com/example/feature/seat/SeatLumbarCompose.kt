@@ -23,10 +23,15 @@ import com.example.common.ui.settings.ItemRenderer
 import com.example.common.ui.settings.LocalItemViewModelRegistry
 import com.example.core.item.ItemViewModel
 import com.example.core.item.ItemViewModelRegistry
+import com.example.core.item.MutableItemViewModel
 
 /**
- * Encapsulated Composable UI for SeatLumbarSupportItem located completely inside :feature-seat.
- * Decoupled from state management: observes and mutates via [ItemViewModel].
+ * Custom 2D Lumbar Support Composable Row.
+ * Directly renders 4 pneumatic control buttons for height/depth adjustment.
+ *
+ * Adheres to Interface Segregation Principle:
+ * Accepts [ItemViewModel] for observation; if the ViewModel also implements [MutableItemViewModel],
+ * adjustment buttons are enabled; otherwise they render gracefully disabled (e.g. read-only telemetry / passenger display).
  */
 @Composable
 fun SeatLumbarRow(
@@ -35,6 +40,7 @@ fun SeatLumbarRow(
     modifier: Modifier = Modifier
 ) {
     val lumbar by viewModel.valueFlow.collectAsState()
+    val isMutable = viewModel is MutableItemViewModel
 
     val title = androidx.compose.ui.res.stringResource(item.titleRes)
     val subtitle = item.subtitleRes?.let { androidx.compose.ui.res.stringResource(it) } ?: ""
@@ -76,8 +82,9 @@ fun SeatLumbarRow(
             OutlinedButton(
                 onClick = {
                     val next = lumbar.copy(heightPercent = (lumbar.heightPercent + 10).coerceAtMost(100))
-                    viewModel.setValue(next)
+                    (viewModel as? MutableItemViewModel)?.setValue(next)
                 },
+                enabled = isMutable,
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(8.dp)
             ) {
@@ -87,8 +94,9 @@ fun SeatLumbarRow(
             OutlinedButton(
                 onClick = {
                     val next = lumbar.copy(heightPercent = (lumbar.heightPercent - 10).coerceAtLeast(0))
-                    viewModel.setValue(next)
+                    (viewModel as? MutableItemViewModel)?.setValue(next)
                 },
+                enabled = isMutable,
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(8.dp)
             ) {
@@ -98,8 +106,9 @@ fun SeatLumbarRow(
             OutlinedButton(
                 onClick = {
                     val next = lumbar.copy(depthPercent = (lumbar.depthPercent + 10).coerceAtMost(100))
-                    viewModel.setValue(next)
+                    (viewModel as? MutableItemViewModel)?.setValue(next)
                 },
+                enabled = isMutable,
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(8.dp)
             ) {
@@ -109,8 +118,9 @@ fun SeatLumbarRow(
             OutlinedButton(
                 onClick = {
                     val next = lumbar.copy(depthPercent = (lumbar.depthPercent - 10).coerceAtLeast(0))
-                    viewModel.setValue(next)
+                    (viewModel as? MutableItemViewModel)?.setValue(next)
                 },
+                enabled = isMutable,
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(8.dp)
             ) {

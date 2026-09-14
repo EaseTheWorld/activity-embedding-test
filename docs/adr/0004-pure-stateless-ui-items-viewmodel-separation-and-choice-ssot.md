@@ -125,11 +125,28 @@ To eliminate monolithic file accumulation (`*Items.kt`), enforce clean git owner
 
 ---
 
+### 7. Interface Segregation Principle (ISP): Read-Only vs. Mutable ViewModels
+Certain vehicle features require observable domain state without user mutation capability (e.g. instrument cluster telemetry, dashboard gauges, battery SOC, speed, passive passenger displays):
+- **`interface ItemViewModel<T>` (Read-Only)**:
+  - Exposes only `val valueFlow: StateFlow<T>`.
+  - Implemented by read-only telemetry sensors (`ReadOnlyItemViewModel`, `ReadOnlyHardwareItemViewModel`).
+- **`interface MutableItemViewModel<T> : ItemViewModel<T>` (Read-Write)**:
+  - Inherits `ItemViewModel<T>` and introduces `fun setValue(newValue: T)`.
+  - Implemented by interactive controls (`HardwareItemViewModel`, `LocalStorageItemViewModel`, `SeatLumbarViewModel`).
+- **`interface ChoiceItemViewModel<T> : ItemViewModel<T>` & `interface MutableChoiceItemViewModel<T>`**:
+  - Separates read-only multi-choice observation (`optionStates`) from user choice selection.
+- **Automatic UI Graceful Degradation**:
+  - UI row Composables (`ToggleItemRow`, `ChoiceItemRow`, `SliderItemRow`, `SeatLumbarRow`) evaluate `val isMutable = viewModel is MutableItemViewModel`.
+  - If a read-only `ItemViewModel` is bound, controls (switches, buttons, sliders) render in a disabled/read-only state, eliminating runtime crashes and preventing unintended mutations.
+
+---
+
 ## Consequences
 
 ### Positive
 - **Guaranteed SSOT**: Zero string duplication between UI catalogs, VHAL property mappers, and ViewModels.
 - **Zero Split-Brain Defaults**: Settings defaults are owned strictly by the vehicle data/storage layer, preventing divergence between UI and hardware.
+- **Strict Interface Segregation (ISP)**: Read-only telemetry/dashboard features cannot accidentally mutate hardware state; mutation capability is explicitly typed.
 - **Automated Regression Defense**: Reflection guard tests fail CI/builds if anyone attempts to attach state to `UiItem` classes.
 - **Compose Layout Freedom**: Eliminating `ItemRendererRegistry` from category screens unlocks complete Jetpack Compose layout expressiveness.
 

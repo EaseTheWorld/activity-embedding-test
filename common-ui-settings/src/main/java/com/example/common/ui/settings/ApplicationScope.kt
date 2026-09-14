@@ -3,6 +3,8 @@ package com.example.common.ui.settings
 import com.example.core.item.ChoiceItemViewModel
 import com.example.core.item.ItemViewModel
 import com.example.core.item.ItemViewModelRegistry
+import com.example.core.item.MutableChoiceItemViewModel
+import com.example.core.item.MutableItemViewModel
 import com.example.core.item.ValueWithState
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -28,11 +30,32 @@ object AppScope {
 }
 
 /**
+ * Lightweight read-only [ItemViewModel] wrapping a given [StateFlow].
+ * Ideal for telemetry sensors, battery levels, speed, or read-only vehicle gauges.
+ */
+class ReadOnlyItemViewModel<T>(
+    override val valueFlow: StateFlow<T>
+) : ItemViewModel<T>
+
+fun <T> StateFlow<T>.asReadOnlyViewModel(): ItemViewModel<T> = ReadOnlyItemViewModel(this)
+
+/**
+ * Read-only hardware ViewModel observing [VehicleProperty] from [HardwarePropertyStorage]
+ * without offering mutation capabilities.
+ */
+class ReadOnlyHardwareItemViewModel<DomainT, RawV>(
+    val property: com.example.core.item.VehicleProperty<DomainT, RawV>,
+    private val storage: HardwarePropertyStorage
+) : ItemViewModel<DomainT> {
+    override val valueFlow: StateFlow<DomainT> = storage.observe(property)
+}
+
+/**
  * Thread-safe, reactive in-memory ViewModel for tests, previews, and runtime settings.
  */
 class InMemoryItemViewModel<T>(
     initialValue: T
-) : com.example.core.item.ItemViewModel<T> {
+) : MutableItemViewModel<T> {
     private val _valueFlow = MutableStateFlow(initialValue)
     override val valueFlow: StateFlow<T> = _valueFlow.asStateFlow()
 
@@ -49,7 +72,7 @@ class LocalStorageItemViewModel<T>(
     initialValue: T,
     private val scope: CoroutineScope = AppScope.scope,
     private val onPersist: suspend (T) -> Unit = {}
-) : com.example.core.item.ItemViewModel<T> {
+) : MutableItemViewModel<T> {
     private val _valueFlow = MutableStateFlow(initialValue)
     override val valueFlow: StateFlow<T> = _valueFlow.asStateFlow()
 
@@ -69,7 +92,7 @@ class NetworkItemViewModel<T>(
     initialValue: T,
     private val scope: CoroutineScope = AppScope.scope,
     private val remoteUpdate: suspend (T) -> Boolean
-) : com.example.core.item.ItemViewModel<T> {
+) : MutableItemViewModel<T> {
     private val _valueFlow = MutableStateFlow(initialValue)
     override val valueFlow: StateFlow<T> = _valueFlow.asStateFlow()
 
@@ -107,7 +130,7 @@ class HardwareItemViewModel<DomainT, RawV>(
     val property: com.example.core.item.VehicleProperty<DomainT, RawV>,
     private val storage: HardwarePropertyStorage,
     private val scope: CoroutineScope = AppScope.scope
-) : com.example.core.item.ItemViewModel<DomainT> {
+) : MutableItemViewModel<DomainT> {
 
     override val valueFlow: StateFlow<DomainT> = storage.observe(property)
 
@@ -141,7 +164,7 @@ class KeyValueItemViewModel<DomainT, RawV>(
     initialRawValue: RawV,
     private val scope: CoroutineScope = AppScope.scope,
     private val onPersist: suspend (key: String, rawValue: RawV) -> Unit = { _, _ -> }
-) : com.example.core.item.ItemViewModel<DomainT> {
+) : MutableItemViewModel<DomainT> {
 
     private val _valueFlow = MutableStateFlow(binding.valueMapping.toDomain(initialRawValue))
     override val valueFlow: StateFlow<DomainT> = _valueFlow.asStateFlow()
@@ -207,7 +230,7 @@ class InMemoryChoiceItemViewModel<T>(
     initialSelectedId: T = supportedOptionIds.first(),
     private val disabledOptionIdsFlow: StateFlow<Set<T>> = MutableStateFlow(emptySet()),
     scope: CoroutineScope = AppScope.scope
-) : ChoiceItemViewModel<T> {
+) : MutableChoiceItemViewModel<T> {
     private val _selectedIdFlow = MutableStateFlow(initialSelectedId)
     override val valueFlow: StateFlow<T> = _selectedIdFlow.asStateFlow()
 
@@ -249,7 +272,7 @@ class ChoiceHardwareItemViewModel<DomainT, RawV>(
     private val storage: HardwarePropertyStorage,
     private val disabledOptionIdsFlow: StateFlow<Set<DomainT>> = MutableStateFlow(emptySet()),
     private val scope: CoroutineScope = AppScope.scope
-) : ChoiceItemViewModel<DomainT> {
+) : MutableChoiceItemViewModel<DomainT> {
 
     override val valueFlow: StateFlow<DomainT> = storage.observe(property)
 

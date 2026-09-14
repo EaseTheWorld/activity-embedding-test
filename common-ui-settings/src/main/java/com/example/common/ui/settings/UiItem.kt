@@ -8,6 +8,7 @@ import com.example.core.item.HasVhalBinding
 import com.example.core.item.Item
 import com.example.core.item.ItemType
 import com.example.core.item.ItemViewModel
+import com.example.core.item.MutableItemViewModel
 import com.example.core.item.VhalBinding
 import com.example.core.item.VhalPropertyBinder
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -277,7 +278,7 @@ abstract class VhalChoiceItem<V>(
     iconResId = iconResId,
     optionSlot = optionSlot,
     children = children
-), HasVhalBinding<String, V>, ItemViewModel<String> {
+), HasVhalBinding<String, V>, MutableItemViewModel<String> {
 
     override val vhalBinding: VhalBinding<String, V> = VhalBinding(
         propertyId = propertyId,
@@ -356,7 +357,7 @@ abstract class VhalToggleItem<V>(
     onIconRes = onIconRes,
     offIconRes = offIconRes,
     children = children
-), HasVhalBinding<Boolean, V>, ItemViewModel<Boolean> {
+), HasVhalBinding<Boolean, V>, MutableItemViewModel<Boolean> {
 
     override val vhalBinding: VhalBinding<Boolean, V> = VhalBinding(
         propertyId = propertyId,

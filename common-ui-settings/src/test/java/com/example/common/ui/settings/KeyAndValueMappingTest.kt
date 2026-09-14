@@ -47,7 +47,7 @@ class KeyAndValueMappingTest {
         )
 
         // Mutate auto_lock from UI
-        val autoLockViewModel = registry.getViewModel<Boolean>("auto_lock")!!
+        val autoLockViewModel = registry.getMutableViewModel<Boolean>("auto_lock")!!
         autoLockViewModel.setValue(true)
         testScope.advanceUntilIdle()
 
@@ -73,7 +73,7 @@ class KeyAndValueMappingTest {
             scope = testScope
         )
 
-        val viewModel = registry.getViewModel<Boolean>("auto_lock")!!
+        val viewModel = registry.getMutableViewModel<Boolean>("auto_lock")!!
 
         // Initially domain is false, raw is 0
         assertFalse(viewModel.valueFlow.value)
@@ -133,7 +133,7 @@ class KeyAndValueMappingTest {
             }
         )
 
-        val viewModel = registry.getViewModel<Boolean>("unlock_on_park")!!
+        val viewModel = registry.getMutableViewModel<Boolean>("unlock_on_park")!!
         assertFalse(viewModel.valueFlow.value)
 
         viewModel.setValue(true)
@@ -163,7 +163,7 @@ class KeyAndValueMappingTest {
         val categoryFlow = registry.getViewModel<Boolean>("auto_lock")!!.valueFlow
 
         // Recent Screen (Grid) accesses the same handler by key "auto_lock"
-        val recentViewModel = registry.getViewModel<Boolean>("auto_lock")!!
+        val recentViewModel = registry.getMutableViewModel<Boolean>("auto_lock")!!
 
         // User clicks toggle in Recent Grid Card
         recentViewModel.setValue(true)

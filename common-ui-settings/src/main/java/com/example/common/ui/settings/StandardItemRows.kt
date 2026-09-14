@@ -36,11 +36,15 @@ import androidx.compose.ui.unit.sp
 import com.example.core.item.ChoiceItemViewModel
 import com.example.core.item.ItemViewModel
 import com.example.core.item.ItemViewModelRegistry
+import com.example.core.item.MutableChoiceItemViewModel
+import com.example.core.item.MutableItemViewModel
 import com.example.core.item.ValueWithState
 
 /**
  * Standard Toggle Row: Renders a Switch with compile-time @StringRes title,
  * optional subtitle, optional leading icon, and optional Badge based on item.badgeKey.
+ *
+ * Adheres to ISP: enables Switch only if [viewModel] implements [MutableItemViewModel].
  */
 @Composable
 fun ToggleItemRow(
@@ -49,7 +53,14 @@ fun ToggleItemRow(
     modifier: Modifier = Modifier
 ) {
     val isChecked by viewModel.valueFlow.collectAsState()
-    ToggleItemRowContent(item = item, isChecked = isChecked, onCheckedChange = { viewModel.setValue(it) }, modifier = modifier)
+    val isMutable = viewModel is MutableItemViewModel
+    ToggleItemRowContent(
+        item = item,
+        isChecked = isChecked,
+        onCheckedChange = { (viewModel as? MutableItemViewModel)?.setValue(it) },
+        enabled = isMutable,
+        modifier = modifier
+    )
 }
 
 @Composable
@@ -143,6 +154,7 @@ fun ToggleGridCard(
     modifier: Modifier = Modifier
 ) {
     val isChecked by viewModel.valueFlow.collectAsState()
+    val isMutable = viewModel is MutableItemViewModel
     val title = stringResource(item.titleRes)
     val iconRes = item.getValueIconRes(isChecked) ?: item.iconRes
 
@@ -179,7 +191,8 @@ fun ToggleGridCard(
                 }
                 Switch(
                     checked = isChecked,
-                    onCheckedChange = { viewModel.setValue(it) }
+                    onCheckedChange = { (viewModel as? MutableItemViewModel)?.setValue(it) },
+                    enabled = isMutable
                 )
             }
             Text(
@@ -268,13 +281,15 @@ fun ChoiceItemRow(
     viewModel: ItemViewModel<String>,
     modifier: Modifier = Modifier
 ) {
+    val isMutable = viewModel is MutableItemViewModel
     if (viewModel is ChoiceItemViewModel<String>) {
         val optionStates by viewModel.optionStates.collectAsState()
         val selectedOption by viewModel.valueFlow.collectAsState()
-        ChoiceItemRowWithStates(item, selectedOption, optionStates, { viewModel.setValue(it) }, modifier)
+        val effectiveStates = if (isMutable) optionStates else optionStates.map { it.copy(isEnabled = false) }
+        ChoiceItemRowWithStates(item, selectedOption, effectiveStates, { (viewModel as? MutableItemViewModel)?.setValue(it) }, modifier)
     } else {
         val selectedOption by viewModel.valueFlow.collectAsState()
-        ChoiceItemRowContent(item, selectedOption, { viewModel.setValue(it) }, modifier)
+        ChoiceItemRowContent(item, selectedOption, { (viewModel as? MutableItemViewModel)?.setValue(it) }, isMutable, modifier)
     }
 }
 
@@ -284,9 +299,7 @@ fun ChoiceItemRow(
     viewModel: ChoiceItemViewModel<String>,
     modifier: Modifier = Modifier
 ) {
-    val optionStates by viewModel.optionStates.collectAsState()
-    val selectedOption by viewModel.valueFlow.collectAsState()
-    ChoiceItemRowWithStates(item, selectedOption, optionStates, { viewModel.setValue(it) }, modifier)
+    ChoiceItemRow(item = item, viewModel = viewModel as ItemViewModel<String>, modifier = modifier)
 }
 
 @Composable
@@ -299,7 +312,7 @@ fun ChoiceItemRow(
     if (viewModel != null) {
         ChoiceItemRow(item = item, viewModel = viewModel, modifier = modifier)
     } else {
-        ChoiceItemRowContent(item = item, selectedOption = "", onOptionSelected = {}, modifier = modifier)
+        ChoiceItemRowContent(item = item, selectedOption = "", onOptionSelected = {}, enabled = false, modifier = modifier)
     }
 }
 
@@ -308,6 +321,7 @@ private fun ChoiceItemRowContent(
     item: UiChoiceItem,
     selectedOption: String,
     onOptionSelected: (String) -> Unit,
+    enabled: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val title = stringResource(item.titleRes)
@@ -332,7 +346,7 @@ private fun ChoiceItemRowContent(
                     modifier = Modifier
                         .size(32.dp)
                         .padding(end = 10.dp),
-                    tint = Color(0xFF6750A4)
+                    tint = if (enabled) Color(0xFF6750A4) else Color(0xFF757575)
                 )
             }
             Column(modifier = Modifier.weight(1f)) {
@@ -346,7 +360,7 @@ private fun ChoiceItemRowContent(
                 Text(
                     text = "Current: $currentLabel",
                     style = MaterialTheme.typography.labelMedium.copy(
-                        color = Color(0xFF6750A4),
+                        color = if (enabled) Color(0xFF6750A4) else Color(0xFF757575),
                         fontWeight = FontWeight.Medium
                     )
                 )
@@ -374,7 +388,7 @@ private fun ChoiceItemRowContent(
                     item.optionSlot(
                         option,
                         isSelected,
-                        { onOptionSelected(option.value) }
+                        { if (enabled) onOptionSelected(option.value) }
                     )
                 }
             }
@@ -588,7 +602,14 @@ fun SliderItemRow(
     modifier: Modifier = Modifier
 ) {
     val value by viewModel.valueFlow.collectAsState()
-    SliderItemRowContent(item = item, value = value, onValueChange = { viewModel.setValue(it) }, modifier = modifier)
+    val isMutable = viewModel is MutableItemViewModel
+    SliderItemRowContent(
+        item = item,
+        value = value,
+        onValueChange = { (viewModel as? MutableItemViewModel)?.setValue(it) },
+        enabled = isMutable,
+        modifier = modifier
+    )
 }
 
 @Composable
@@ -670,6 +691,7 @@ fun SliderGridCard(
     modifier: Modifier = Modifier
 ) {
     val value by viewModel.valueFlow.collectAsState()
+    val isMutable = viewModel is MutableItemViewModel
     val title = stringResource(item.titleRes)
     val unit = item.unitRes?.let { stringResource(it) } ?: ""
 
@@ -708,8 +730,9 @@ fun SliderGridCard(
             }
             androidx.compose.material3.Slider(
                 value = value.toFloat(),
-                onValueChange = { viewModel.setValue(it.toInt()) },
+                onValueChange = { (viewModel as? MutableItemViewModel)?.setValue(it.toInt()) },
                 valueRange = item.min.toFloat()..item.max.toFloat(),
+                enabled = isMutable,
                 modifier = Modifier.fillMaxWidth()
             )
         }

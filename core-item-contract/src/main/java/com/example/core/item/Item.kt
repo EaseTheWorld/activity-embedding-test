@@ -170,17 +170,30 @@ interface MutableItemViewModel<T> : ItemViewModel<T> {
 
 /**
  * Specialized [ItemViewModel] contract for multi-option Choice items (Read-Only).
- * Exposes rich [optionStates] for UI rendering while preserving [valueFlow]
- * for uniform key-value observation.
+ * State is modeled directly as a list of options with dynamic selection and enablement: [List<ValueWithState<T>>].
+ * Inherits [valueFlow] directly from [ItemViewModel] as its single source of truth.
  */
-interface ChoiceItemViewModel<T> : ItemViewModel<T> {
+interface ChoiceItemViewModel<T> : ItemViewModel<List<ValueWithState<T>>> {
+    /**
+     * Convenience accessor for the currently selected option value, derived directly from [valueFlow].
+     */
+    val selectedValue: T?
+        get() = valueFlow.value.firstOrNull { it.isSelected }?.id
+
+    /**
+     * Backward-compatible alias for [valueFlow].
+     */
     val optionStates: StateFlow<List<ValueWithState<T>>>
+        get() = valueFlow
 }
 
 /**
- * Mutable Choice ViewModel contract supporting both dynamic option states and user selection mutations.
+ * Mutable Choice ViewModel contract supporting user option selection.
+ * Receives the selected option ID [newValue] to update domain state.
  */
-interface MutableChoiceItemViewModel<T> : ChoiceItemViewModel<T>, MutableItemViewModel<T>
+interface MutableChoiceItemViewModel<T> : ChoiceItemViewModel<T> {
+    fun setValue(newValue: T)
+}
 
 
 /**

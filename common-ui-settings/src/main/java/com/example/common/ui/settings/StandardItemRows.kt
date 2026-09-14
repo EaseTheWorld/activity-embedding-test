@@ -39,6 +39,7 @@ import com.example.core.item.ItemViewModelRegistry
 import com.example.core.item.MutableChoiceItemViewModel
 import com.example.core.item.MutableItemViewModel
 import com.example.core.item.ValueWithState
+import kotlinx.coroutines.flow.StateFlow
 
 /**
  * Standard Toggle Row: Renders a Switch with compile-time @StringRes title,
@@ -278,28 +279,41 @@ fun ToggleGridCard(
 @Composable
 fun ChoiceItemRow(
     item: UiChoiceItem,
-    viewModel: ItemViewModel<String>,
+    viewModel: ChoiceItemViewModel<String>,
     modifier: Modifier = Modifier
 ) {
-    val isMutable = viewModel is MutableItemViewModel
-    if (viewModel is ChoiceItemViewModel<String>) {
-        val optionStates by viewModel.optionStates.collectAsState()
-        val selectedOption by viewModel.valueFlow.collectAsState()
-        val effectiveStates = if (isMutable) optionStates else optionStates.map { it.copy(isEnabled = false) }
-        ChoiceItemRowWithStates(item, selectedOption, effectiveStates, { (viewModel as? MutableItemViewModel)?.setValue(it) }, modifier)
-    } else {
-        val selectedOption by viewModel.valueFlow.collectAsState()
-        ChoiceItemRowContent(item, selectedOption, { (viewModel as? MutableItemViewModel)?.setValue(it) }, isMutable, modifier)
-    }
+    val optionStates by viewModel.valueFlow.collectAsState()
+    val isMutable = viewModel is MutableChoiceItemViewModel
+    val effectiveStates = if (isMutable) optionStates else optionStates.map { it.copy(isEnabled = false) }
+    ChoiceItemRowWithStates(
+        item = item,
+        optionStates = effectiveStates,
+        onOptionSelected = { (viewModel as? MutableChoiceItemViewModel)?.setValue(it) },
+        modifier = modifier
+    )
 }
 
 @Composable
 fun ChoiceItemRow(
     item: UiChoiceItem,
-    viewModel: ChoiceItemViewModel<String>,
+    viewModel: ItemViewModel<*>,
     modifier: Modifier = Modifier
 ) {
-    ChoiceItemRow(item = item, viewModel = viewModel as ItemViewModel<String>, modifier = modifier)
+    if (viewModel is ChoiceItemViewModel<*>) {
+        @Suppress("UNCHECKED_CAST")
+        ChoiceItemRow(item = item, viewModel = viewModel as ChoiceItemViewModel<String>, modifier = modifier)
+    } else {
+        @Suppress("UNCHECKED_CAST")
+        val selectedOption by (viewModel.valueFlow as StateFlow<String>).collectAsState()
+        val isMutable = viewModel is MutableItemViewModel<*>
+        ChoiceItemRowContent(
+            item = item,
+            selectedOption = selectedOption,
+            onOptionSelected = { (viewModel as? MutableItemViewModel<String>)?.setValue(it) },
+            enabled = isMutable,
+            modifier = modifier
+        )
+    }
 }
 
 @Composable
@@ -308,11 +322,16 @@ fun ChoiceItemRow(
     viewModelRegistry: ItemViewModelRegistry = LocalItemViewModelRegistry.current,
     modifier: Modifier = Modifier
 ) {
-    val viewModel = viewModelRegistry.getViewModel<String>(item.id)
-    if (viewModel != null) {
-        ChoiceItemRow(item = item, viewModel = viewModel, modifier = modifier)
+    val choiceVm = viewModelRegistry.getChoiceViewModel<String>(item.id)
+    if (choiceVm != null) {
+        ChoiceItemRow(item = item, viewModel = choiceVm, modifier = modifier)
     } else {
-        ChoiceItemRowContent(item = item, selectedOption = "", onOptionSelected = {}, enabled = false, modifier = modifier)
+        val stringVm = viewModelRegistry.getViewModel<String>(item.id)
+        if (stringVm != null) {
+            ChoiceItemRow(item = item, viewModel = stringVm, modifier = modifier)
+        } else {
+            ChoiceItemRowContent(item = item, selectedOption = "", onOptionSelected = {}, enabled = false, modifier = modifier)
+        }
     }
 }
 
@@ -399,15 +418,19 @@ private fun ChoiceItemRowContent(
 @Composable
 private fun ChoiceItemRowWithStates(
     item: UiChoiceItem,
-    selectedOption: String,
     optionStates: List<ValueWithState<String>>,
     onOptionSelected: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val selectedOption = optionStates.firstOrNull { it.isSelected }?.id ?: ""
     val title = stringResource(item.titleRes)
     val subtitle = item.subtitleRes?.let { stringResource(it) }
     val iconRes = item.iconRes
-    val currentLabel = item.getValueTextRes(selectedOption)?.let { stringResource(it) } ?: selectedOption
+    val currentLabel = if (selectedOption.isNotEmpty()) {
+        item.getValueTextRes(selectedOption)?.let { stringResource(it) } ?: selectedOption
+    } else {
+        "-"
+    }
 
     Column(
         modifier = modifier
@@ -482,12 +505,61 @@ private fun ChoiceItemRowWithStates(
 @Composable
 fun ChoiceGridCard(
     item: UiChoiceItem,
-    viewModel: ItemViewModel<String>,
+    viewModel: ChoiceItemViewModel<String>,
     modifier: Modifier = Modifier
 ) {
-    val selectedOption by viewModel.valueFlow.collectAsState()
+    val options by viewModel.valueFlow.collectAsState()
+    val selectedOption = options.firstOrNull { it.isSelected }?.id ?: ""
+    ChoiceGridCardContent(item = item, selectedOption = selectedOption, modifier = modifier)
+}
+
+@Composable
+fun ChoiceGridCard(
+    item: UiChoiceItem,
+    viewModel: ItemViewModel<*>,
+    modifier: Modifier = Modifier
+) {
+    if (viewModel is ChoiceItemViewModel<*>) {
+        @Suppress("UNCHECKED_CAST")
+        ChoiceGridCard(item = item, viewModel = viewModel as ChoiceItemViewModel<String>, modifier = modifier)
+    } else {
+        @Suppress("UNCHECKED_CAST")
+        val selectedOption by (viewModel.valueFlow as StateFlow<String>).collectAsState()
+        ChoiceGridCardContent(item = item, selectedOption = selectedOption, modifier = modifier)
+    }
+}
+
+@Composable
+fun ChoiceGridCard(
+    item: UiChoiceItem,
+    viewModelRegistry: ItemViewModelRegistry = LocalItemViewModelRegistry.current,
+    modifier: Modifier = Modifier
+) {
+    val choiceVm = viewModelRegistry.getChoiceViewModel<String>(item.id)
+    if (choiceVm != null) {
+        ChoiceGridCard(item = item, viewModel = choiceVm, modifier = modifier)
+    } else {
+        val stringVm = viewModelRegistry.getViewModel<String>(item.id)
+        if (stringVm != null) {
+            ChoiceGridCard(item = item, viewModel = stringVm, modifier = modifier)
+        } else {
+            ChoiceGridCardContent(item = item, selectedOption = "-", modifier = modifier)
+        }
+    }
+}
+
+@Composable
+private fun ChoiceGridCardContent(
+    item: UiChoiceItem,
+    selectedOption: String,
+    modifier: Modifier = Modifier
+) {
     val title = stringResource(item.titleRes)
-    val currentLabel = item.getValueTextRes(selectedOption)?.let { stringResource(it) } ?: selectedOption
+    val currentLabel = if (selectedOption.isNotEmpty() && selectedOption != "-") {
+        item.getValueTextRes(selectedOption)?.let { stringResource(it) } ?: selectedOption
+    } else {
+        "-"
+    }
 
     Card(
         modifier = modifier
@@ -529,64 +601,6 @@ fun ChoiceGridCard(
                 ),
                 maxLines = 2
             )
-        }
-    }
-}
-
-@Composable
-fun ChoiceGridCard(
-    item: UiChoiceItem,
-    viewModelRegistry: ItemViewModelRegistry = LocalItemViewModelRegistry.current,
-    modifier: Modifier = Modifier
-) {
-    val viewModel = viewModelRegistry.getViewModel<String>(item.id)
-    if (viewModel != null) {
-        ChoiceGridCard(item = item, viewModel = viewModel, modifier = modifier)
-    } else {
-        val title = stringResource(item.titleRes)
-        val currentLabel = "-"
-
-        Card(
-            modifier = modifier
-                .fillMaxWidth()
-                .height(110.dp),
-            shape = RoundedCornerShape(12.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(12.dp),
-                verticalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    val iconRes = item.iconRes
-                    if (iconRes != null) {
-                        Icon(
-                            painter = painterResource(iconRes),
-                            contentDescription = null,
-                            modifier = Modifier.size(24.dp),
-                            tint = Color(0xFF6750A4)
-                        )
-                    }
-                    Badge(containerColor = Color(0xFFEDE7F6), contentColor = Color(0xFF6750A4)) {
-                        Text(text = currentLabel, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color(0xFF1E1E2E)
-                    ),
-                    maxLines = 2
-                )
-            }
         }
     }
 }

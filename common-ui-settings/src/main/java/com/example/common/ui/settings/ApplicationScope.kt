@@ -232,7 +232,6 @@ class InMemoryChoiceItemViewModel<T>(
     scope: CoroutineScope = AppScope.scope
 ) : MutableChoiceItemViewModel<T> {
     private val _selectedIdFlow = MutableStateFlow(initialSelectedId)
-    override val valueFlow: StateFlow<T> = _selectedIdFlow.asStateFlow()
 
     private fun computeStates(selectedId: T, disabledSet: Set<T>): List<ValueWithState<T>> =
         supportedOptionIds.map { id ->
@@ -243,7 +242,7 @@ class InMemoryChoiceItemViewModel<T>(
             )
         }
 
-    override val optionStates: StateFlow<List<ValueWithState<T>>> = combine(
+    override val valueFlow: StateFlow<List<ValueWithState<T>>> = combine(
         _selectedIdFlow,
         disabledOptionIdsFlow
     ) { selectedId, disabledSet ->
@@ -263,7 +262,7 @@ class InMemoryChoiceItemViewModel<T>(
 
 /**
  * Hardware-backed [ChoiceItemViewModel] bridging a Choice Item to [HardwarePropertyStorage].
- * Exposes dynamic [optionStates] with per-option [ValueWithState] (isSelected, isEnabled)
+ * Exposes dynamic [valueFlow] with per-option [ValueWithState] (isSelected, isEnabled)
  * while preserving SSOT (option IDs come from the Item Catalog).
  */
 class ChoiceHardwareItemViewModel<DomainT, RawV>(
@@ -274,7 +273,7 @@ class ChoiceHardwareItemViewModel<DomainT, RawV>(
     private val scope: CoroutineScope = AppScope.scope
 ) : MutableChoiceItemViewModel<DomainT> {
 
-    override val valueFlow: StateFlow<DomainT> = storage.observe(property)
+    private val rawFlow: StateFlow<DomainT> = storage.observe(property)
 
     private fun computeStates(selectedId: DomainT?, disabledSet: Set<DomainT>): List<ValueWithState<DomainT>> =
         supportedOptionIds.map { id ->
@@ -285,15 +284,15 @@ class ChoiceHardwareItemViewModel<DomainT, RawV>(
             )
         }
 
-    override val optionStates: StateFlow<List<ValueWithState<DomainT>>> = combine(
-        valueFlow,
+    override val valueFlow: StateFlow<List<ValueWithState<DomainT>>> = combine(
+        rawFlow,
         disabledOptionIdsFlow
     ) { selectedId, disabledSet ->
         computeStates(selectedId, disabledSet)
     }.stateIn(
         scope,
         SharingStarted.Eagerly,
-        computeStates(valueFlow.value, disabledOptionIdsFlow.value)
+        computeStates(rawFlow.value, disabledOptionIdsFlow.value)
     )
 
     override fun setValue(newValue: DomainT) {

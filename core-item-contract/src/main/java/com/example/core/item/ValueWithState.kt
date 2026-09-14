@@ -12,4 +12,9 @@ data class ValueWithState<T>(
     val id: T,
     val isSelected: Boolean,
     val isEnabled: Boolean = true
-)
+) {
+    /**
+     * Alias for [id] representing the option's domain value.
+     */
+    val value: T get() = id
+}

@@ -48,41 +48,35 @@ open class UiToggleItem(
 
 ---
 
-### 2. Choice Item SSOT with `ValueWithState` and Declarative DI Binding
-To support rich options (Segmented, Chip, Icon-Only) with dynamic selection and lockout states without duplicating string literals:
+### 2. Choice Item SSOT with `ValueWithState` and Unified Single `valueFlow`
+To support rich options (Segmented, Chip, Icon-Only) with dynamic selection and lockout states without duplicating string literals or maintaining redundant dual StateFlows:
 
-```
-[ Layer 1: UI Catalog (SSOT) ]
-SeatCatalog.massageMode (Item ID: "seat_massage", Option IDs: ["OFF", "WAVE", "LUMBAR", "STRETCH"])
-              │
-              ├── references Option IDs directly (zero raw string duplication)
-              ▼
-[ Layer 2: Hardware / HAL Layer ]
-SeatVehicleProperties.MASSAGE_MODE = VehicleProperty(
-    propertyId = 0x11400F00,
-    mapper = ValueMapping.fromOptions(SeatCatalog.massageMode.optionIds)
-)
-              │
-              ├── bound via declarative DSL
-              ▼
-[ Layer 3: ViewModel / Assembler ]
-SeatCatalog.massageMode bindsTo ChoiceHardwareItemViewModel(
-    property = SeatVehicleProperties.MASSAGE_MODE,
-    supportedOptionIds = SeatCatalog.massageMode.optionIds,
-    disabledOptionIdsFlow = drivingLockoutFlow
-)
-              │
-              ├── emits pure domain state
-              ▼
-optionStates: StateFlow<List<ValueWithState<String>>> (id, isSelected, isEnabled)
-              │
-              ├── mapped back in UI
-              ▼
-[ Jetpack Compose UI ]
-Maps state.id -> item.getOption(state.id) for localized text, icon, and badge.
+```mermaid
+graph TD
+    subgraph Layer1["Layer 1: UI Catalog (SSOT)"]
+        Catalog["SeatCatalog.massageMode<br/>Item ID: 'seat_massage'<br/>Option IDs: ['OFF', 'WAVE', 'LUMBAR', 'STRETCH']"]
+    end
+
+    subgraph Layer2["Layer 2: Hardware / HAL Layer"]
+        Prop["SeatVehicleProperties.MASSAGE_MODE<br/>mapper = ValueMapping.fromOptions(optionIds)"]
+    end
+
+    subgraph Layer3["Layer 3: ViewModel / Assembler"]
+        VM["ChoiceHardwareItemViewModel<br/>Single valueFlow: StateFlow&lt;List&lt;ValueWithState&lt;String&gt;&gt;&gt;<br/>selectedValue: T?"]
+    end
+
+    subgraph UI["Jetpack Compose UI"]
+        ComposeUI["ChoiceItemRow / ChoiceGridCard<br/>Collects single valueFlow<br/>Maps state.id -> item.getOption(state.id)"]
+    end
+
+    Catalog -->|references Option IDs| Prop
+    Prop -->|bound via declarative DSL| VM
+    VM -->|emits single valueFlow| ComposeUI
 ```
 
-- **Data Layer Independence**: `ValueWithState<T>` contains only domain primitives (`val value: T`, `val isSelected: Boolean`, `val isEnabled: Boolean`) with zero UI dependencies.
+- **Data Layer Independence**: `ValueWithState<T>` contains only domain primitives (`val id: T`, `val value: T get() = id`, `val isSelected: Boolean`, `val isEnabled: Boolean`) with zero UI dependencies.
+- **Unified Reactive Stream**: `ChoiceItemViewModel<T>` extends `ItemViewModel<List<ValueWithState<T>>>`. Every `ItemViewModel` across the entire system exposes exactly **one** reactive flow: `valueFlow`.
+- **Derived Selected Value**: `val selectedValue: T? get() = valueFlow.value.firstOrNull { it.isSelected }?.id`. Legacy `val optionStates get() = valueFlow` is retained as a zero-overhead alias for backward compatibility.
 - **SSOT Guarantee**: Raw strings are declared only in `SeatCatalog`. The hardware mapping and ViewModel consume `SeatCatalog.massageMode.optionIds` directly.
 
 ---
@@ -133,8 +127,10 @@ Certain vehicle features require observable domain state without user mutation c
 - **`interface MutableItemViewModel<T> : ItemViewModel<T>` (Read-Write)**:
   - Inherits `ItemViewModel<T>` and introduces `fun setValue(newValue: T)`.
   - Implemented by interactive controls (`HardwareItemViewModel`, `LocalStorageItemViewModel`, `SeatLumbarViewModel`).
-- **`interface ChoiceItemViewModel<T> : ItemViewModel<T>` & `interface MutableChoiceItemViewModel<T>`**:
-  - Separates read-only multi-choice observation (`optionStates`) from user choice selection.
+- **`interface ChoiceItemViewModel<T> : ItemViewModel<List<ValueWithState<T>>>` & `interface MutableChoiceItemViewModel<T> : ChoiceItemViewModel<T>`**:
+  - Unifies Choice observation under the universal `valueFlow: StateFlow<List<ValueWithState<T>>>`, eliminating redundant separate flows.
+  - Read-only Choice ViewModels (e.g. passive drive mode indicator on cluster) expose full option states and `val selectedValue: T?` without offering mutation.
+  - `MutableChoiceItemViewModel<T>` provides `fun setValue(newValue: T)` (mutates by selecting option `T`).
 - **Automatic UI Graceful Degradation**:
   - UI row Composables (`ToggleItemRow`, `ChoiceItemRow`, `SliderItemRow`, `SeatLumbarRow`) evaluate `val isMutable = viewModel is MutableItemViewModel`.
   - If a read-only `ItemViewModel` is bound, controls (switches, buttons, sliders) render in a disabled/read-only state, eliminating runtime crashes and preventing unintended mutations.

@@ -82,7 +82,7 @@ class ChoiceItemSSOTTest {
         assertNotNull("Choice ViewModel should be registered for SeatCatalog.massageMode", choiceVm)
 
         // Verify initial state
-        assertEquals("OFF", choiceVm!!.valueFlow.value)
+        assertEquals("OFF", choiceVm!!.selectedValue)
     }
 
     // ========================================================================
@@ -119,7 +119,7 @@ class ChoiceItemSSOTTest {
         // 2. User selects "WAVE" -> updates hardware storage and option states atomically
         choiceVm.setValue("WAVE")
 
-        assertEquals("WAVE", choiceVm.valueFlow.value)
+        assertEquals("WAVE", choiceVm.selectedValue)
         val rawAfter = hardwareStorage.observe<Int>(
             SeatVehicleProperties.MASSAGE_MODE.propertyId,
             SeatVehicleProperties.MASSAGE_MODE.areaId

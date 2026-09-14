@@ -116,8 +116,7 @@ class ItemViewModelSegregationTest {
     fun `ReadOnly ChoiceItemViewModel exposes optionStates but cannot mutate`() {
         // Passive display Choice ViewModel (e.g. Current Driving Mode gauge on cluster)
         val readOnlyChoiceVm = object : ChoiceItemViewModel<String> {
-            override val valueFlow: StateFlow<String> = MutableStateFlow("SPORT")
-            override val optionStates: StateFlow<List<ValueWithState<String>>> = MutableStateFlow(
+            override val valueFlow: StateFlow<List<ValueWithState<String>>> = MutableStateFlow(
                 listOf(
                     ValueWithState("ECO", isSelected = false, isEnabled = true),
                     ValueWithState("SPORT", isSelected = true, isEnabled = true)
@@ -131,7 +130,7 @@ class ItemViewModelSegregationTest {
         // 1. Can be retrieved as ChoiceItemViewModel
         val choiceVm = registry.getChoiceViewModel<String>("drive_mode_gauge")
         assertNotNull(choiceVm)
-        assertEquals("SPORT", choiceVm!!.valueFlow.value)
+        assertEquals("SPORT", choiceVm!!.selectedValue)
         assertEquals(2, choiceVm.optionStates.value.size)
 
         // 2. getMutableChoiceViewModel returns null
@@ -153,13 +152,13 @@ class ItemViewModelSegregationTest {
 
         val writableChoiceVm = registry.getMutableChoiceViewModel<String>("massage_mode")
         assertNotNull(writableChoiceVm)
-        assertEquals("OFF", writableChoiceVm!!.valueFlow.value)
+        assertEquals("OFF", writableChoiceVm!!.selectedValue)
 
         // Mutate
         writableChoiceVm.setValue("WAVE")
         testScope.advanceUntilIdle()
 
-        assertEquals("WAVE", writableChoiceVm.valueFlow.value)
+        assertEquals("WAVE", writableChoiceVm.selectedValue)
         assertTrue(writableChoiceVm.optionStates.value.first { it.id == "WAVE" }.isSelected)
     }
 }

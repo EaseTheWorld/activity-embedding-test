@@ -29,7 +29,7 @@ class MainSettingsDashboardTest {
         val soundChoice = UiChoiceItem(
             id = "surround_mode",
             nameResId = 301,
-            choiceOptions = listOf(UiOption("OFF", 1), UiOption("CINEMA", 2))
+            options = listOf(UiOption("OFF", 1), UiOption("CINEMA", 2))
         )
 
         val doorProvider = MockCategoryProvider("door", items = listOf(doorToggle))
@@ -58,7 +58,7 @@ class MainSettingsDashboardTest {
     @Test
     fun `Actual categories preserve display order and render without ItemRendererRegistry`() {
         val toggleItem = UiToggleItem(id = "auto_lock", nameResId = 1)
-        val choiceItem = UiChoiceItem(id = "theme", nameResId = 2, choiceOptions = listOf(UiOption("DARK", 10)))
+        val choiceItem = UiChoiceItem(id = "theme", nameResId = 2, options = listOf(UiOption("DARK", 10)))
         val sliderItem = UiSliderItem(id = "volume", nameResId = 3, min = 0, max = 100)
 
         val provider = MockCategoryProvider("car_settings", items = listOf(toggleItem, choiceItem, sliderItem))

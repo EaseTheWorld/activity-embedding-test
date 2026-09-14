@@ -85,7 +85,7 @@ class UiItemStatelessContractTest {
         val choice = UiChoiceItem(
             id = "test_choice",
             nameResId = 2,
-            choiceOptions = listOf(UiOption("OPT_A", 10), UiOption("OPT_B", 11))
+            options = listOf(UiOption("OPT_A", 10), UiOption("OPT_B", 11))
         )
         assertEquals("test_choice", choice.id)
         assertEquals(listOf("OPT_A", "OPT_B"), choice.optionIds)

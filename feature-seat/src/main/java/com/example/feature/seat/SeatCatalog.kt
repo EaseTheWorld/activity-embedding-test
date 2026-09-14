@@ -3,7 +3,7 @@ package com.example.feature.seat
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import com.example.common.ui.settings.CarUiOption
-import com.example.common.ui.settings.ChoiceOptionSlots
+import com.example.common.ui.settings.OptionSlots
 import com.example.common.ui.settings.UiChoiceItem
 import com.example.common.ui.settings.UiItem
 import com.example.common.ui.settings.UiOption
@@ -13,7 +13,7 @@ import com.example.core.item.ItemType
 import com.example.core.item.SettingCatalog
 
 // ============================================================================
-// Layer 1: Canonical Catalog SSOT (UI Presentation Layer)
+// Layer 1: UI Presentation Layer (Canonical SSOT Definition)
 // ============================================================================
 
 /**
@@ -29,7 +29,7 @@ object SeatCatalog : SettingCatalog("seat") {
             nameResId = R.string.seat_item_driver_heat_title,
             descriptionResId = R.string.seat_item_driver_heat_subtitle,
             iconResId = R.drawable.ic_feature_seat,
-            choiceOptions = listOf(
+            options = listOf(
                 UiOption("OFF", R.string.seat_heat_off),
                 UiOption("LEVEL 1", R.string.seat_heat_level_1),
                 UiOption("LEVEL 2", R.string.seat_heat_level_2),
@@ -44,7 +44,7 @@ object SeatCatalog : SettingCatalog("seat") {
             nameResId = R.string.seat_item_passenger_heat_title,
             descriptionResId = R.string.seat_item_passenger_heat_subtitle,
             iconResId = R.drawable.ic_feature_seat,
-            choiceOptions = listOf(
+            options = listOf(
                 UiOption("OFF", R.string.seat_heat_off),
                 UiOption("LEVEL 1", R.string.seat_heat_level_1),
                 UiOption("LEVEL 2", R.string.seat_heat_level_2),
@@ -59,8 +59,8 @@ object SeatCatalog : SettingCatalog("seat") {
             nameResId = R.string.seat_item_driver_vent_title,
             descriptionResId = R.string.seat_item_driver_vent_subtitle,
             iconResId = R.drawable.ic_seat_ventilation,
-            optionSlot = ChoiceOptionSlots.IconOnly,
-            choiceOptions = listOf(
+            optionSlot = OptionSlots.IconOnly,
+            options = listOf(
                 UiOption("OFF", R.string.seat_vent_off, iconRes = R.drawable.ic_seat_ventilation),
                 UiOption("LEVEL 1", R.string.seat_vent_1, iconRes = R.drawable.ic_seat_ventilation),
                 UiOption("LEVEL 2", R.string.seat_vent_2, iconRes = R.drawable.ic_seat_ventilation),
@@ -75,8 +75,8 @@ object SeatCatalog : SettingCatalog("seat") {
             nameResId = R.string.seat_item_massage_title,
             descriptionResId = R.string.seat_item_massage_subtitle,
             iconResId = R.drawable.ic_feature_seat,
-            optionSlot = ChoiceOptionSlots.Chip,
-            choiceOptions = listOf(
+            optionSlot = OptionSlots.Chip,
+            options = listOf(
                 UiOption("OFF", R.string.massage_off),
                 UiOption("WAVE", R.string.massage_wave, badge = "추천"),
                 UiOption("LUMBAR", R.string.massage_lumbar),
@@ -172,7 +172,7 @@ class PassengerSeatHeatingItem(
 )
 
 /**
- * Variant 1: Icon-Only Slot ([ChoiceOptionSlots.IconOnly])
+ * Variant 1: Icon-Only Slot ([OptionSlots.IconOnly])
  * Compact, icon-centric airflow buttons without text labels inside buttons.
  */
 class DriverSeatVentilationItem(
@@ -191,12 +191,12 @@ class DriverSeatVentilationItem(
         CarUiOption("LEVEL 3", R.string.seat_vent_3, iconRes = R.drawable.ic_seat_ventilation, vhalValue = 3)
     ),
     initialValue = "OFF",
-    optionSlot = ChoiceOptionSlots.IconOnly,
+    optionSlot = OptionSlots.IconOnly,
     binder = repository
 )
 
 /**
- * Variant 2: Chip Slot ([ChoiceOptionSlots.Chip])
+ * Variant 2: Chip Slot ([OptionSlots.Chip])
  * Compact filter chip buttons with optional badges.
  */
 class SeatMassageModeItem(
@@ -215,6 +215,6 @@ class SeatMassageModeItem(
         CarUiOption("STRETCH", R.string.massage_stretch, vhalValue = 3)
     ),
     initialValue = "OFF",
-    optionSlot = ChoiceOptionSlots.Chip,
+    optionSlot = OptionSlots.Chip,
     binder = repository
 )

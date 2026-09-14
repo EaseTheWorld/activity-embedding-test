@@ -1,12 +1,13 @@
 package com.example.common.ui.settings
 
+import com.example.core.item.ChoiceItemViewModel
 import com.example.core.item.ItemViewModel
 import com.example.core.item.ItemViewModelRegistry
+import com.example.core.item.MutableChoiceItemViewModel
 import com.example.core.item.MutableItemViewModel
 import com.example.core.item.ValueMapping
 import com.example.core.item.ValueWithState
 import com.example.core.item.VehicleProperty
-import com.example.core.item.selectedValue
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -25,6 +26,8 @@ import org.junit.Test
  * Verifies the Interface Segregation Principle (ISP) architectural contract:
  * - [ItemViewModel] provides read-only observation ([ItemViewModel.valueFlow]) for telemetry / gauges.
  * - [MutableItemViewModel] provides write capability ([MutableItemViewModel.setValue]) for interactive controls.
+ * - [ChoiceItemViewModel] provides per-option states ([ChoiceItemViewModel.optionStates]) for multi-option selection.
+ * - [MutableChoiceItemViewModel] combines [ChoiceItemViewModel] and [MutableItemViewModel].
  * - [ItemViewModelRegistry] cleanly separates read-only retrieval from mutable retrieval.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -112,11 +115,11 @@ class ItemViewModelSegregationTest {
     }
 
     @Test
-    fun `ReadOnly Choice ViewModel exposes valueFlow and valueWithStateFlow but cannot mutate`() {
+    fun `ReadOnly Choice ViewModel exposes valueFlow and optionStates but cannot mutate`() {
         // Passive display Choice ViewModel (e.g. Current Driving Mode gauge on cluster)
-        val readOnlyChoiceVm = object : ItemViewModel<String> {
+        val readOnlyChoiceVm = object : ChoiceItemViewModel<String> {
             override val valueFlow: StateFlow<String> = MutableStateFlow("SPORT")
-            override val valueWithStateFlow: StateFlow<List<ValueWithState<String>>> = MutableStateFlow(
+            override val optionStates: StateFlow<List<ValueWithState<String>>> = MutableStateFlow(
                 listOf(
                     ValueWithState("ECO", isSelected = false, isEnabled = true),
                     ValueWithState("SPORT", isSelected = true, isEnabled = true)
@@ -127,15 +130,16 @@ class ItemViewModelSegregationTest {
         val registry = ItemViewModelRegistry()
         registry.register("drive_mode_gauge", readOnlyChoiceVm)
 
-        // 1. Can be retrieved as ItemViewModel<String>
-        val choiceVm = registry.getViewModel<String>("drive_mode_gauge")
+        // 1. Can be retrieved as ChoiceItemViewModel<String> and ItemViewModel<String>
+        val choiceVm = registry.getChoiceViewModel<String>("drive_mode_gauge")
         assertNotNull(choiceVm)
         assertEquals("SPORT", choiceVm!!.valueFlow.value)
         assertEquals("SPORT", choiceVm.selectedValue)
-        assertEquals(2, choiceVm.valueWithStateFlow!!.value.size)
+        assertEquals(2, choiceVm.optionStates.value.size)
 
-        // 2. getMutableViewModel returns null
+        // 2. getMutableViewModel & getMutableChoiceViewModel return null
         assertNull(registry.getMutableViewModel<String>("drive_mode_gauge"))
+        assertNull(registry.getMutableChoiceViewModel<String>("drive_mode_gauge"))
         assertFalse(choiceVm is MutableItemViewModel<*>)
     }
 
@@ -151,7 +155,7 @@ class ItemViewModelSegregationTest {
         val registry = ItemViewModelRegistry()
         registry.register("massage_mode", mutableChoiceVm)
 
-        val writableChoiceVm = registry.getMutableViewModel<String>("massage_mode")
+        val writableChoiceVm = registry.getMutableChoiceViewModel<String>("massage_mode")
         assertNotNull(writableChoiceVm)
         assertEquals("OFF", writableChoiceVm!!.valueFlow.value)
         assertEquals("OFF", writableChoiceVm.selectedValue)
@@ -162,6 +166,6 @@ class ItemViewModelSegregationTest {
 
         assertEquals("WAVE", writableChoiceVm.valueFlow.value)
         assertEquals("WAVE", writableChoiceVm.selectedValue)
-        assertTrue(writableChoiceVm.valueWithStateFlow!!.value.first { it.id == "WAVE" }.isSelected)
+        assertTrue(writableChoiceVm.optionStates.value.first { it.id == "WAVE" }.isSelected)
     }
 }

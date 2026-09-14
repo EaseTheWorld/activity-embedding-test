@@ -33,6 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
+import com.example.core.item.ChoiceItemViewModel
 import com.example.core.item.ItemViewModel
 import com.example.core.item.ItemViewModelRegistry
 import com.example.core.item.MutableItemViewModel
@@ -280,10 +281,9 @@ fun ChoiceItemRow(
     viewModel: ItemViewModel<String>,
     modifier: Modifier = Modifier
 ) {
-    val optionStatesFlow = viewModel.valueWithStateFlow
-    val isMutable = viewModel is MutableItemViewModel<*>
-    if (optionStatesFlow != null) {
-        val optionStates by optionStatesFlow.collectAsState()
+    if (viewModel is ChoiceItemViewModel<String>) {
+        val optionStates by viewModel.optionStates.collectAsState()
+        val isMutable = viewModel is MutableItemViewModel<*>
         val effectiveStates = if (isMutable) optionStates else optionStates.map { it.copy(isEnabled = false) }
         ChoiceItemRowWithStates(
             item = item,
@@ -293,6 +293,7 @@ fun ChoiceItemRow(
         )
     } else {
         val selectedOption by viewModel.valueFlow.collectAsState()
+        val isMutable = viewModel is MutableItemViewModel<*>
         ChoiceItemRowContent(
             item = item,
             selectedOption = selectedOption,
@@ -383,7 +384,7 @@ private fun ChoiceItemRowContent(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            item.choiceOptions.forEach { option ->
+            item.options.forEach { option ->
                 val isSelected = (option.value == selectedOption)
                 androidx.compose.foundation.layout.Box(modifier = Modifier.weight(1f)) {
                     item.optionSlot(

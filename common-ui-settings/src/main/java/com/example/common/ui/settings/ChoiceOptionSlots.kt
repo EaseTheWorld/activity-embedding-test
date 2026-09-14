@@ -27,7 +27,7 @@ import androidx.compose.ui.unit.sp
 /**
  * Predefined, reusable Composable slots for rendering options in [UiChoiceItem].
  */
-object ChoiceOptionSlots {
+object OptionSlots {
 
     /**
      * Standard Segmented Button slot with filled selected state and outlined unselected state.
@@ -134,3 +134,6 @@ object ChoiceOptionSlots {
         }
     }
 }
+
+@Deprecated("Use OptionSlots instead.", ReplaceWith("OptionSlots"))
+val ChoiceOptionSlots = OptionSlots

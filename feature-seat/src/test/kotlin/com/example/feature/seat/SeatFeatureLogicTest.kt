@@ -110,7 +110,7 @@ class SeatFeatureLogicTest {
 
         // Verify initial state
         assertEquals("OFF", heating.valueFlow.value)
-        assertEquals(listOf("OFF", "LEVEL 1", "LEVEL 2", "LEVEL 3"), heating.options)
+        assertEquals(listOf("OFF", "LEVEL 1", "LEVEL 2", "LEVEL 3"), heating.optionIds)
 
         // Valid domain transitions
         heating.onValueChanged("LEVEL 1")
@@ -175,9 +175,9 @@ class SeatFeatureLogicTest {
         assertEquals(R.string.seat_item_driver_heat_subtitle, heating.subtitleRes)
         assertEquals(R.drawable.ic_feature_seat, heating.iconRes)
 
-        // 2. Choice options SSOT & auto-derived options list
-        assertEquals(4, heating.choiceOptions.size)
-        assertEquals(listOf("OFF", "LEVEL 1", "LEVEL 2", "LEVEL 3"), heating.options)
+        // 2. Options SSOT & auto-derived optionIds list
+        assertEquals(4, heating.options.size)
+        assertEquals(listOf("OFF", "LEVEL 1", "LEVEL 2", "LEVEL 3"), heating.optionIds)
 
         // 3. Value -> String mapping verification via getValueVisual / getValueTextRes
         assertEquals(R.string.seat_heat_off, heating.getValueTextRes("OFF"))

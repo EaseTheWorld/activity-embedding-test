@@ -141,21 +141,25 @@ typealias OptionSlot<T> = @Composable (option: UiOption<T>, isSelected: Boolean,
 open class UiChoiceItem(
     id: String,
     @StringRes nameResId: Int,
-    val choiceOptions: List<UiOption<String>>,
+    val options: List<UiOption<String>>,
     @DrawableRes iconResId: Int? = null,
     @StringRes descriptionResId: Int? = null,
-    val optionSlot: OptionSlot<String> = ChoiceOptionSlots.Segmented,
+    val optionSlot: OptionSlot<String> = OptionSlots.Segmented,
     children: Set<Item> = emptySet()
 ) : UiItem(id, nameResId, iconResId, descriptionResId, children) {
 
     override val type: ItemType get() = ItemType.CHOICE
 
-    val options: List<String> get() = choiceOptions.map { it.value }
-    val possibleOptions: List<UiOption<String>> get() = choiceOptions
-    val optionIds: List<String> get() = options
+    @Deprecated("Use options instead.", ReplaceWith("options"))
+    val choiceOptions: List<UiOption<String>> get() = options
+
+    @Deprecated("Use options instead.", ReplaceWith("options"))
+    val possibleOptions: List<UiOption<String>> get() = options
+
+    val optionIds: List<String> get() = options.map { it.value }
 
     fun getOption(value: String): UiOption<String>? =
-        choiceOptions.firstOrNull { it.value == value }
+        options.firstOrNull { it.value == value }
 
     open fun getValueVisual(value: String): UiVisualData? {
         val opt = getOption(value) ?: return null
@@ -192,7 +196,6 @@ open class UiSliderItem(
 open class UiActionItem(
     id: String,
     @StringRes nameResId: Int,
-    @StringRes val buttonLabelRes: Int? = null,
     @DrawableRes iconResId: Int? = null,
     @StringRes descriptionResId: Int? = null,
     children: Set<Item> = emptySet()
@@ -215,15 +218,15 @@ typealias ComposableChoiceItem = UiChoiceItem
 open class BaseUiChoiceItem(
     id: String,
     @StringRes nameResId: Int,
-    choiceOptions: List<UiOption<String>>,
+    options: List<UiOption<String>>,
     @StringRes descriptionResId: Int? = null,
     @DrawableRes iconResId: Int? = null,
-    optionSlot: OptionSlot<String> = ChoiceOptionSlots.Segmented,
+    optionSlot: OptionSlot<String> = OptionSlots.Segmented,
     children: Set<Item> = emptySet()
 ) : UiChoiceItem(
     id = id,
     nameResId = nameResId,
-    choiceOptions = choiceOptions,
+    options = options,
     iconResId = iconResId,
     descriptionResId = descriptionResId,
     optionSlot = optionSlot,
@@ -267,13 +270,13 @@ abstract class VhalChoiceItem<V>(
     val initialValue: String = carOptions.firstOrNull()?.value ?: "",
     @StringRes descriptionResId: Int? = null,
     @DrawableRes iconResId: Int? = null,
-    optionSlot: OptionSlot<String> = ChoiceOptionSlots.Segmented,
+    optionSlot: OptionSlot<String> = OptionSlots.Segmented,
     private val binder: VhalPropertyBinder = InMemoryVhalBinder(),
     children: Set<Item> = emptySet()
 ) : BaseUiChoiceItem(
     id = id,
     nameResId = nameResId,
-    choiceOptions = carOptions,
+    options = carOptions,
     descriptionResId = descriptionResId,
     iconResId = iconResId,
     optionSlot = optionSlot,
@@ -296,7 +299,7 @@ abstract class VhalChoiceItem<V>(
     }
 
     open val onValueChanged: (String) -> Unit = { newValue ->
-        if (options.contains(newValue)) {
+        if (optionIds.contains(newValue)) {
             binder.setProperty(vhalBinding, newValue)
         }
     }

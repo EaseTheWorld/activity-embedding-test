@@ -1,9 +1,9 @@
 package com.example.feature.seat
 
 import com.example.common.ui.settings.InMemoryHardwareStorage
+import com.example.core.item.ChoiceItemViewModel
 import com.example.core.item.ItemViewModelRegistry
 import com.example.core.item.ValueWithState
-import com.example.core.item.selectedValue
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -79,7 +79,7 @@ class ChoiceItemSSOTTest {
         val registry = ItemViewModelRegistry(bindings)
 
         // Verify lookup by Item object (NO raw string!)
-        val choiceVm = registry.getViewModel<String>(SeatCatalog.massageMode)
+        val choiceVm = registry.getChoiceViewModel<String>(SeatCatalog.massageMode)
         assertNotNull("Choice ViewModel should be registered for SeatCatalog.massageMode", choiceVm)
 
         // Verify initial state
@@ -107,10 +107,10 @@ class ChoiceItemSSOTTest {
             scope = testScope
         )
 
-        val choiceVm = registry.getMutableViewModel<String>(SeatCatalog.massageMode)!!
+        val choiceVm = registry.getMutableChoiceViewModel<String>(SeatCatalog.massageMode)!!
 
         // 1. Initial State: "OFF" selected, all enabled
-        val initialStates = choiceVm.valueWithStateFlow!!.value
+        val initialStates = choiceVm.optionStates.value
         assertEquals(4, initialStates.size)
 
         assertEquals(ValueWithState(id = "OFF", isSelected = true, isEnabled = true), initialStates[0])
@@ -129,7 +129,7 @@ class ChoiceItemSSOTTest {
         ).value
         assertEquals(1, rawAfter)
 
-        val waveStates = choiceVm.valueWithStateFlow!!.value
+        val waveStates = choiceVm.optionStates.value
         assertFalse(waveStates[0].isSelected) // "OFF" unselected
         assertTrue(waveStates[1].isSelected)  // "WAVE" selected
         assertTrue(waveStates[1].isEnabled)
@@ -138,7 +138,7 @@ class ChoiceItemSSOTTest {
         drivingRestrictions.value = setOf("STRETCH")
         testScheduler.advanceUntilIdle()
 
-        val restrictedStates = choiceVm.valueWithStateFlow!!.value
+        val restrictedStates = choiceVm.optionStates.value
         val stretchState = restrictedStates.find { it.id == "STRETCH" }!!
         assertFalse("STRETCH should be disabled while driving", stretchState.isEnabled)
         assertFalse("STRETCH should not be selected", stretchState.isSelected)

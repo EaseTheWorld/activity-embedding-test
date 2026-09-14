@@ -151,12 +151,10 @@ abstract class SettingCatalog(val id: String) {
  * Decouples the storage mechanism (DataStore, Network, VHAL) from the UI layer.
  *
  * Exposes observable domain state via [valueFlow].
- * Items that possess discrete selectable options with dynamic states (e.g. Choice items)
- * also provide [valueWithStateFlow].
+ * Pure, minimal base contract for all setting items (Toggles, Sliders, Custom items, etc.).
  */
 interface ItemViewModel<T> {
     val valueFlow: StateFlow<T>
-    val valueWithStateFlow: StateFlow<List<ValueWithState<T>>>? get() = null
 }
 
 /**
@@ -171,27 +169,22 @@ interface MutableItemViewModel<T> : ItemViewModel<T> {
 }
 
 /**
- * Convenience accessor for the currently selected option value.
+ * Specialized [ItemViewModel] contract for multi-option Choice items (Read-Only).
+ * Extends [ItemViewModel<T>] where T is the domain value type (e.g. String or Enum).
+ * Exposes [optionStates] representing dynamic per-option selection and enablement.
  */
-val <T> ItemViewModel<T>.selectedValue: T?
-    get() = valueWithStateFlow?.value?.firstOrNull { it.isSelected }?.id ?: valueFlow.value
+interface ChoiceItemViewModel<T> : ItemViewModel<T> {
+    val optionStates: StateFlow<List<ValueWithState<T>>>
+
+    val selectedValue: T?
+        get() = optionStates.value.firstOrNull { it.isSelected }?.id ?: valueFlow.value
+}
 
 /**
- * Backward-compatible alias for [valueWithStateFlow].
+ * Mutable Choice ViewModel contract supporting user option selection.
+ * Receives the selected option ID [newValue] to update domain state.
  */
-val <T> ItemViewModel<T>.optionStates: StateFlow<List<ValueWithState<T>>>?
-    get() = valueWithStateFlow
-
-/**
- * Legacy typealias for backward compatibility during transition.
- */
-@Deprecated("Use ItemViewModel<T> directly. Choice items now implement ItemViewModel<T> with valueWithStateFlow.",
-    ReplaceWith("ItemViewModel<T>"))
-typealias ChoiceItemViewModel<T> = ItemViewModel<T>
-
-@Deprecated("Use MutableItemViewModel<T> directly.",
-    ReplaceWith("MutableItemViewModel<T>"))
-typealias MutableChoiceItemViewModel<T> = MutableItemViewModel<T>
+interface MutableChoiceItemViewModel<T> : ChoiceItemViewModel<T>, MutableItemViewModel<T>
 
 
 /**
@@ -232,17 +225,19 @@ open class ItemViewModelRegistry(
 
     fun <T> getMutableViewModel(item: Item): MutableItemViewModel<T>? = getMutableViewModel(item.id)
 
-    @Deprecated("Use getViewModel<T>(itemId) directly.", ReplaceWith("getViewModel(itemId)"))
-    fun <T> getChoiceViewModel(itemId: String): ItemViewModel<T>? = getViewModel(itemId)
+    @Suppress("UNCHECKED_CAST")
+    fun <T> getChoiceViewModel(itemId: String): ChoiceItemViewModel<T>? {
+        return viewModels[itemId] as? ChoiceItemViewModel<T>
+    }
 
-    @Deprecated("Use getViewModel<T>(item) directly.", ReplaceWith("getViewModel(item)"))
-    fun <T> getChoiceViewModel(item: Item): ItemViewModel<T>? = getViewModel(item)
+    fun <T> getChoiceViewModel(item: Item): ChoiceItemViewModel<T>? = getChoiceViewModel(item.id)
 
-    @Deprecated("Use getMutableViewModel<T>(itemId) directly.", ReplaceWith("getMutableViewModel(itemId)"))
-    fun <T> getMutableChoiceViewModel(itemId: String): MutableItemViewModel<T>? = getMutableViewModel(itemId)
+    @Suppress("UNCHECKED_CAST")
+    fun <T> getMutableChoiceViewModel(itemId: String): MutableChoiceItemViewModel<T>? {
+        return viewModels[itemId] as? MutableChoiceItemViewModel<T>
+    }
 
-    @Deprecated("Use getMutableViewModel<T>(item) directly.", ReplaceWith("getMutableViewModel(item)"))
-    fun <T> getMutableChoiceViewModel(item: Item): MutableItemViewModel<T>? = getMutableViewModel(item)
+    fun <T> getMutableChoiceViewModel(item: Item): MutableChoiceItemViewModel<T>? = getMutableChoiceViewModel(item.id)
 
     fun hasViewModel(itemId: String): Boolean = viewModels.containsKey(itemId)
     fun hasViewModel(item: Item): Boolean = hasViewModel(item.id)

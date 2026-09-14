@@ -115,6 +115,16 @@ To permanently prevent regressions where state streams or mutation methods are a
 
 ---
 
+### 6. Physical Separation of Layers into Dedicated Files
+To eliminate monolithic file accumulation (`*Items.kt`), enforce clean git ownership (`CODEOWNERS`), and guarantee strict layer boundaries:
+- **`*Catalog.kt`**: **Layer 1 (UI Presentation)** — Canonical catalog declaring item IDs, titles, descriptions, icons, and choices. Owned by UI/Design engineers (zero VHAL knowledge needed).
+- **`*VehicleProperties.kt`**: **Layer 2 (Hardware / HAL)** — Vehicle HAL property IDs, area IDs, and `ValueMapping`. Owned by Vehicle/Embedded engineers (zero UI/Compose knowledge needed).
+- **`*ViewModelModule.kt`**: **Layer 3 (Assembler / DI)** — Declarative `bindsTo` bindings. Owned by Platform/App engineers.
+- **`*ItemRegistry.kt`**: Category registry implementing `CategoryItemProvider` for dynamic discovery and IPC traversal.
+- Custom domain models & ViewModels (e.g. `SeatLumbarSupport.kt`) reside in dedicated files.
+
+---
+
 ## Consequences
 
 ### Positive

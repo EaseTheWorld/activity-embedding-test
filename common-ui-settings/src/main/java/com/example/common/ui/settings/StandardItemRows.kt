@@ -52,6 +52,10 @@ fun ToggleItemRow(
     viewModel: ItemViewModel<Boolean>,
     modifier: Modifier = Modifier
 ) {
+    val isVmVisible by viewModel.isVisibleFlow.collectAsState()
+    val isItemVisible by item.isVisible.collectAsState(initial = true)
+    if (!isVmVisible || !isItemVisible) return
+
     val isChecked by viewModel.valueFlow.collectAsState()
     val isMutable = viewModel is MutableItemViewModel
     ToggleItemRowContent(
@@ -69,6 +73,8 @@ fun ToggleItemRow(
     viewModelRegistry: ItemViewModelRegistry = LocalItemViewModelRegistry.current,
     modifier: Modifier = Modifier
 ) {
+    val isItemVisible by item.isVisible.collectAsState(initial = true)
+    if (!isItemVisible) return
     val viewModel = viewModelRegistry.getViewModel<Boolean>(item.id)
     if (viewModel != null) {
         ToggleItemRow(item = item, viewModel = viewModel, modifier = modifier)
@@ -153,6 +159,10 @@ fun ToggleGridCard(
     viewModel: ItemViewModel<Boolean>,
     modifier: Modifier = Modifier
 ) {
+    val isVmVisible by viewModel.isVisibleFlow.collectAsState()
+    val isItemVisible by item.isVisible.collectAsState(initial = true)
+    if (!isVmVisible || !isItemVisible) return
+
     val isChecked by viewModel.valueFlow.collectAsState()
     val isMutable = viewModel is MutableItemViewModel
     val title = stringResource(item.titleRes)
@@ -213,6 +223,8 @@ fun ToggleGridCard(
     viewModelRegistry: ItemViewModelRegistry = LocalItemViewModelRegistry.current,
     modifier: Modifier = Modifier
 ) {
+    val isItemVisible by item.isVisible.collectAsState(initial = true)
+    if (!isItemVisible) return
     val viewModel = viewModelRegistry.getViewModel<Boolean>(item.id)
     if (viewModel != null) {
         ToggleGridCard(item = item, viewModel = viewModel, modifier = modifier)
@@ -281,6 +293,10 @@ fun ChoiceItemRow(
     viewModel: ItemViewModel<String>,
     modifier: Modifier = Modifier
 ) {
+    val isVmVisible by viewModel.isVisibleFlow.collectAsState()
+    val isItemVisible by item.isVisible.collectAsState(initial = true)
+    if (!isVmVisible || !isItemVisible) return
+
     if (viewModel is ChoiceItemViewModel<String>) {
         val optionStates by viewModel.optionStates.collectAsState()
         val isMutable = viewModel is MutableItemViewModel<*>
@@ -310,6 +326,8 @@ fun ChoiceItemRow(
     viewModelRegistry: ItemViewModelRegistry = LocalItemViewModelRegistry.current,
     modifier: Modifier = Modifier
 ) {
+    val isItemVisible by item.isVisible.collectAsState(initial = true)
+    if (!isItemVisible) return
     val viewModel = viewModelRegistry.getViewModel<String>(item.id)
     if (viewModel != null) {
         ChoiceItemRow(item = item, viewModel = viewModel, modifier = modifier)
@@ -491,6 +509,10 @@ fun ChoiceGridCard(
     viewModel: ItemViewModel<String>,
     modifier: Modifier = Modifier
 ) {
+    val isVmVisible by viewModel.isVisibleFlow.collectAsState()
+    val isItemVisible by item.isVisible.collectAsState(initial = true)
+    if (!isVmVisible || !isItemVisible) return
+
     val selectedOption by viewModel.valueFlow.collectAsState()
     ChoiceGridCardContent(item = item, selectedOption = selectedOption, modifier = modifier)
 }
@@ -501,6 +523,8 @@ fun ChoiceGridCard(
     viewModelRegistry: ItemViewModelRegistry = LocalItemViewModelRegistry.current,
     modifier: Modifier = Modifier
 ) {
+    val isItemVisible by item.isVisible.collectAsState(initial = true)
+    if (!isItemVisible) return
     val viewModel = viewModelRegistry.getViewModel<String>(item.id)
     if (viewModel != null) {
         ChoiceGridCard(item = item, viewModel = viewModel, modifier = modifier)
@@ -576,6 +600,10 @@ fun SliderItemRow(
     viewModel: ItemViewModel<Int>,
     modifier: Modifier = Modifier
 ) {
+    val isVmVisible by viewModel.isVisibleFlow.collectAsState()
+    val isItemVisible by item.isVisible.collectAsState(initial = true)
+    if (!isVmVisible || !isItemVisible) return
+
     val value by viewModel.valueFlow.collectAsState()
     val isMutable = viewModel is MutableItemViewModel
     SliderItemRowContent(
@@ -593,6 +621,8 @@ fun SliderItemRow(
     viewModelRegistry: ItemViewModelRegistry = LocalItemViewModelRegistry.current,
     modifier: Modifier = Modifier
 ) {
+    val isItemVisible by item.isVisible.collectAsState(initial = true)
+    if (!isItemVisible) return
     val viewModel = viewModelRegistry.getViewModel<Int>(item.id)
     if (viewModel != null) {
         SliderItemRow(item = item, viewModel = viewModel, modifier = modifier)
@@ -665,6 +695,10 @@ fun SliderGridCard(
     viewModel: ItemViewModel<Int>,
     modifier: Modifier = Modifier
 ) {
+    val isVmVisible by viewModel.isVisibleFlow.collectAsState()
+    val isItemVisible by item.isVisible.collectAsState(initial = true)
+    if (!isVmVisible || !isItemVisible) return
+
     val value by viewModel.valueFlow.collectAsState()
     val isMutable = viewModel is MutableItemViewModel
     val title = stringResource(item.titleRes)
@@ -720,6 +754,8 @@ fun SliderGridCard(
     viewModelRegistry: ItemViewModelRegistry = LocalItemViewModelRegistry.current,
     modifier: Modifier = Modifier
 ) {
+    val isItemVisible by item.isVisible.collectAsState(initial = true)
+    if (!isItemVisible) return
     val viewModel = viewModelRegistry.getViewModel<Int>(item.id)
     if (viewModel != null) {
         SliderGridCard(item = item, viewModel = viewModel, modifier = modifier)

@@ -8,7 +8,9 @@ import android.database.MatrixCursor
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
-import com.example.core.item.ChoiceItem
+import com.example.common.ui.settings.UiChoiceItem
+import com.example.core.item.ItemType
+import com.example.core.item.MutableItemViewModel
 
 class SeatSettingsProvider : ContentProvider() {
 
@@ -129,9 +131,9 @@ class SeatSettingsProvider : ContentProvider() {
                     val uiItem = item as? com.example.common.ui.settings.UiItem
                     val titleResId = uiItem?.titleRes ?: 0
                     val subtitleResId = uiItem?.subtitleRes ?: 0
-                    val title = if (titleResId != 0) ctx.getString(titleResId) else item.key
+                    val title = if (titleResId != 0) ctx.getString(titleResId) else item.id
                     val subtitle = if (subtitleResId != 0) ctx.getString(subtitleResId) else ""
-                    val options = if (item is ChoiceItem) item.options.joinToString(",") else ""
+                    val options = if (item is UiChoiceItem) item.optionIds.joinToString(",") else ""
                     val serializedValue = when (item) {
                         is SeatLumbarSupportItem -> SeatItemRegistry.seatLumbarViewModel.valueFlow.value.toSerialized()
                         else -> item.serializedValue
@@ -140,7 +142,7 @@ class SeatSettingsProvider : ContentProvider() {
                     cursor.addRow(
                         arrayOf(
                             (index + 1).toString(),
-                            item.key,
+                            item.id,
                             title,
                             subtitle,
                             item.type.name,
@@ -167,10 +169,16 @@ class SeatSettingsProvider : ContentProvider() {
             val value = extras?.getString(EXTRA_VALUE) ?: extras?.getString("value") ?: return null
             val targetItem = SeatItemRegistry.findItem(key)
             if (targetItem != null) {
-                when (targetItem) {
-                    is ChoiceItem -> targetItem.onValueChanged(value)
-                    is com.example.core.item.ToggleItem -> targetItem.onValueChanged(value.toBoolean())
-                    is SeatLumbarSupportItem -> SeatItemRegistry.seatLumbarViewModel.updateFromSerialized(value)
+                when {
+                    targetItem is MutableItemViewModel<*> -> {
+                        @Suppress("UNCHECKED_CAST")
+                        when (targetItem.type) {
+                            ItemType.TOGGLE -> (targetItem as MutableItemViewModel<Boolean>).setValue(value.toBoolean())
+                            ItemType.CHOICE -> (targetItem as MutableItemViewModel<String>).setValue(value)
+                            else -> Unit
+                        }
+                    }
+                    targetItem is SeatLumbarSupportItem -> SeatItemRegistry.seatLumbarViewModel.updateFromSerialized(value)
                     else -> Unit
                 }
                 context?.contentResolver?.notifyChange(Uri.parse("content://$AUTHORITY/$PATH_ITEMS"), null)

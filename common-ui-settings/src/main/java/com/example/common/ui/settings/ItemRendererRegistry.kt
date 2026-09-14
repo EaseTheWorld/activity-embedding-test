@@ -174,13 +174,7 @@ class SliderGridCardRenderer : ItemRenderer<UiSliderItem, Int> {
     }
 }
 
-// Backward compatibility typealiases
-typealias ToggleItemRenderer = ToggleListRenderer
-typealias ChoiceItemRenderer = ChoiceListRenderer
-typealias SliderItemRenderer = SliderListRenderer
-
 val LocalListItemRendererRegistry = staticCompositionLocalOf { ItemRendererRegistry.defaultListRegistry }
 val LocalGridItemRendererRegistry = staticCompositionLocalOf { ItemRendererRegistry.defaultGridRegistry }
-val LocalItemRendererRegistry = LocalListItemRendererRegistry
 val LocalItemViewModelRegistry = staticCompositionLocalOf { ItemViewModelRegistry() }
 

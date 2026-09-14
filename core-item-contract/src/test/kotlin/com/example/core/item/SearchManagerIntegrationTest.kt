@@ -40,11 +40,11 @@ class SearchManagerIntegrationTest {
 
     @Test
     fun `SearchManager indexes nested Item hierarchy and performs search lookups`() {
-        val autoLock = ToggleItem("auto_lock", MutableStateFlow(true))
-        val childLock = ToggleItem("child_lock", MutableStateFlow(false))
+        val autoLock = object : Item("auto_lock") { override val type = ItemType.TOGGLE }
+        val childLock = Item("child_lock")
         val lockGroup = Item("lock_settings", setOf(autoLock, childLock))
 
-        val mirrorFold = ToggleItem("auto_mirror_fold", MutableStateFlow(true))
+        val mirrorFold = Item("auto_mirror_fold")
         val doorCategory = Item("door", setOf(lockGroup, mirrorFold))
 
         val searchManager = MockSearchManager()

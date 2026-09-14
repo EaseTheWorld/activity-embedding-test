@@ -50,8 +50,7 @@ class UiItemTreeTest {
         assertEquals(1, parent.children.size)
         assertTrue(parent.children.contains(child))
 
-        // Ensure key and id match
-        assertEquals("parent_1", parent.key)
+        // Ensure id matches
         assertEquals("parent_1", parent.id)
     }
 

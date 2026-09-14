@@ -1,6 +1,7 @@
 package com.example.core.item
 
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flowOf
 
@@ -19,23 +20,18 @@ enum class ItemType {
  *
  * @property id Unique identifier for this item (used as primary key in search and registries).
  * @property children Immutable set of child Items in the settings hierarchy.
+ * @property isVisible Reactive stream determining whether this item should be displayed.
  */
 open class Item(
     open val id: String,
-    open val children: Set<Item> = emptySet()
+    open val children: Set<Item> = emptySet(),
+    open val isVisible: Flow<Boolean> = flowOf(true)
 ) {
     init {
         require(id.isNotBlank()) { "Item id cannot be blank" }
     }
 
-    /**
-     * Backward-compatibility alias for [id].
-     */
-    val key: String get() = id
-
     open val type: ItemType get() = ItemType.CUSTOM
-    open val isVisible: Flow<Boolean> get() = flowOf(true)
-    open val isEnabled: Flow<Boolean> get() = flowOf(true)
     open val serializedValue: String get() = ""
 
     /**
@@ -73,58 +69,6 @@ open class Item(
 }
 
 /**
- * Setting item holding a reactive state value of type [T].
- */
-open class ValueItem<T>(
-    id: String,
-    open val valueFlow: StateFlow<T>,
-    children: Set<Item> = emptySet()
-) : Item(id, children) {
-    open fun onValueChanged(newValue: T) {}
-
-    /**
-     * Serialized string representation of value for IPC / MatrixCursor transmission.
-     */
-    override val serializedValue: String get() = valueFlow.value.toString()
-}
-
-open class ToggleItem(
-    id: String,
-    valueFlow: StateFlow<Boolean>,
-    children: Set<Item> = emptySet()
-) : ValueItem<Boolean>(id, valueFlow, children) {
-    override val type: ItemType get() = ItemType.TOGGLE
-}
-
-open class ChoiceItem(
-    id: String,
-    valueFlow: StateFlow<String>,
-    open val options: List<String>,
-    children: Set<Item> = emptySet()
-) : ValueItem<String>(id, valueFlow, children) {
-    override val type: ItemType get() = ItemType.CHOICE
-}
-
-open class SliderItem(
-    id: String,
-    valueFlow: StateFlow<Int>,
-    open val min: Int,
-    open val max: Int,
-    open val unitKey: String? = null,
-    children: Set<Item> = emptySet()
-) : ValueItem<Int>(id, valueFlow, children) {
-    override val type: ItemType get() = ItemType.SLIDER
-}
-
-open class ActionItem(
-    id: String,
-    valueFlow: StateFlow<Unit>,
-    children: Set<Item> = emptySet()
-) : ValueItem<Unit>(id, valueFlow, children) {
-    override val type: ItemType get() = ItemType.ACTION
-}
-
-/**
  * Canonical Builder base class for declaring Setting Items with zero omission.
  * Any item registered via [item] is automatically appended to [children].
  */
@@ -150,11 +94,12 @@ abstract class SettingCatalog(val id: String) {
  * Encapsulated reactive ViewModel contract for an individual setting item (Read-Only).
  * Decouples the storage mechanism (DataStore, Network, VHAL) from the UI layer.
  *
- * Exposes observable domain state via [valueFlow].
+ * Exposes observable domain state via [valueFlow] and dynamic visibility via [isVisibleFlow].
  * Pure, minimal base contract for all setting items (Toggles, Sliders, Custom items, etc.).
  */
 interface ItemViewModel<T> {
     val valueFlow: StateFlow<T>
+    val isVisibleFlow: StateFlow<Boolean> get() = MutableStateFlow(true)
 }
 
 /**

@@ -23,17 +23,8 @@ class CoreContractInvariantsTest {
     // ========================================================================
 
     @Test
-    fun `verify Item_type default implementations map every sub-interface correctly to ItemType`() {
-        val toggleItem = ToggleItem("toggle", MutableStateFlow(true))
-        val choiceItem = ChoiceItem("choice", MutableStateFlow("A"), listOf("A", "B"))
-        val sliderItem = SliderItem("slider", MutableStateFlow(50), 0, 100)
-        val actionItem = ActionItem("action", MutableStateFlow(Unit))
+    fun `verify Item_type default implementations map correctly to ItemType`() {
         val customItem = Item("custom")
-
-        assertEquals(ItemType.TOGGLE, toggleItem.type)
-        assertEquals(ItemType.CHOICE, choiceItem.type)
-        assertEquals(ItemType.SLIDER, sliderItem.type)
-        assertEquals(ItemType.ACTION, actionItem.type)
         assertEquals(ItemType.CUSTOM, customItem.type)
     }
 

@@ -1,6 +1,7 @@
 package com.example.core.item
 
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -23,20 +24,20 @@ class ItemTreeTest {
 
     @Test
     fun `findById finds items recursively at any depth`() {
-        val leaf = Item("deep_leaf")
-        val mid = Item("mid_node", setOf(leaf))
-        val root = Item("root_node", setOf(mid))
+        val child1 = Item("child_1")
+        val grandChild = Item("grand_child")
+        val branch = Item("branch", setOf(grandChild))
+        val root = Item("root", setOf(child1, branch))
 
-        assertNotNull(root.findById("root_node"))
-        assertNotNull(root.findById("mid_node"))
-        assertNotNull(root.findById("deep_leaf"))
+        assertEquals(root, root.findById("root"))
+        assertEquals(child1, root.findById("child_1"))
+        assertEquals(branch, root.findById("branch"))
+        assertEquals(grandChild, root.findById("grand_child"))
         assertNull(root.findById("non_existent"))
-
-        assertEquals("deep_leaf", root.findById("deep_leaf")?.id)
     }
 
     @Test
-    fun `flatten returns depth-first traversal of all nodes for search indexing`() {
+    fun `flatten flattens tree in depth-first order`() {
         val child1 = Item("child_1")
         val child2 = Item("child_2")
         val grandChild = Item("grand_child")
@@ -54,13 +55,16 @@ class ItemTreeTest {
     }
 
     @Test
-    fun `ValueItem subclasses hold stateflow and handle value changes`() {
-        val flow = MutableStateFlow(true)
-        val toggle = ToggleItem("auto_lock", flow)
+    fun `Item constructor accepts isVisible Flow and defaults to true`() = kotlinx.coroutines.test.runTest {
+        val defaultItem = Item("default_item")
+        val defaultVisible = defaultItem.isVisible.first()
+        assertTrue(defaultVisible)
 
-        assertEquals("auto_lock", toggle.id)
-        assertEquals(ItemType.TOGGLE, toggle.type)
-        assertEquals(true, toggle.valueFlow.value)
-        assertEquals("true", toggle.serializedValue)
+        val dynamicFlow = MutableStateFlow(false)
+        val dynamicItem = Item("dynamic_item", isVisible = dynamicFlow)
+        assertEquals(false, dynamicItem.isVisible.first())
+
+        dynamicFlow.value = true
+        assertEquals(true, dynamicItem.isVisible.first())
     }
 }

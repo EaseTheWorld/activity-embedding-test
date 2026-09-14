@@ -139,11 +139,11 @@ class SeatFeatureLogicTest {
     fun `SeatItemRegistry enforces unique item keys and complete SSOT registration`() {
         val items = SeatItemRegistry.items
 
-        // Regression Guard: ContentProvider queries and Database index mappings require unique keys.
-        // If a copy-paste error duplicates an item key, ContentProvider query responses corrupt.
-        val keys = items.map { it.key }
-        val uniqueKeys = keys.toSet()
-        assertEquals("Every setting item in SeatItemRegistry must have a distinct unique key", uniqueKeys.size, keys.size)
+        // Regression Guard: ContentProvider queries and Database index mappings require unique IDs.
+        // If a copy-paste error duplicates an item ID, ContentProvider query responses corrupt.
+        val ids = items.map { it.id }
+        val uniqueIds = ids.toSet()
+        assertEquals("Every setting item in SeatItemRegistry must have a distinct unique ID", uniqueIds.size, ids.size)
 
         // Verify all items exist in registry
         assertNotNull(SeatItemRegistry.findItem("driver_seat_heat"))

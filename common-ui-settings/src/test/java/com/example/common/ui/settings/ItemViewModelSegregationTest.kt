@@ -168,4 +168,22 @@ class ItemViewModelSegregationTest {
         assertEquals("WAVE", writableChoiceVm.selectedValue)
         assertTrue(writableChoiceVm.optionStates.value.first { it.id == "WAVE" }.isSelected)
     }
+
+    @Test
+    fun `ItemViewModel dynamically observes isVisibleFlow`() = runTest {
+        val testScope = TestScope(testScheduler)
+        val visibleFlow = MutableStateFlow(true)
+        val vm = LocalStorageItemViewModel(
+            initialValue = false,
+            scope = testScope,
+            isVisibleFlow = visibleFlow.asStateFlow()
+        )
+
+        assertTrue(vm.isVisibleFlow.value)
+
+        visibleFlow.value = false
+        testScope.advanceUntilIdle()
+
+        assertFalse(vm.isVisibleFlow.value)
+    }
 }

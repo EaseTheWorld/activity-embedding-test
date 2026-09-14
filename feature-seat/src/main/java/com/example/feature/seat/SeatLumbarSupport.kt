@@ -40,7 +40,8 @@ data class SeatLumbarSupport(
  * Also handles IPC serialization / deserialization roundtrips.
  */
 class SeatLumbarViewModel(
-    initialValue: SeatLumbarSupport = SeatLumbarSupport.DEFAULT
+    initialValue: SeatLumbarSupport = SeatLumbarSupport.DEFAULT,
+    override val isVisibleFlow: StateFlow<Boolean> = MutableStateFlow(true)
 ) : MutableItemViewModel<SeatLumbarSupport> {
 
     private val _valueFlow = MutableStateFlow(initialValue)
@@ -48,13 +49,6 @@ class SeatLumbarViewModel(
 
     override fun setValue(newValue: SeatLumbarSupport) {
         _valueFlow.value = newValue
-    }
-
-    /**
-     * Backward-compatibility or direct update hook.
-     */
-    fun onValueChanged(newValue: SeatLumbarSupport) {
-        setValue(newValue)
     }
 
     /**

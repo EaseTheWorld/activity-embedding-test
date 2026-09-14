@@ -212,37 +212,42 @@ fun DefaultCategoryItemsContent(
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
         items.forEachIndexed { index, item ->
-            when (item) {
-                is UiToggleItem -> {
-                    ToggleItemRow(item = item, viewModelRegistry = viewModelRegistry)
+            val isItemVisible by item.isVisible.collectAsState(initial = true)
+            val vm = viewModelRegistry.getViewModel<Any>(item.id)
+            val isVmVisible = (vm?.isVisibleFlow?.collectAsState())?.value ?: true
+            if (isItemVisible && isVmVisible) {
+                when (item) {
+                    is UiToggleItem -> {
+                        ToggleItemRow(item = item, viewModelRegistry = viewModelRegistry)
+                    }
+                    is UiChoiceItem -> {
+                        ChoiceItemRow(item = item, viewModelRegistry = viewModelRegistry)
+                    }
+                    is UiSliderItem -> {
+                        SliderItemRow(item = item, viewModelRegistry = viewModelRegistry)
+                    }
+                    is UiItem -> {
+                        Text(
+                            text = stringResource(item.nameResId),
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        )
+                    }
+                    else -> {
+                        Text(
+                            text = "Item: ${item.id}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        )
+                    }
                 }
-                is UiChoiceItem -> {
-                    ChoiceItemRow(item = item, viewModelRegistry = viewModelRegistry)
-                }
-                is UiSliderItem -> {
-                    SliderItemRow(item = item, viewModelRegistry = viewModelRegistry)
-                }
-                is UiItem -> {
-                    Text(
-                        text = stringResource(item.nameResId),
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(vertical = 8.dp)
+                if (index < items.size - 1) {
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 12.dp),
+                        color = Color(0xFFF1F2F6)
                     )
                 }
-                else -> {
-                    Text(
-                        text = "Item: ${item.id}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(vertical = 8.dp)
-                    )
-                }
-            }
-            if (index < items.size - 1) {
-                HorizontalDivider(
-                    modifier = Modifier.padding(vertical = 12.dp),
-                    color = Color(0xFFF1F2F6)
-                )
             }
         }
     }
@@ -257,6 +262,11 @@ fun DashboardGridItemCard(
     viewModelRegistry: ItemViewModelRegistry = LocalItemViewModelRegistry.current,
     modifier: Modifier = Modifier
 ) {
+    val isItemVisible by item.isVisible.collectAsState(initial = true)
+    val vm = viewModelRegistry.getViewModel<Any>(item.id)
+    val isVmVisible = (vm?.isVisibleFlow?.collectAsState())?.value ?: true
+    if (!isItemVisible || !isVmVisible) return
+
     when (item) {
         is UiToggleItem -> {
             ToggleGridCard(item = item, viewModelRegistry = viewModelRegistry, modifier = modifier)

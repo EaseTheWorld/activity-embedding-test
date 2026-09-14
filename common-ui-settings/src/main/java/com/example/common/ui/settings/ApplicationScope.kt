@@ -33,10 +33,13 @@ object AppScope {
  * Ideal for telemetry sensors, battery levels, speed, or read-only vehicle gauges.
  */
 class ReadOnlyItemViewModel<T>(
-    override val valueFlow: StateFlow<T>
+    override val valueFlow: StateFlow<T>,
+    override val isVisibleFlow: StateFlow<Boolean> = MutableStateFlow(true)
 ) : ItemViewModel<T>
 
-fun <T> StateFlow<T>.asReadOnlyViewModel(): ItemViewModel<T> = ReadOnlyItemViewModel(this)
+fun <T> StateFlow<T>.asReadOnlyViewModel(
+    isVisibleFlow: StateFlow<Boolean> = MutableStateFlow(true)
+): ItemViewModel<T> = ReadOnlyItemViewModel(this, isVisibleFlow)
 
 /**
  * Read-only hardware ViewModel observing [VehicleProperty] from [HardwarePropertyStorage]
@@ -44,7 +47,8 @@ fun <T> StateFlow<T>.asReadOnlyViewModel(): ItemViewModel<T> = ReadOnlyItemViewM
  */
 class ReadOnlyHardwareItemViewModel<DomainT, RawV>(
     val property: com.example.core.item.VehicleProperty<DomainT, RawV>,
-    private val storage: HardwarePropertyStorage
+    private val storage: HardwarePropertyStorage,
+    override val isVisibleFlow: StateFlow<Boolean> = MutableStateFlow(true)
 ) : ItemViewModel<DomainT> {
     override val valueFlow: StateFlow<DomainT> = storage.observe(property)
 }
@@ -53,7 +57,8 @@ class ReadOnlyHardwareItemViewModel<DomainT, RawV>(
  * Thread-safe, reactive in-memory ViewModel for tests, previews, and runtime settings.
  */
 class InMemoryItemViewModel<T>(
-    initialValue: T
+    initialValue: T,
+    override val isVisibleFlow: StateFlow<Boolean> = MutableStateFlow(true)
 ) : MutableItemViewModel<T> {
     private val _valueFlow = MutableStateFlow(initialValue)
     override val valueFlow: StateFlow<T> = _valueFlow.asStateFlow()
@@ -70,6 +75,7 @@ class InMemoryItemViewModel<T>(
 class LocalStorageItemViewModel<T>(
     initialValue: T,
     private val scope: CoroutineScope = AppScope.scope,
+    override val isVisibleFlow: StateFlow<Boolean> = MutableStateFlow(true),
     private val onPersist: suspend (T) -> Unit = {}
 ) : MutableItemViewModel<T> {
     private val _valueFlow = MutableStateFlow(initialValue)
@@ -90,6 +96,7 @@ class LocalStorageItemViewModel<T>(
 class NetworkItemViewModel<T>(
     initialValue: T,
     private val scope: CoroutineScope = AppScope.scope,
+    override val isVisibleFlow: StateFlow<Boolean> = MutableStateFlow(true),
     private val remoteUpdate: suspend (T) -> Boolean
 ) : MutableItemViewModel<T> {
     private val _valueFlow = MutableStateFlow(initialValue)
@@ -128,7 +135,8 @@ class NetworkItemViewModel<T>(
 class HardwareItemViewModel<DomainT, RawV>(
     val property: com.example.core.item.VehicleProperty<DomainT, RawV>,
     private val storage: HardwarePropertyStorage,
-    private val scope: CoroutineScope = AppScope.scope
+    private val scope: CoroutineScope = AppScope.scope,
+    override val isVisibleFlow: StateFlow<Boolean> = MutableStateFlow(true)
 ) : MutableItemViewModel<DomainT> {
 
     override val valueFlow: StateFlow<DomainT> = storage.observe(property)
@@ -138,21 +146,6 @@ class HardwareItemViewModel<DomainT, RawV>(
             storage.write(property, newValue)
         }
     }
-
-    // Backward-compatible constructor for HardwareBinding
-    constructor(
-        binding: com.example.core.item.HardwareBinding<DomainT, RawV>,
-        storage: HardwarePropertyStorage,
-        scope: CoroutineScope = AppScope.scope
-    ) : this(
-        property = com.example.core.item.VehicleProperty(
-            propertyId = binding.storageKey.propertyId,
-            areaId = binding.storageKey.areaId,
-            mapper = binding.valueMapping
-        ),
-        storage = storage,
-        scope = scope
-    )
 }
 
 /**
@@ -162,6 +155,7 @@ class KeyValueItemViewModel<DomainT, RawV>(
     val binding: com.example.core.item.PropertyBinding<DomainT, RawV, String>,
     initialRawValue: RawV,
     private val scope: CoroutineScope = AppScope.scope,
+    override val isVisibleFlow: StateFlow<Boolean> = MutableStateFlow(true),
     private val onPersist: suspend (key: String, rawValue: RawV) -> Unit = { _, _ -> }
 ) : MutableItemViewModel<DomainT> {
 
@@ -186,14 +180,15 @@ fun <DomainT, RawV> com.example.core.item.ItemViewModelRegistry.bindHardware(
     areaId: Int = 0,
     valueMapping: com.example.core.item.ValueMapping<DomainT, RawV>,
     storage: HardwarePropertyStorage,
-    scope: CoroutineScope = AppScope.scope
+    scope: CoroutineScope = AppScope.scope,
+    isVisibleFlow: StateFlow<Boolean> = MutableStateFlow(true)
 ): HardwareItemViewModel<DomainT, RawV> {
-    val binding = com.example.core.item.PropertyBinding(
-        itemId = itemId,
-        storageKey = com.example.core.item.HardwareKey(propertyId, areaId),
-        valueMapping = valueMapping
+    val property = com.example.core.item.VehicleProperty(
+        propertyId = propertyId,
+        areaId = areaId,
+        mapper = valueMapping
     )
-    val viewModel = HardwareItemViewModel(binding, storage, scope)
+    val viewModel = HardwareItemViewModel(property, storage, scope, isVisibleFlow)
     register(itemId, viewModel)
     return viewModel
 }
@@ -207,6 +202,7 @@ fun <DomainT, RawV> com.example.core.item.ItemViewModelRegistry.bindStorage(
     valueMapping: com.example.core.item.ValueMapping<DomainT, RawV>,
     initialRawValue: RawV,
     scope: CoroutineScope = AppScope.scope,
+    isVisibleFlow: StateFlow<Boolean> = MutableStateFlow(true),
     onPersist: suspend (key: String, rawValue: RawV) -> Unit = { _, _ -> }
 ): KeyValueItemViewModel<DomainT, RawV> {
     val binding = com.example.core.item.PropertyBinding(
@@ -214,7 +210,7 @@ fun <DomainT, RawV> com.example.core.item.ItemViewModelRegistry.bindStorage(
         storageKey = storageKey,
         valueMapping = valueMapping
     )
-    val viewModel = KeyValueItemViewModel(binding, initialRawValue, scope, onPersist)
+    val viewModel = KeyValueItemViewModel(binding, initialRawValue, scope, isVisibleFlow, onPersist)
     register(itemId, viewModel)
     return viewModel
 }
@@ -228,6 +224,7 @@ class InMemoryChoiceItemViewModel<T>(
     val supportedOptionIds: List<T>,
     initialSelectedId: T = supportedOptionIds.first(),
     private val disabledOptionIdsFlow: StateFlow<Set<T>> = MutableStateFlow(emptySet()),
+    override val isVisibleFlow: StateFlow<Boolean> = MutableStateFlow(true),
     scope: CoroutineScope = AppScope.scope
 ) : MutableChoiceItemViewModel<T> {
     private val _selectedIdFlow = MutableStateFlow(initialSelectedId)
@@ -270,6 +267,7 @@ class ChoiceHardwareItemViewModel<DomainT, RawV>(
     val supportedOptionIds: List<DomainT>,
     private val storage: HardwarePropertyStorage,
     private val disabledOptionIdsFlow: StateFlow<Set<DomainT>> = MutableStateFlow(emptySet()),
+    override val isVisibleFlow: StateFlow<Boolean> = MutableStateFlow(true),
     private val scope: CoroutineScope = AppScope.scope
 ) : MutableChoiceItemViewModel<DomainT> {
 

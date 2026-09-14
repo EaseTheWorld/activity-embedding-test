@@ -39,6 +39,10 @@ fun SeatLumbarRow(
     viewModel: ItemViewModel<SeatLumbarSupport>,
     modifier: Modifier = Modifier
 ) {
+    val isVmVisible by viewModel.isVisibleFlow.collectAsState()
+    val isItemVisible by item.isVisible.collectAsState(initial = true)
+    if (!isVmVisible || !isItemVisible) return
+
     val lumbar by viewModel.valueFlow.collectAsState()
     val isMutable = viewModel is MutableItemViewModel
 
@@ -139,8 +143,10 @@ fun SeatLumbarRow(
     viewModelRegistry: ItemViewModelRegistry = LocalItemViewModelRegistry.current,
     modifier: Modifier = Modifier
 ) {
+    val isItemVisible by item.isVisible.collectAsState(initial = true)
+    if (!isItemVisible) return
     val viewModel = viewModelRegistry.getViewModel<SeatLumbarSupport>(item.id)
-        ?: error("No ItemViewModel found for lumbar item: ${item.id}")
+        ?: return
     SeatLumbarRow(item = item, viewModel = viewModel, modifier = modifier)
 }
 

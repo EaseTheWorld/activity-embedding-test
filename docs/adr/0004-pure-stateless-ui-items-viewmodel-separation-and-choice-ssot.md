@@ -151,6 +151,50 @@ Certain vehicle features require observable domain state without user mutation c
 
 ---
 
+### 8. Dynamic Reactive Visibility (`isVisible`) and Pre-Release Cleanup
+Vehicle settings frequently require conditional visibility:
+- **Declarative / Catalog Level**: An item may have static or standalone visibility conditions governed by `Item.isVisible: Flow<Boolean> = flowOf(true)`.
+- **Dynamic / Hardware Level**: Runtime vehicle states (e.g., passenger seat occupancy, vehicle moving vs. parked, hardware capability flags) dictate whether an item is visible via `ItemViewModel.isVisibleFlow: StateFlow<Boolean> get() = MutableStateFlow(true)` and `isVisible: StateFlow<Boolean> get() = isVisibleFlow`.
+- **Compound Visibility Evaluation**:
+  UI rows (`ToggleItemRow`, `ChoiceItemRow`, `SliderItemRow`, `SeatLumbarRow`) and Quick Control grid cards (`ToggleGridCard`, `ChoiceGridCard`, `SliderGridCard`, `DashboardGridItemCard`) evaluate:
+  ```kotlin
+  val isVmVisible by viewModel.isVisibleFlow.collectAsState()
+  val isItemVisible by item.isVisible.collectAsState(initial = true)
+  if (!isVmVisible || !isItemVisible) return
+  ```
+  If either is `false`, the item skips rendering entirely, preventing empty card gaps and dangling category dividers.
+
+```mermaid
+graph LR
+    subgraph VisibilitySources["Reactive Visibility Sources"]
+        ItemVis["Item.isVisible: Flow&lt;Boolean&gt;<br/>(Static/Catalog Condition)"]
+        VmVis["ItemViewModel.isVisibleFlow: StateFlow&lt;Boolean&gt;<br/>(Dynamic Sensor / VHAL / Occupancy)"]
+    end
+
+    subgraph ComposeGate["Composable Visibility Gate"]
+        Check{"isVmVisible &&<br/>isItemVisible?"}
+    end
+
+    subgraph Output["UI Render"]
+        Render["Render Row / Card"]
+        Skip["Omit Composable (Early Return)"]
+    end
+
+    ItemVis --> Check
+    VmVis --> Check
+    Check -->|true| Render
+    Check -->|false| Skip
+```
+
+#### Pre-Release Legacy Cleanup (Zero Backward Compatibility Debt)
+As this system is pre-release, all obsolete intermediate abstractions and `@Deprecated` compatibility wrappers have been thoroughly deleted:
+- Legacy item classes in `core-item-contract` (`ValueItem`, `ToggleItem`, `ChoiceItem`, `SliderItem`, `ActionItem`) are removed in favor of `UiItem` + `ItemViewModel`.
+- Redundant `Item.key` is removed in favor of canonical `Item.id`.
+- Obsolete aliases and renderers (`ChoiceOptionSlots`, `ComposableToggleItem`, `ComposableChoiceItem`, `ToggleItemRenderer`, `ChoiceItemRenderer`, `SliderItemRenderer`, `LocalItemRendererRegistry`, `CarPropertyBinder`, `HardwareBinding`) are permanently deleted.
+
+---
+---
+
 ## Consequences
 
 ### Positive

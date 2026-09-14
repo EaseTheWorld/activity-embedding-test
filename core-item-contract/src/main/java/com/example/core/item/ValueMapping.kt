@@ -67,10 +67,6 @@ data class PropertyBinding<DomainT, RawV, KeyT>(
     val valueMapping: ValueMapping<DomainT, RawV>
 )
 
-/**
- * Typealias specializing [PropertyBinding] for Vehicle Hardware / VHAL properties.
- */
-typealias HardwareBinding<DomainT, RawV> = PropertyBinding<DomainT, RawV, HardwareKey>
 
 /**
  * Encapsulates a hardware property identifier alongside its [ValueMapping].

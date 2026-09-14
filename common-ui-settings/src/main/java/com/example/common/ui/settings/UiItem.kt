@@ -11,9 +11,11 @@ import com.example.core.item.ItemViewModel
 import com.example.core.item.MutableItemViewModel
 import com.example.core.item.VhalBinding
 import com.example.core.item.VhalPropertyBinder
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flowOf
 
 /**
  * Visual presentation metadata for an individual value or state.
@@ -93,10 +95,10 @@ open class UiItem(
     @get:StringRes val nameResId: Int,
     @get:DrawableRes val iconResId: Int? = null,
     @get:StringRes val descriptionResId: Int? = null,
+    isVisible: Flow<Boolean> = flowOf(true),
     children: Set<Item> = emptySet()
-) : Item(id, children) {
+) : Item(id = id, children = children, isVisible = isVisible) {
 
-    // Backward-compatibility aliases
     val titleRes: Int get() = nameResId
     val subtitleRes: Int? get() = descriptionResId
     val iconRes: Int? get() = iconResId
@@ -115,8 +117,16 @@ open class UiToggleItem(
     open val badgeKey: String? = null,
     @get:DrawableRes open val onIconRes: Int? = null,
     @get:DrawableRes open val offIconRes: Int? = null,
+    isVisible: Flow<Boolean> = flowOf(true),
     children: Set<Item> = emptySet()
-) : UiItem(id, nameResId, iconResId, descriptionResId, children) {
+) : UiItem(
+    id = id,
+    nameResId = nameResId,
+    iconResId = iconResId,
+    descriptionResId = descriptionResId,
+    isVisible = isVisible,
+    children = children
+) {
 
     override val type: ItemType get() = ItemType.TOGGLE
 
@@ -145,16 +155,18 @@ open class UiChoiceItem(
     @DrawableRes iconResId: Int? = null,
     @StringRes descriptionResId: Int? = null,
     val optionSlot: OptionSlot<String> = OptionSlots.Segmented,
+    isVisible: Flow<Boolean> = flowOf(true),
     children: Set<Item> = emptySet()
-) : UiItem(id, nameResId, iconResId, descriptionResId, children) {
+) : UiItem(
+    id = id,
+    nameResId = nameResId,
+    iconResId = iconResId,
+    descriptionResId = descriptionResId,
+    isVisible = isVisible,
+    children = children
+) {
 
     override val type: ItemType get() = ItemType.CHOICE
-
-    @Deprecated("Use options instead.", ReplaceWith("options"))
-    val choiceOptions: List<UiOption<String>> get() = options
-
-    @Deprecated("Use options instead.", ReplaceWith("options"))
-    val possibleOptions: List<UiOption<String>> get() = options
 
     val optionIds: List<String> get() = options.map { it.value }
 
@@ -183,8 +195,16 @@ open class UiSliderItem(
     @StringRes val unitRes: Int? = null,
     @DrawableRes iconResId: Int? = null,
     @StringRes descriptionResId: Int? = null,
+    isVisible: Flow<Boolean> = flowOf(true),
     children: Set<Item> = emptySet()
-) : UiItem(id, nameResId, iconResId, descriptionResId, children) {
+) : UiItem(
+    id = id,
+    nameResId = nameResId,
+    iconResId = iconResId,
+    descriptionResId = descriptionResId,
+    isVisible = isVisible,
+    children = children
+) {
     override val type: ItemType get() = ItemType.SLIDER
 }
 
@@ -198,14 +218,18 @@ open class UiActionItem(
     @StringRes nameResId: Int,
     @DrawableRes iconResId: Int? = null,
     @StringRes descriptionResId: Int? = null,
+    isVisible: Flow<Boolean> = flowOf(true),
     children: Set<Item> = emptySet()
-) : UiItem(id, nameResId, iconResId, descriptionResId, children) {
+) : UiItem(
+    id = id,
+    nameResId = nameResId,
+    iconResId = iconResId,
+    descriptionResId = descriptionResId,
+    isVisible = isVisible,
+    children = children
+) {
     override val type: ItemType get() = ItemType.ACTION
 }
-
-// Backward-compatibility aliases
-typealias ComposableToggleItem = UiToggleItem
-typealias ComposableChoiceItem = UiChoiceItem
 
 // ============================================================================
 // Base Abstract Classes & VHAL Bridges
@@ -222,6 +246,7 @@ open class BaseUiChoiceItem(
     @StringRes descriptionResId: Int? = null,
     @DrawableRes iconResId: Int? = null,
     optionSlot: OptionSlot<String> = OptionSlots.Segmented,
+    isVisible: Flow<Boolean> = flowOf(true),
     children: Set<Item> = emptySet()
 ) : UiChoiceItem(
     id = id,
@@ -230,6 +255,7 @@ open class BaseUiChoiceItem(
     iconResId = iconResId,
     descriptionResId = descriptionResId,
     optionSlot = optionSlot,
+    isVisible = isVisible,
     children = children
 )
 
@@ -272,6 +298,7 @@ abstract class VhalChoiceItem<V>(
     @DrawableRes iconResId: Int? = null,
     optionSlot: OptionSlot<String> = OptionSlots.Segmented,
     private val binder: VhalPropertyBinder = InMemoryVhalBinder(),
+    isVisible: Flow<Boolean> = flowOf(true),
     children: Set<Item> = emptySet()
 ) : BaseUiChoiceItem(
     id = id,
@@ -280,6 +307,7 @@ abstract class VhalChoiceItem<V>(
     descriptionResId = descriptionResId,
     iconResId = iconResId,
     optionSlot = optionSlot,
+    isVisible = isVisible,
     children = children
 ), HasVhalBinding<String, V>, MutableItemViewModel<String> {
 
@@ -320,6 +348,7 @@ open class BaseUiToggleItem(
     badgeKey: String? = null,
     @DrawableRes onIconRes: Int? = null,
     @DrawableRes offIconRes: Int? = null,
+    isVisible: Flow<Boolean> = flowOf(true),
     children: Set<Item> = emptySet()
 ) : UiToggleItem(
     id = id,
@@ -329,6 +358,7 @@ open class BaseUiToggleItem(
     badgeKey = badgeKey,
     onIconRes = onIconRes,
     offIconRes = offIconRes,
+    isVisible = isVisible,
     children = children
 )
 
@@ -350,6 +380,7 @@ abstract class VhalToggleItem<V>(
     @DrawableRes onIconRes: Int? = null,
     @DrawableRes offIconRes: Int? = null,
     private val binder: VhalPropertyBinder = InMemoryVhalBinder(),
+    isVisible: Flow<Boolean> = flowOf(true),
     children: Set<Item> = emptySet()
 ) : BaseUiToggleItem(
     id = id,
@@ -359,6 +390,7 @@ abstract class VhalToggleItem<V>(
     badgeKey = badgeKey,
     onIconRes = onIconRes,
     offIconRes = offIconRes,
+    isVisible = isVisible,
     children = children
 ), HasVhalBinding<Boolean, V>, MutableItemViewModel<Boolean> {
 

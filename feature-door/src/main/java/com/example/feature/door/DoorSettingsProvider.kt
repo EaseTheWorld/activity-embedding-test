@@ -128,13 +128,13 @@ class DoorSettingsProvider : ContentProvider() {
                     val uiItem = item as? com.example.common.ui.settings.UiItem
                     val titleResId = uiItem?.titleRes ?: 0
                     val subtitleResId = uiItem?.subtitleRes ?: 0
-                    val title = if (titleResId != 0) ctx.getString(titleResId) else item.key
+                    val title = if (titleResId != 0) ctx.getString(titleResId) else item.id
                     val subtitle = if (subtitleResId != 0) ctx.getString(subtitleResId) else ""
 
                     cursor.addRow(
                         arrayOf(
                             (index + 1).toString(),
-                            item.key,
+                            item.id,
                             title,
                             subtitle,
                             item.type.name,
@@ -161,8 +161,9 @@ class DoorSettingsProvider : ContentProvider() {
             val value = extras?.getString(EXTRA_VALUE) ?: extras?.getString("value") ?: return null
             val targetItem = DoorItemRegistry.findItem(key)
             if (targetItem != null) {
-                if (targetItem is com.example.core.item.ToggleItem) {
-                    targetItem.onValueChanged(value.toBoolean())
+                if (targetItem is com.example.core.item.MutableItemViewModel<*>) {
+                    @Suppress("UNCHECKED_CAST")
+                    (targetItem as com.example.core.item.MutableItemViewModel<Boolean>).setValue(value.toBoolean())
                 }
                 context?.contentResolver?.notifyChange(Uri.parse("content://$AUTHORITY/$PATH_ITEMS"), null)
                 Log.d(TAG, "[$AUTHORITY] Item updated via SSOT: $key = $value")

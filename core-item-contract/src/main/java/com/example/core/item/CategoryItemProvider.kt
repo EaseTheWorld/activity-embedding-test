@@ -12,5 +12,5 @@ interface CategoryItemProvider {
 
     val rootItem: Item get() = Item(id = categoryId, children = items.toSet())
 
-    fun findItem(key: String): Item? = rootItem.findById(key) ?: items.find { it.key == key }
+    fun findItem(id: String): Item? = rootItem.findById(id) ?: items.find { it.id == id }
 }

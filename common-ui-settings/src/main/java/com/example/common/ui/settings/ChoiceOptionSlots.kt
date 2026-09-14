@@ -134,6 +134,3 @@ object OptionSlots {
         }
     }
 }
-
-@Deprecated("Use OptionSlots instead.", ReplaceWith("OptionSlots"))
-val ChoiceOptionSlots = OptionSlots

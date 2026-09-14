@@ -16,6 +16,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -72,29 +74,34 @@ fun GenericSettingsScreen(
                         .fillMaxWidth()
                         .padding(horizontal = 20.dp, vertical = 12.dp)
                 ) {
-                    items(items, key = { it.key }) { item ->
-                        when (item) {
-                            is UiToggleItem -> ToggleItemRow(item = item, viewModelRegistry = viewModelRegistry)
-                            is UiChoiceItem -> ChoiceItemRow(item = item, viewModelRegistry = viewModelRegistry)
-                            is UiSliderItem -> SliderItemRow(item = item, viewModelRegistry = viewModelRegistry)
-                            is UiItem -> {
-                                Text(
-                                    text = androidx.compose.ui.res.stringResource(item.nameResId),
-                                    style = MaterialTheme.typography.titleMedium
-                                )
+                    items(items, key = { it.id }) { item ->
+                        val isItemVisible by item.isVisible.collectAsState(initial = true)
+                        val vm = viewModelRegistry.getViewModel<Any>(item.id)
+                        val isVmVisible = (vm?.isVisibleFlow?.collectAsState())?.value ?: true
+                        if (isItemVisible && isVmVisible) {
+                            when (item) {
+                                is UiToggleItem -> ToggleItemRow(item = item, viewModelRegistry = viewModelRegistry)
+                                is UiChoiceItem -> ChoiceItemRow(item = item, viewModelRegistry = viewModelRegistry)
+                                is UiSliderItem -> SliderItemRow(item = item, viewModelRegistry = viewModelRegistry)
+                                is UiItem -> {
+                                    Text(
+                                        text = androidx.compose.ui.res.stringResource(item.nameResId),
+                                        style = MaterialTheme.typography.titleMedium
+                                    )
+                                }
+                                else -> {
+                                    Text(
+                                        text = "Item: ${item.id}",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                }
                             }
-                            else -> {
-                                Text(
-                                    text = "Item: ${item.id}",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.error
-                                )
-                            }
+                            HorizontalDivider(
+                                modifier = Modifier.padding(vertical = 12.dp),
+                                color = Color(0xFFF1F2F6)
+                            )
                         }
-                        HorizontalDivider(
-                            modifier = Modifier.padding(vertical = 12.dp),
-                            color = Color(0xFFF1F2F6)
-                        )
                     }
                 }
             }

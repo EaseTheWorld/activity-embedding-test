@@ -115,11 +115,11 @@ class ToggleListRenderer : ItemRenderer<UiToggleItem, Boolean> {
     }
 }
 
-class ChoiceListRenderer : ItemRenderer<UiChoiceItem, Any?> {
+class ChoiceListRenderer : ItemRenderer<UiChoiceItem, String> {
     @Composable
     override fun Render(
         item: UiChoiceItem,
-        viewModel: ItemViewModel<Any?>,
+        viewModel: ItemViewModel<String>,
         modifier: Modifier
     ) {
         ChoiceItemRow(item = item, viewModel = viewModel, modifier = modifier)
@@ -152,11 +152,11 @@ class ToggleGridCardRenderer : ItemRenderer<UiToggleItem, Boolean> {
     }
 }
 
-class ChoiceGridCardRenderer : ItemRenderer<UiChoiceItem, Any?> {
+class ChoiceGridCardRenderer : ItemRenderer<UiChoiceItem, String> {
     @Composable
     override fun Render(
         item: UiChoiceItem,
-        viewModel: ItemViewModel<Any?>,
+        viewModel: ItemViewModel<String>,
         modifier: Modifier
     ) {
         ChoiceGridCard(item = item, viewModel = viewModel, modifier = modifier)

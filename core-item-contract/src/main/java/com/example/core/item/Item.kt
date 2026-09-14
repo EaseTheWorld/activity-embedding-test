@@ -151,10 +151,12 @@ abstract class SettingCatalog(val id: String) {
  * Decouples the storage mechanism (DataStore, Network, VHAL) from the UI layer.
  *
  * Exposes observable domain state via [valueFlow].
- * Ideal for telemetry sensors, vehicle status gauges, and passive dashboard displays.
+ * Items that possess discrete selectable options with dynamic states (e.g. Choice items)
+ * also provide [valueWithStateFlow].
  */
 interface ItemViewModel<T> {
     val valueFlow: StateFlow<T>
+    val valueWithStateFlow: StateFlow<List<ValueWithState<T>>>? get() = null
 }
 
 /**
@@ -169,31 +171,27 @@ interface MutableItemViewModel<T> : ItemViewModel<T> {
 }
 
 /**
- * Specialized [ItemViewModel] contract for multi-option Choice items (Read-Only).
- * State is modeled directly as a list of options with dynamic selection and enablement: [List<ValueWithState<T>>].
- * Inherits [valueFlow] directly from [ItemViewModel] as its single source of truth.
+ * Convenience accessor for the currently selected option value.
  */
-interface ChoiceItemViewModel<T> : ItemViewModel<List<ValueWithState<T>>> {
-    /**
-     * Convenience accessor for the currently selected option value, derived directly from [valueFlow].
-     */
-    val selectedValue: T?
-        get() = valueFlow.value.firstOrNull { it.isSelected }?.id
-
-    /**
-     * Backward-compatible alias for [valueFlow].
-     */
-    val optionStates: StateFlow<List<ValueWithState<T>>>
-        get() = valueFlow
-}
+val <T> ItemViewModel<T>.selectedValue: T?
+    get() = valueWithStateFlow?.value?.firstOrNull { it.isSelected }?.id ?: valueFlow.value
 
 /**
- * Mutable Choice ViewModel contract supporting user option selection.
- * Receives the selected option ID [newValue] to update domain state.
+ * Backward-compatible alias for [valueWithStateFlow].
  */
-interface MutableChoiceItemViewModel<T> : ChoiceItemViewModel<T> {
-    fun setValue(newValue: T)
-}
+val <T> ItemViewModel<T>.optionStates: StateFlow<List<ValueWithState<T>>>?
+    get() = valueWithStateFlow
+
+/**
+ * Legacy typealias for backward compatibility during transition.
+ */
+@Deprecated("Use ItemViewModel<T> directly. Choice items now implement ItemViewModel<T> with valueWithStateFlow.",
+    ReplaceWith("ItemViewModel<T>"))
+typealias ChoiceItemViewModel<T> = ItemViewModel<T>
+
+@Deprecated("Use MutableItemViewModel<T> directly.",
+    ReplaceWith("MutableItemViewModel<T>"))
+typealias MutableChoiceItemViewModel<T> = MutableItemViewModel<T>
 
 
 /**
@@ -234,19 +232,17 @@ open class ItemViewModelRegistry(
 
     fun <T> getMutableViewModel(item: Item): MutableItemViewModel<T>? = getMutableViewModel(item.id)
 
-    @Suppress("UNCHECKED_CAST")
-    fun <T> getChoiceViewModel(itemId: String): ChoiceItemViewModel<T>? {
-        return viewModels[itemId] as? ChoiceItemViewModel<T>
-    }
+    @Deprecated("Use getViewModel<T>(itemId) directly.", ReplaceWith("getViewModel(itemId)"))
+    fun <T> getChoiceViewModel(itemId: String): ItemViewModel<T>? = getViewModel(itemId)
 
-    fun <T> getChoiceViewModel(item: Item): ChoiceItemViewModel<T>? = getChoiceViewModel(item.id)
+    @Deprecated("Use getViewModel<T>(item) directly.", ReplaceWith("getViewModel(item)"))
+    fun <T> getChoiceViewModel(item: Item): ItemViewModel<T>? = getViewModel(item)
 
-    @Suppress("UNCHECKED_CAST")
-    fun <T> getMutableChoiceViewModel(itemId: String): MutableChoiceItemViewModel<T>? {
-        return viewModels[itemId] as? MutableChoiceItemViewModel<T>
-    }
+    @Deprecated("Use getMutableViewModel<T>(itemId) directly.", ReplaceWith("getMutableViewModel(itemId)"))
+    fun <T> getMutableChoiceViewModel(itemId: String): MutableItemViewModel<T>? = getMutableViewModel(itemId)
 
-    fun <T> getMutableChoiceViewModel(item: Item): MutableChoiceItemViewModel<T>? = getMutableChoiceViewModel(item.id)
+    @Deprecated("Use getMutableViewModel<T>(item) directly.", ReplaceWith("getMutableViewModel(item)"))
+    fun <T> getMutableChoiceViewModel(item: Item): MutableItemViewModel<T>? = getMutableViewModel(item)
 
     fun hasViewModel(itemId: String): Boolean = viewModels.containsKey(itemId)
     fun hasViewModel(item: Item): Boolean = hasViewModel(item.id)

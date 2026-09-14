@@ -3,6 +3,7 @@ package com.example.feature.seat
 import com.example.common.ui.settings.InMemoryHardwareStorage
 import com.example.core.item.ItemViewModelRegistry
 import com.example.core.item.ValueWithState
+import com.example.core.item.selectedValue
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -78,11 +79,12 @@ class ChoiceItemSSOTTest {
         val registry = ItemViewModelRegistry(bindings)
 
         // Verify lookup by Item object (NO raw string!)
-        val choiceVm = registry.getChoiceViewModel<String>(SeatCatalog.massageMode)
+        val choiceVm = registry.getViewModel<String>(SeatCatalog.massageMode)
         assertNotNull("Choice ViewModel should be registered for SeatCatalog.massageMode", choiceVm)
 
         // Verify initial state
-        assertEquals("OFF", choiceVm!!.selectedValue)
+        assertEquals("OFF", choiceVm!!.valueFlow.value)
+        assertEquals("OFF", choiceVm.selectedValue)
     }
 
     // ========================================================================
@@ -105,10 +107,10 @@ class ChoiceItemSSOTTest {
             scope = testScope
         )
 
-        val choiceVm = registry.getMutableChoiceViewModel<String>(SeatCatalog.massageMode)!!
+        val choiceVm = registry.getMutableViewModel<String>(SeatCatalog.massageMode)!!
 
         // 1. Initial State: "OFF" selected, all enabled
-        val initialStates = choiceVm.optionStates.value
+        val initialStates = choiceVm.valueWithStateFlow!!.value
         assertEquals(4, initialStates.size)
 
         assertEquals(ValueWithState(id = "OFF", isSelected = true, isEnabled = true), initialStates[0])
@@ -119,6 +121,7 @@ class ChoiceItemSSOTTest {
         // 2. User selects "WAVE" -> updates hardware storage and option states atomically
         choiceVm.setValue("WAVE")
 
+        assertEquals("WAVE", choiceVm.valueFlow.value)
         assertEquals("WAVE", choiceVm.selectedValue)
         val rawAfter = hardwareStorage.observe<Int>(
             SeatVehicleProperties.MASSAGE_MODE.propertyId,
@@ -126,7 +129,7 @@ class ChoiceItemSSOTTest {
         ).value
         assertEquals(1, rawAfter)
 
-        val waveStates = choiceVm.optionStates.value
+        val waveStates = choiceVm.valueWithStateFlow!!.value
         assertFalse(waveStates[0].isSelected) // "OFF" unselected
         assertTrue(waveStates[1].isSelected)  // "WAVE" selected
         assertTrue(waveStates[1].isEnabled)
@@ -135,7 +138,7 @@ class ChoiceItemSSOTTest {
         drivingRestrictions.value = setOf("STRETCH")
         testScheduler.advanceUntilIdle()
 
-        val restrictedStates = choiceVm.optionStates.value
+        val restrictedStates = choiceVm.valueWithStateFlow!!.value
         val stretchState = restrictedStates.find { it.id == "STRETCH" }!!
         assertFalse("STRETCH should be disabled while driving", stretchState.isEnabled)
         assertFalse("STRETCH should not be selected", stretchState.isSelected)

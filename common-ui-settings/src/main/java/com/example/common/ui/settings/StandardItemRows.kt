@@ -33,10 +33,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-import com.example.core.item.ChoiceItemViewModel
 import com.example.core.item.ItemViewModel
 import com.example.core.item.ItemViewModelRegistry
-import com.example.core.item.MutableChoiceItemViewModel
 import com.example.core.item.MutableItemViewModel
 import com.example.core.item.ValueWithState
 import kotlinx.coroutines.flow.StateFlow
@@ -279,33 +277,22 @@ fun ToggleGridCard(
 @Composable
 fun ChoiceItemRow(
     item: UiChoiceItem,
-    viewModel: ChoiceItemViewModel<String>,
+    viewModel: ItemViewModel<String>,
     modifier: Modifier = Modifier
 ) {
-    val optionStates by viewModel.valueFlow.collectAsState()
-    val isMutable = viewModel is MutableChoiceItemViewModel
-    val effectiveStates = if (isMutable) optionStates else optionStates.map { it.copy(isEnabled = false) }
-    ChoiceItemRowWithStates(
-        item = item,
-        optionStates = effectiveStates,
-        onOptionSelected = { (viewModel as? MutableChoiceItemViewModel)?.setValue(it) },
-        modifier = modifier
-    )
-}
-
-@Composable
-fun ChoiceItemRow(
-    item: UiChoiceItem,
-    viewModel: ItemViewModel<*>,
-    modifier: Modifier = Modifier
-) {
-    if (viewModel is ChoiceItemViewModel<*>) {
-        @Suppress("UNCHECKED_CAST")
-        ChoiceItemRow(item = item, viewModel = viewModel as ChoiceItemViewModel<String>, modifier = modifier)
+    val optionStatesFlow = viewModel.valueWithStateFlow
+    val isMutable = viewModel is MutableItemViewModel<*>
+    if (optionStatesFlow != null) {
+        val optionStates by optionStatesFlow.collectAsState()
+        val effectiveStates = if (isMutable) optionStates else optionStates.map { it.copy(isEnabled = false) }
+        ChoiceItemRowWithStates(
+            item = item,
+            optionStates = effectiveStates,
+            onOptionSelected = { (viewModel as? MutableItemViewModel<String>)?.setValue(it) },
+            modifier = modifier
+        )
     } else {
-        @Suppress("UNCHECKED_CAST")
-        val selectedOption by (viewModel.valueFlow as StateFlow<String>).collectAsState()
-        val isMutable = viewModel is MutableItemViewModel<*>
+        val selectedOption by viewModel.valueFlow.collectAsState()
         ChoiceItemRowContent(
             item = item,
             selectedOption = selectedOption,
@@ -322,16 +309,11 @@ fun ChoiceItemRow(
     viewModelRegistry: ItemViewModelRegistry = LocalItemViewModelRegistry.current,
     modifier: Modifier = Modifier
 ) {
-    val choiceVm = viewModelRegistry.getChoiceViewModel<String>(item.id)
-    if (choiceVm != null) {
-        ChoiceItemRow(item = item, viewModel = choiceVm, modifier = modifier)
+    val viewModel = viewModelRegistry.getViewModel<String>(item.id)
+    if (viewModel != null) {
+        ChoiceItemRow(item = item, viewModel = viewModel, modifier = modifier)
     } else {
-        val stringVm = viewModelRegistry.getViewModel<String>(item.id)
-        if (stringVm != null) {
-            ChoiceItemRow(item = item, viewModel = stringVm, modifier = modifier)
-        } else {
-            ChoiceItemRowContent(item = item, selectedOption = "", onOptionSelected = {}, enabled = false, modifier = modifier)
-        }
+        ChoiceItemRowContent(item = item, selectedOption = "", onOptionSelected = {}, enabled = false, modifier = modifier)
     }
 }
 
@@ -505,28 +487,11 @@ private fun ChoiceItemRowWithStates(
 @Composable
 fun ChoiceGridCard(
     item: UiChoiceItem,
-    viewModel: ChoiceItemViewModel<String>,
+    viewModel: ItemViewModel<String>,
     modifier: Modifier = Modifier
 ) {
-    val options by viewModel.valueFlow.collectAsState()
-    val selectedOption = options.firstOrNull { it.isSelected }?.id ?: ""
+    val selectedOption by viewModel.valueFlow.collectAsState()
     ChoiceGridCardContent(item = item, selectedOption = selectedOption, modifier = modifier)
-}
-
-@Composable
-fun ChoiceGridCard(
-    item: UiChoiceItem,
-    viewModel: ItemViewModel<*>,
-    modifier: Modifier = Modifier
-) {
-    if (viewModel is ChoiceItemViewModel<*>) {
-        @Suppress("UNCHECKED_CAST")
-        ChoiceGridCard(item = item, viewModel = viewModel as ChoiceItemViewModel<String>, modifier = modifier)
-    } else {
-        @Suppress("UNCHECKED_CAST")
-        val selectedOption by (viewModel.valueFlow as StateFlow<String>).collectAsState()
-        ChoiceGridCardContent(item = item, selectedOption = selectedOption, modifier = modifier)
-    }
 }
 
 @Composable
@@ -535,16 +500,11 @@ fun ChoiceGridCard(
     viewModelRegistry: ItemViewModelRegistry = LocalItemViewModelRegistry.current,
     modifier: Modifier = Modifier
 ) {
-    val choiceVm = viewModelRegistry.getChoiceViewModel<String>(item.id)
-    if (choiceVm != null) {
-        ChoiceGridCard(item = item, viewModel = choiceVm, modifier = modifier)
+    val viewModel = viewModelRegistry.getViewModel<String>(item.id)
+    if (viewModel != null) {
+        ChoiceGridCard(item = item, viewModel = viewModel, modifier = modifier)
     } else {
-        val stringVm = viewModelRegistry.getViewModel<String>(item.id)
-        if (stringVm != null) {
-            ChoiceGridCard(item = item, viewModel = stringVm, modifier = modifier)
-        } else {
-            ChoiceGridCardContent(item = item, selectedOption = "-", modifier = modifier)
-        }
+        ChoiceGridCardContent(item = item, selectedOption = "-", modifier = modifier)
     }
 }
 

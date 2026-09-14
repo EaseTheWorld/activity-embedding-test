@@ -1,9 +1,7 @@
 package com.example.common.ui.settings
 
-import com.example.core.item.ChoiceItemViewModel
 import com.example.core.item.ItemViewModel
 import com.example.core.item.ItemViewModelRegistry
-import com.example.core.item.MutableChoiceItemViewModel
 import com.example.core.item.MutableItemViewModel
 import com.example.core.item.ValueWithState
 import kotlinx.coroutines.CoroutineDispatcher
@@ -221,17 +219,18 @@ fun <DomainT, RawV> com.example.core.item.ItemViewModelRegistry.bindStorage(
 }
 
 /**
- * In-memory [ChoiceItemViewModel] for tests, previews, and runtime settings.
- * Produces [optionStates] with dynamic [ValueWithState] flags (isSelected, isEnabled)
- * while preserving SSOT (option IDs come from the Item Catalog).
+ * In-memory choice ViewModel for tests, previews, and runtime settings.
+ * Implements [MutableItemViewModel<T>] where T is the option value (e.g. String).
+ * Exposes [valueFlow] for the selected value, and [valueWithStateFlow] for option states.
  */
 class InMemoryChoiceItemViewModel<T>(
     val supportedOptionIds: List<T>,
     initialSelectedId: T = supportedOptionIds.first(),
     private val disabledOptionIdsFlow: StateFlow<Set<T>> = MutableStateFlow(emptySet()),
     scope: CoroutineScope = AppScope.scope
-) : MutableChoiceItemViewModel<T> {
+) : MutableItemViewModel<T> {
     private val _selectedIdFlow = MutableStateFlow(initialSelectedId)
+    override val valueFlow: StateFlow<T> = _selectedIdFlow
 
     private fun computeStates(selectedId: T, disabledSet: Set<T>): List<ValueWithState<T>> =
         supportedOptionIds.map { id ->
@@ -242,7 +241,7 @@ class InMemoryChoiceItemViewModel<T>(
             )
         }
 
-    override val valueFlow: StateFlow<List<ValueWithState<T>>> = combine(
+    override val valueWithStateFlow: StateFlow<List<ValueWithState<T>>> = combine(
         _selectedIdFlow,
         disabledOptionIdsFlow
     ) { selectedId, disabledSet ->
@@ -261,9 +260,9 @@ class InMemoryChoiceItemViewModel<T>(
 }
 
 /**
- * Hardware-backed [ChoiceItemViewModel] bridging a Choice Item to [HardwarePropertyStorage].
- * Exposes dynamic [valueFlow] with per-option [ValueWithState] (isSelected, isEnabled)
- * while preserving SSOT (option IDs come from the Item Catalog).
+ * Hardware-backed Choice ViewModel bridging a Choice Item to [HardwarePropertyStorage].
+ * Implements [MutableItemViewModel<DomainT>] where DomainT is the option value (e.g. String).
+ * Exposes [valueFlow] for the selected value, and [valueWithStateFlow] for option states.
  */
 class ChoiceHardwareItemViewModel<DomainT, RawV>(
     val property: com.example.core.item.VehicleProperty<DomainT, RawV>,
@@ -271,9 +270,10 @@ class ChoiceHardwareItemViewModel<DomainT, RawV>(
     private val storage: HardwarePropertyStorage,
     private val disabledOptionIdsFlow: StateFlow<Set<DomainT>> = MutableStateFlow(emptySet()),
     private val scope: CoroutineScope = AppScope.scope
-) : MutableChoiceItemViewModel<DomainT> {
+) : MutableItemViewModel<DomainT> {
 
     private val rawFlow: StateFlow<DomainT> = storage.observe(property)
+    override val valueFlow: StateFlow<DomainT> = rawFlow
 
     private fun computeStates(selectedId: DomainT?, disabledSet: Set<DomainT>): List<ValueWithState<DomainT>> =
         supportedOptionIds.map { id ->
@@ -284,7 +284,7 @@ class ChoiceHardwareItemViewModel<DomainT, RawV>(
             )
         }
 
-    override val valueFlow: StateFlow<List<ValueWithState<DomainT>>> = combine(
+    override val valueWithStateFlow: StateFlow<List<ValueWithState<DomainT>>> = combine(
         rawFlow,
         disabledOptionIdsFlow
     ) { selectedId, disabledSet ->

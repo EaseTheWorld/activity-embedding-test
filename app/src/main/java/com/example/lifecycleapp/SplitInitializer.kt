@@ -21,8 +21,6 @@ class SplitInitializer : Initializer<RuleController> {
 
         val filters = setOf(
             SplitPairFilter(primaryComponent, ComponentName("com.example.carsettings.light", "com.example.feature.light.LightSettingsActivity"), null),
-            SplitPairFilter(primaryComponent, ComponentName("com.example.carsettings.sound", "com.example.feature.sound.SoundSettingsActivity"), null),
-            SplitPairFilter(primaryComponent, ComponentName("com.example.carsettings.display", "com.example.feature.display.DisplaySettingsActivity"), null),
             SplitPairFilter(primaryComponent, ComponentName(context, GenericSettingsActivity::class.java), null)
         )
 

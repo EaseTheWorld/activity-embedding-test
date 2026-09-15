@@ -5,15 +5,17 @@ import android.os.Bundle
 import android.util.Log
 import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.example.core.item.CategoryItemProvider
 import com.example.core.item.CategoryItemRegistry
+import com.example.core.item.ItemViewModelRegistry
 
 /**
  * Universal Data-Driven Settings Activity powered by Jetpack Compose.
- * Renders any category's items dynamically via polymorphic ComposableItemRenderer.
+ * Renders any category's items dynamically via declarative Compose UI.
  */
 open class GenericSettingsActivity : AppCompatActivity() {
 
@@ -22,6 +24,8 @@ open class GenericSettingsActivity : AppCompatActivity() {
     private var currentProvider by mutableStateOf<CategoryItemProvider?>(null)
     private var currentTitle by mutableStateOf("Settings")
     private var currentSubtitle by mutableStateOf("Data-driven items rendered via Jetpack Compose")
+
+    protected open fun getViewModelRegistry(): ItemViewModelRegistry = defaultViewModelRegistry
 
     private val recentManager by lazy {
         RecentCategoryManager(
@@ -35,24 +39,28 @@ open class GenericSettingsActivity : AppCompatActivity() {
         resolveCategory(intent)
 
         setContent {
-            if (isDashboard) {
-                val providers = CategoryItemRegistry.getAllProviders().toList()
-                val itemResolver: (String) -> com.example.core.item.Item? = { key ->
-                    providers.firstNotNullOfOrNull { it.findItem(key) }
-                }
-                MainSettingsDashboardScreen(
-                    recentManager = recentManager,
-                    providers = providers,
-                    itemResolver = itemResolver
-                )
-            } else {
-                val provider = currentProvider
-                if (provider != null) {
-                    GenericSettingsScreen(
-                        title = currentTitle,
-                        subtitle = currentSubtitle,
-                        items = provider.items
+            CompositionLocalProvider(
+                LocalItemViewModelRegistry provides getViewModelRegistry()
+            ) {
+                if (isDashboard) {
+                    val providers = CategoryItemRegistry.getAllProviders().toList()
+                    val itemResolver: (String) -> com.example.core.item.Item? = { key ->
+                        providers.firstNotNullOfOrNull { it.findItem(key) }
+                    }
+                    MainSettingsDashboardScreen(
+                        recentManager = recentManager,
+                        providers = providers,
+                        itemResolver = itemResolver
                     )
+                } else {
+                    val provider = currentProvider
+                    if (provider != null) {
+                        GenericSettingsScreen(
+                            title = currentTitle,
+                            subtitle = currentSubtitle,
+                            items = provider.items
+                        )
+                    }
                 }
             }
         }
@@ -104,6 +112,7 @@ open class GenericSettingsActivity : AppCompatActivity() {
     }
 
     companion object {
+        var defaultViewModelRegistry: ItemViewModelRegistry = ItemViewModelRegistry()
         const val EXTRA_CATEGORY_ID = "extra_category_id"
         const val EXTRA_AUTHORITY = "extra_authority"
         const val EXTRA_TITLE = "extra_title"

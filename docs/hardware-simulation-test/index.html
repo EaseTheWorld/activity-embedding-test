@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>차량 하드웨어 시뮬레이션 및 UI 상태 반응 테스트 리포트 & 수동 테스트 가이드</title>
+    <style>
+        :root {
+            --bg-primary: #0F1117;
+            --bg-secondary: #1A1D27;
+            --bg-card: #222634;
+            --bg-card-hover: #2B3042;
+            --text-primary: #F0F3F8;
+            --text-secondary: #9DA7BE;
+            --text-muted: #657088;
+            --accent-purple: #7C4DFF;
+            --accent-purple-light: #B388FF;
+            --accent-purple-dim: rgba(124, 77, 255, 0.15);
+            --accent-green: #00E676;
+            --accent-green-dim: rgba(0, 230, 118, 0.12);
+            --accent-amber: #FFB300;
+            --accent-amber-dim: rgba(255, 179, 0, 0.12);
+            --accent-red: #FF5252;
+            --accent-red-dim: rgba(255, 82, 82, 0.12);
+            --border-color: #2F3547;
+            --font-mono: "JetBrains Mono", "Fira Code", Consolas, Menlo, monospace;
+            --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Pretendard", sans-serif;
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 18px;
+            --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.35);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: var(--font-sans);
+            line-height: 1.6;
+            padding: 32px 20px;
+        }
+
+        .container {
+            max-width: 1240px;
+            margin: 0 auto;
+        }
+
+        header {
+            margin-bottom: 36px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 24px;
+        }
+
+        .badge-bar {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 14px;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 12px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+        }
+
+        .badge-success { background: var(--accent-green-dim); color: var(--accent-green); border: 1px solid rgba(0, 230, 118, 0.3); }
+        .badge-purple { background: var(--accent-purple-dim); color: var(--accent-purple-light); border: 1px solid rgba(124, 77, 255, 0.3); }
+        .badge-amber { background: var(--accent-amber-dim); color: var(--accent-amber); border: 1px solid rgba(255, 179, 0, 0.3); }
+
+        h1 {
+            font-size: 28px;
+            font-weight: 800;
+            color: #FFFFFF;
+            margin-bottom: 8px;
+            letter-spacing: -0.5px;
+        }
+
+        .header-desc {
+            color: var(--text-secondary);
+            font-size: 15px;
+            max-width: 860px;
+        }
+
+        /* Architecture Section */
+        .arch-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 24px;
+            margin-bottom: 36px;
+            box-shadow: var(--shadow-md);
+        }
+
+        .arch-title {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .flow-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 16px;
+            margin-top: 16px;
+        }
+
+        .flow-step {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: 16px;
+        }
+
+        .flow-step-num {
+            color: var(--accent-purple-light);
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+
+        .flow-step-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 6px;
+            color: #FFF;
+        }
+
+        .flow-step-desc {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        /* Section Title */
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 40px 0 20px;
+        }
+
+        .section-title {
+            font-size: 22px;
+            font-weight: 700;
+            color: #FFF;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* Scenario Card */
+        .scenario-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 24px;
+            margin-bottom: 32px;
+            box-shadow: var(--shadow-md);
+            transition: border-color 0.2s ease;
+        }
+
+        .scenario-card:hover {
+            border-color: #3D455D;
+        }
+
+        .scenario-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .scenario-name {
+            font-size: 18px;
+            font-weight: 700;
+            color: #FFF;
+        }
+
+        .scenario-target {
+            color: var(--accent-purple-light);
+            font-family: var(--font-mono);
+            font-size: 13px;
+            background: var(--accent-purple-dim);
+            padding: 3px 8px;
+            border-radius: 4px;
+        }
+
+        .scenario-desc {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-bottom: 16px;
+        }
+
+        /* ADB Command Box */
+        .cmd-block {
+            background: #11141C;
+            border: 1px solid #2B3245;
+            border-radius: var(--radius-sm);
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        .cmd-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            margin-bottom: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .cmd-code {
+            font-family: var(--font-mono);
+            font-size: 13px;
+            color: #80CBC4;
+            word-break: break-all;
+            padding-right: 70px;
+            display: block;
+        }
+
+        .copy-btn {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: var(--accent-purple);
+            color: #FFF;
+            border: none;
+            border-radius: 6px;
+            padding: 6px 12px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .copy-btn:hover {
+            background: #651FFF;
+        }
+
+        .copy-btn.copied {
+            background: var(--accent-green);
+            color: #000;
+        }
+
+        /* Screen Comparison Grid */
+        .screen-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-top: 16px;
+        }
+
+        .screen-item {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .screen-label-bar {
+            padding: 10px 14px;
+            background: rgba(0, 0, 0, 0.25);
+            border-bottom: 1px solid var(--border-color);
+            font-size: 13px;
+            font-weight: 600;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .screen-tag {
+            font-size: 10px;
+            text-transform: uppercase;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 700;
+        }
+
+        .tag-before { background: rgba(255, 255, 255, 0.1); color: #FFF; }
+        .tag-after { background: var(--accent-purple-dim); color: var(--accent-purple-light); }
+        .tag-restored { background: var(--accent-green-dim); color: var(--accent-green); }
+
+        .screen-img-container {
+            padding: 12px;
+            background: #080A0F;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .screen-img {
+            max-width: 100%;
+            height: auto;
+            max-height: 480px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+            transition: transform 0.2s ease;
+        }
+
+        .screen-img:hover {
+            transform: scale(1.02);
+        }
+
+        .screen-caption {
+            padding: 12px 14px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            border-top: 1px solid var(--border-color);
+            background: var(--bg-card);
+        }
+
+        .screen-caption strong {
+            color: #FFF;
+        }
+
+        /* Modal for Enlarged Image */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.88);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            max-width: 90%;
+            max-height: 90vh;
+            border-radius: var(--radius-md);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 24px;
+            right: 32px;
+            font-size: 32px;
+            color: #FFF;
+            cursor: pointer;
+        }
+
+        /* Checklist Section */
+        .checklist-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        .checklist-table th, .checklist-table td {
+            padding: 12px 14px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .checklist-table th {
+            background: var(--bg-card);
+            color: var(--text-secondary);
+            font-weight: 600;
+        }
+
+        .checklist-table tr:hover {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            body { padding: 16px 12px; }
+            h1 { font-size: 22px; }
+            .screen-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+
+    <!-- Header -->
+    <header>
+        <div class="badge-bar">
+            <span class="badge badge-success">✓ 100% PASS (145 Gradle Tasks)</span>
+            <span class="badge badge-purple">Jetpack Compose UI</span>
+            <span class="badge badge-amber">Automotive HAL Simulation</span>
+            <span class="badge badge-purple">ADB Broadcast Driven</span>
+        </div>
+        <h1>차량 하드웨어 시뮬레이션 및 UI 상태 반응 테스트 리포트</h1>
+        <p class="header-desc">
+            VHAL 하드웨어 센서(탑승자 감지, 주행 속도, HAL 프로퍼티)의 변경 사항을 <code>adb shell am broadcast</code>로 주입하고,
+            Jetpack Compose 설정 화면에서 <code>Item.isVisible</code>, <code>ValueWithState.isEnabled</code>, <code>ValueWithState.isVisible</code>, 
+            <code>ValueWithState.isSelected</code>가 실시간으로 재구성(Recomposition)되는 결과를 검증한 리포트 및 수동 테스트 가이드입니다.
+        </p>
+    </header>
+
+    <!-- Architecture Summary -->
+    <div class="arch-card">
+        <div class="arch-title">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+            시뮬레이션 아키텍처 및 반응 파이프라인
+        </div>
+        <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 16px;">
+            개발자나 QA 엔지니어가 물리적 차량 장비 없이도 터미널 명령어 한 줄로 모든 하드웨어 상태와 UI 엣지 케이스를 테스트할 수 있도록 설계되었습니다.
+        </p>
+        <div class="flow-grid">
+            <div class="flow-step">
+                <div class="flow-step-num">Step 1. ADB Broadcast</div>
+                <div class="flow-step-title">HardwareSimulationReceiver</div>
+                <div class="flow-step-desc"><code>com.example.carsettings.SIMULATE_HARDWARE</code> Intent 액션을 수신하여 파라미터 파싱</div>
+            </div>
+            <div class="flow-step">
+                <div class="flow-step-num">Step 2. HAL Simulation Hub</div>
+                <div class="flow-step-title">VehicleHardwareSimulator</div>
+                <div class="flow-step-desc">인메모리 VHAL 스토리지 및 센서별 <code>StateFlow</code>(탑승자 감지, 주행 락아웃, 옵션 숨김) 값 갱신</div>
+            </div>
+            <div class="flow-step">
+                <div class="flow-step-num">Step 3. Reactive ViewModel</div>
+                <div class="flow-step-title">ChoiceHardwareItemViewModel</div>
+                <div class="flow-step-desc"><code>combine()</code>을 통해 <code>ValueWithState(isSelected, isEnabled, isVisible)</code> 리스트를 원자적으로 방출</div>
+            </div>
+            <div class="flow-step">
+                <div class="flow-step-num">Step 4. Compose UI</div>
+                <div class="flow-step-title">GenericSettingsActivity</div>
+                <div class="flow-step-desc"><code>LocalItemViewModelRegistry</code>를 구독하여 Item 전체 또는 개별 Option 칩이 즉각 리컴포지션</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Environment Prep -->
+    <div class="cmd-block" style="margin-bottom: 36px;">
+        <div class="cmd-label">
+            <span>[사전 준비] 시트 설정 화면 실행 명령어 (PowerShell / CMD / Bash 공용)</span>
+        </div>
+        <code class="cmd-code">adb shell am start -n com.example.lifecycleapp/.GenericSettingsActivity -a com.example.carsettings.seat.OPEN</code>
+        <button class="copy-btn" onclick="copyCmd(this)">복사</button>
+    </div>
+
+    <div class="section-title">
+        시나리오별 테스트 검증 결과 및 수동 재현 가이드
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- Scenario 1: Item isVisible (Passenger Heat) -->
+    <!-- ========================================================================= -->
+    <div class="scenario-card" id="scenario-1">
+        <div class="scenario-header">
+            <div>
+                <div class="scenario-name">시나리오 1. 탑승자 감지 센서 연동 (Item isVisible 동적 제어)</div>
+                <div class="scenario-desc">조수석 탑승자가 하차하면 동승석 열선 Item 전체가 화면에서 사라지고, 탑승 시 다시 나타납니다.</div>
+            </div>
+            <span class="scenario-target">Item.isVisible / isVisibleFlow</span>
+        </div>
+
+        <div class="cmd-block">
+            <div class="cmd-label">
+                <span>[1-A] 미착석 시뮬레이션 (동승석 시트 열선 숨김)</span>
+            </div>
+            <code class="cmd-code">adb shell am broadcast -a com.example.carsettings.SIMULATE_HARDWARE -p com.example.lifecycleapp --ez passenger_present false</code>
+            <button class="copy-btn" onclick="copyCmd(this)">복사</button>
+        </div>
+
+        <div class="cmd-block">
+            <div class="cmd-label">
+                <span>[1-B] 재착석 시뮬레이션 (동승석 시트 열선 복원)</span>
+            </div>
+            <code class="cmd-code">adb shell am broadcast -a com.example.carsettings.SIMULATE_HARDWARE -p com.example.lifecycleapp --ez passenger_present true</code>
+            <button class="copy-btn" onclick="copyCmd(this)">복사</button>
+        </div>
+
+        <div class="screen-grid">
+            <div class="screen-item">
+                <div class="screen-label-bar">
+                    <span>기준 화면 (착석 상태)</span>
+                    <span class="screen-tag tag-before">Baseline</span>
+                </div>
+                <div class="screen-img-container" onclick="openModal(this)">
+                    <img src="screenshots/01_seat_baseline_passenger_present.png" alt="착석 기준 화면" class="screen-img">
+                </div>
+                <div class="screen-caption">
+                    <strong>동승석 시트 열선 노출:</strong> 4번째 항목으로 조수석 열선 조절 행(꺼짐/1단/2단/3단)이 정상 표시됩니다.
+                </div>
+            </div>
+
+            <div class="screen-item">
+                <div class="screen-label-bar">
+                    <span>미착석 시뮬레이션 결과</span>
+                    <span class="screen-tag tag-after">Item Hidden</span>
+                </div>
+                <div class="screen-img-container" onclick="openModal(this)">
+                    <img src="screenshots/02_seat_item_hidden_passenger_absent.png" alt="미착석 숨김 화면" class="screen-img">
+                </div>
+                <div class="screen-caption">
+                    <strong>Item 완전 제거:</strong> 동승석 시트 열선이 사라지고, '이지 억세스'와 '4방향 럼버' 항목이 상단으로 이동합니다.
+                </div>
+            </div>
+
+            <div class="screen-item">
+                <div class="screen-label-bar">
+                    <span>재착석 시뮬레이션 결과</span>
+                    <span class="screen-tag tag-restored">Item Restored</span>
+                </div>
+                <div class="screen-img-container" onclick="openModal(this)">
+                    <img src="screenshots/03_seat_item_restored_passenger_present.png" alt="재착석 복원 화면" class="screen-img">
+                </div>
+                <div class="screen-caption">
+                    <strong>즉시 복원:</strong> 탑승자가 감지되는 즉시 동승석 시트 열선 행이 원래 위치로 부드럽게 복원됩니다.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- Scenario 2: ValueWithState isEnabled (Speed Lockout) -->
+    <!-- ========================================================================= -->
+    <div class="scenario-card" id="scenario-2">
+        <div class="scenario-header">
+            <div>
+                <div class="scenario-name">시나리오 2. 주행 중 마사지 락아웃 (ValueWithState isEnabled 비활성화)</div>
+                <div class="scenario-desc">차량 주행(속도 > 0 km/h) 시 운전자 안전을 위해 위험 마사지 모드가 Grayed-out 비활성화되며 터치가 차단됩니다.</div>
+            </div>
+            <span class="scenario-target">ValueWithState.isEnabled</span>
+        </div>
+
+        <div class="cmd-block">
+            <div class="cmd-label">
+                <span>[2-A] 주행 속도 60km/h 락아웃 시뮬레이션</span>
+            </div>
+            <code class="cmd-code">adb shell am broadcast -a com.example.carsettings.SIMULATE_HARDWARE -p com.example.lifecycleapp --ei speed 60</code>
+            <button class="copy-btn" onclick="copyCmd(this)">복사</button>
+        </div>
+
+        <div class="cmd-block">
+            <div class="cmd-label">
+                <span>[2-B] 정차(속도 0km/h) 락아웃 해제 시뮬레이션</span>
+            </div>
+            <code class="cmd-code">adb shell am broadcast -a com.example.carsettings.SIMULATE_HARDWARE -p com.example.lifecycleapp --ei speed 0</code>
+            <button class="copy-btn" onclick="copyCmd(this)">복사</button>
+        </div>
+
+        <div class="screen-grid">
+            <div class="screen-item">
+                <div class="screen-label-bar">
+                    <span>정차 상태 (전체 모드 활성)</span>
+                    <span class="screen-tag tag-before">Speed = 0</span>
+                </div>
+                <div class="screen-img-container" onclick="openModal(this)">
+                    <img src="screenshots/01_seat_baseline_passenger_present.png" alt="정차 상태 화면" class="screen-img">
+                </div>
+                <div class="screen-caption">
+                    <strong>전체 옵션 활성:</strong> '에르고 모션 마사지'의 골반/웨이브, 허리 집중, 전신 스트레칭이 모두 선명하게 선택 가능한 상태입니다.
+                </div>
+            </div>
+
+            <div class="screen-item">
+                <div class="screen-label-bar">
+                    <span>주행 중 상태 (위험 옵션 잠금)</span>
+                    <span class="screen-tag tag-after">Speed = 60 km/h</span>
+                </div>
+                <div class="screen-img-container" onclick="openModal(this)">
+                    <img src="screenshots/04_seat_option_lockout_speed_60kmh.png" alt="주행 중 락아웃 화면" class="screen-img">
+                </div>
+                <div class="screen-caption">
+                    <strong>시각적 Grayed-Out & 상호작용 차단:</strong> '꺼짐'만 선택 가능하며, 골반/웨이브, 허리 집중, 전신 스트레칭 칩의 텍스트가 회색으로 비활성화됩니다.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- Scenario 3: ValueWithState isVisible (Option Hidden) -->
+    <!-- ========================================================================= -->
+    <div class="scenario-card" id="scenario-3">
+        <div class="scenario-header">
+            <div>
+                <div class="scenario-name">시나리오 3. 특정 옵션 동적 숨김 (ValueWithState isVisible)</div>
+                <div class="scenario-desc">차량 트림별 미지원 기능이나 특정 국가 법규에 따라 특정 옵션(예: '전신 스트레칭')만 칩 목록에서 제거합니다.</div>
+            </div>
+            <span class="scenario-target">ValueWithState.isVisible</span>
+        </div>
+
+        <div class="cmd-block">
+            <div class="cmd-label">
+                <span>[3-A] '전신 스트레칭(STRETCH)' 옵션 숨김 시뮬레이션</span>
+            </div>
+            <code class="cmd-code">adb shell am broadcast -a com.example.carsettings.SIMULATE_HARDWARE -p com.example.lifecycleapp --es item seat_massage --es hide_options STRETCH</code>
+            <button class="copy-btn" onclick="copyCmd(this)">복사</button>
+        </div>
+
+        <div class="cmd-block">
+            <div class="cmd-label">
+                <span>[3-B] 모든 옵션 숨김 해제</span>
+            </div>
+            <code class="cmd-code">adb shell am broadcast -a com.example.carsettings.SIMULATE_HARDWARE -p com.example.lifecycleapp --es item seat_massage --es hide_options none</code>
+            <button class="copy-btn" onclick="copyCmd(this)">복사</button>
+        </div>
+
+        <div class="screen-grid">
+            <div class="screen-item">
+                <div class="screen-label-bar">
+                    <span>기준 상태 (4개 칩 노출)</span>
+                    <span class="screen-tag tag-before">4 Options</span>
+                </div>
+                <div class="screen-img-container" onclick="openModal(this)">
+                    <img src="screenshots/01_seat_baseline_passenger_present.png" alt="4개 옵션 화면" class="screen-img">
+                </div>
+                <div class="screen-caption">
+                    <strong>전체 옵션 표시:</strong> [꺼짐], [골반/웨이브], [허리 집중], [전신 스트레칭] 4개의 FilterChip이 배치되어 있습니다.
+                </div>
+            </div>
+
+            <div class="screen-item">
+                <div class="screen-label-bar">
+                    <span>STRETCH 숨김 결과 (3개 칩 노출)</span>
+                    <span class="screen-tag tag-after">3 Options</span>
+                </div>
+                <div class="screen-img-container" onclick="openModal(this)">
+                    <img src="screenshots/05_seat_option_hidden_stretch_removed.png" alt="옵션 숨김 화면" class="screen-img">
+                </div>
+                <div class="screen-caption">
+                    <strong>단일 옵션 완전 제거:</strong> [전신 스트레칭] 칩만 레이아웃에서 제거되고, 나머지 3개 칩이 너비에 맞춰 균등하게 리사이징됩니다.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- Scenario 4: ValueWithState isSelected (Direct Value Mutation) -->
+    <!-- ========================================================================= -->
+    <div class="scenario-card" id="scenario-4">
+        <div class="scenario-header">
+            <div>
+                <div class="scenario-name">시나리오 4. 하드웨어 스위치 / VHAL 외부 조작 (ValueWithState isSelected)</div>
+                <div class="scenario-desc">센터페시아의 물리적 버튼 조작이나 백그라운드 VHAL 상태 변경이 UI의 세그먼트 버튼 및 라벨에 실시간 반영됩니다.</div>
+            </div>
+            <span class="scenario-target">ValueWithState.isSelected / selectedValue</span>
+        </div>
+
+        <div class="cmd-block">
+            <div class="cmd-label">
+                <span>[4-A] 운전석 시트 열선 3단 설정 시뮬레이션 (따옴표 이스케이프 주의)</span>
+            </div>
+            <code class="cmd-code">adb shell am broadcast -a com.example.carsettings.SIMULATE_HARDWARE -p com.example.lifecycleapp --es item driver_seat_heat --es value '\"LEVEL 3\"'</code>
+            <button class="copy-btn" onclick="copyCmd(this)">복사</button>
+        </div>
+
+        <div class="cmd-block">
+            <div class="cmd-label">
+                <span>[4-B] 운전석 시트 열선 꺼짐(OFF)으로 복원</span>
+            </div>
+            <code class="cmd-code">adb shell am broadcast -a com.example.carsettings.SIMULATE_HARDWARE -p com.example.lifecycleapp --es item driver_seat_heat --es value OFF</code>
+            <button class="copy-btn" onclick="copyCmd(this)">복사</button>
+        </div>
+
+        <div class="screen-grid">
+            <div class="screen-item">
+                <div class="screen-label-bar">
+                    <span>초기 상태 (열선 꺼짐)</span>
+                    <span class="screen-tag tag-before">Initial: OFF</span>
+                </div>
+                <div class="screen-img-container" onclick="openModal(this)">
+                    <img src="screenshots/01_seat_baseline_passenger_present.png" alt="초기 열선 꺼짐" class="screen-img">
+                </div>
+                <div class="screen-caption">
+                    <strong>초기 꺼짐 선택:</strong> 'Current: 꺼짐' 및 [꺼짐] 세그먼트 버튼이 보라색 배경으로 선택되어 있습니다.
+                </div>
+            </div>
+
+            <div class="screen-item">
+                <div class="screen-label-bar">
+                    <span>외부 3단 주입 결과</span>
+                    <span class="screen-tag tag-after">Mutated: LEVEL 3</span>
+                </div>
+                <div class="screen-img-container" onclick="openModal(this)">
+                    <img src="screenshots/06_seat_value_mutated_driver_heat_level3.png" alt="열선 3단 반영 화면" class="screen-img">
+                </div>
+                <div class="screen-caption">
+                    <strong>원자적 즉시 갱신:</strong> [3단] 세그먼트 버튼이 보라색(#6750A4)으로 반전되고, 상단 상태 텍스트가 'Current: 3단'으로 동기화됩니다.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- Scenario 5: Toggle Item isVisible (Door Settings) -->
+    <!-- ========================================================================= -->
+    <div class="scenario-card" id="scenario-5">
+        <div class="scenario-header">
+            <div>
+                <div class="scenario-name">시나리오 5. 도어 카테고리 토글 Item isVisible 제어</div>
+                <div class="scenario-desc">다른 카테고리(도어 및 잠금)에서도 개별 토글 스위치 항목의 `isVisibleFlow`가 유연하게 작동하는지 검증합니다.</div>
+            </div>
+            <span class="scenario-target">UiToggleItem.isVisible</span>
+        </div>
+
+        <div class="cmd-block">
+            <div class="cmd-label">
+                <span>[사전 준비] 도어 설정 화면 실행 명령어</span>
+            </div>
+            <code class="cmd-code">adb shell am start -n com.example.lifecycleapp/.GenericSettingsActivity -a com.example.carsettings.door.OPEN</code>
+            <button class="copy-btn" onclick="copyCmd(this)">복사</button>
+        </div>
+
+        <div class="cmd-block">
+            <div class="cmd-label">
+                <span>[5-A] '주행 시 자동 도어 잠금(auto_lock)' 토글 숨김 시뮬레이션</span>
+            </div>
+            <code class="cmd-code">adb shell am broadcast -a com.example.carsettings.SIMULATE_HARDWARE -p com.example.lifecycleapp --es item auto_lock --ez visible false</code>
+            <button class="copy-btn" onclick="copyCmd(this)">복사</button>
+        </div>
+
+        <div class="cmd-block">
+            <div class="cmd-label">
+                <span>[5-B] '주행 시 자동 도어 잠금(auto_lock)' 토글 복원</span>
+            </div>
+            <code class="cmd-code">adb shell am broadcast -a com.example.carsettings.SIMULATE_HARDWARE -p com.example.lifecycleapp --es item auto_lock --ez visible true</code>
+            <button class="copy-btn" onclick="copyCmd(this)">복사</button>
+        </div>
+
+        <div class="screen-grid">
+            <div class="screen-item">
+                <div class="screen-label-bar">
+                    <span>도어 설정 기준 화면 (3개 항목)</span>
+                    <span class="screen-tag tag-before">3 Items Visible</span>
+                </div>
+                <div class="screen-img-container" onclick="openModal(this)">
+                    <img src="screenshots/07_door_baseline_all_items_visible.png" alt="도어 기준 화면" class="screen-img">
+                </div>
+                <div class="screen-caption">
+                    <strong>전체 항목 노출:</strong> '주행 시 자동 도어 잠금', '후석 어린이 보호 잠금', 'P단 변속 시 자동 잠금 해제' 3개 토글이 노출됩니다.
+                </div>
+            </div>
+
+            <div class="screen-item">
+                <div class="screen-label-bar">
+                    <span>auto_lock 숨김 결과 (2개 항목)</span>
+                    <span class="screen-tag tag-after">AutoLock Hidden</span>
+                </div>
+                <div class="screen-img-container" onclick="openModal(this)">
+                    <img src="screenshots/08_door_item_hidden_autolock_removed.png" alt="도어 자동잠금 숨김 화면" class="screen-img">
+                </div>
+                <div class="screen-caption">
+                    <strong>토글 항목 제거:</strong> '주행 시 자동 도어 잠금'이 사라지고, 하위 항목들이 자연스럽게 리컴포지션되어 배치됩니다.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Manual Testing Checklist Table -->
+    <div class="arch-card" style="margin-top: 48px;">
+        <div class="arch-title">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+            수동 QA 검증 체크리스트
+        </div>
+        <table class="checklist-table">
+            <thead>
+                <tr>
+                    <th style="width: 50px;">상태</th>
+                    <th style="width: 180px;">시나리오</th>
+                    <th>검증 내용</th>
+                    <th style="width: 140px;">타겟 상태</th>
+                    <th style="width: 100px;">결과</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><input type="checkbox" checked disabled></td>
+                    <td><strong>동승석 탑승자 미착석</strong></td>
+                    <td><code>--ez passenger_present false</code> 전송 시 '동승석 시트 열선'이 UI 트리에서 완전히 사라지는지 확인</td>
+                    <td><code>Item.isVisible</code></td>
+                    <td><span class="badge badge-success">PASS</span></td>
+                </tr>
+                <tr>
+                    <td><input type="checkbox" checked disabled></td>
+                    <td><strong>동승석 탑승자 재착석</strong></td>
+                    <td><code>--ez passenger_present true</code> 전송 시 '동승석 시트 열선'이 원래 위치로 복원되는지 확인</td>
+                    <td><code>Item.isVisible</code></td>
+                    <td><span class="badge badge-success">PASS</span></td>
+                </tr>
+                <tr>
+                    <td><input type="checkbox" checked disabled></td>
+                    <td><strong>주행 속도 60km/h 락아웃</strong></td>
+                    <td><code>--ei speed 60</code> 전송 시 마사지 모드의 위험 3개 옵션이 Grayed-out 비활성화되고 클릭이 차단되는지 확인</td>
+                    <td><code>ValueWithState.isEnabled</code></td>
+                    <td><span class="badge badge-success">PASS</span></td>
+                </tr>
+                <tr>
+                    <td><input type="checkbox" checked disabled></td>
+                    <td><strong>정차 시 락아웃 해제</strong></td>
+                    <td><code>--ei speed 0</code> 전송 시 마사지 모드의 모든 옵션이 다시 활성화되는지 확인</td>
+                    <td><code>ValueWithState.isEnabled</code></td>
+                    <td><span class="badge badge-success">PASS</span></td>
+                </tr>
+                <tr>
+                    <td><input type="checkbox" checked disabled></td>
+                    <td><strong>마사지 특정 옵션 숨김</strong></td>
+                    <td><code>--es hide_options STRETCH</code> 전송 시 '전신 스트레칭' 칩만 사라지고 3개 칩만 남는지 확인</td>
+                    <td><code>ValueWithState.isVisible</code></td>
+                    <td><span class="badge badge-success">PASS</span></td>
+                </tr>
+                <tr>
+                    <td><input type="checkbox" checked disabled></td>
+                    <td><strong>열선 3단 외부 변경</strong></td>
+                    <td><code>--es item driver_seat_heat --es value '\"LEVEL 3\"'</code> 전송 시 세그먼트 버튼과 'Current' 라벨이 3단으로 동기화되는지 확인</td>
+                    <td><code>ValueWithState.isSelected</code></td>
+                    <td><span class="badge badge-success">PASS</span></td>
+                </tr>
+                <tr>
+                    <td><input type="checkbox" checked disabled></td>
+                    <td><strong>도어 자동 잠금 토글 숨김</strong></td>
+                    <td><code>--es item auto_lock --ez visible false</code> 전송 시 '주행 시 자동 도어 잠금' 토글이 사라지는지 확인</td>
+                    <td><code>UiToggleItem.isVisible</code></td>
+                    <td><span class="badge badge-success">PASS</span></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+</div>
+
+<!-- Modal for Image Preview -->
+<div class="modal" id="imageModal" onclick="closeModal()">
+    <span class="modal-close">&times;</span>
+    <img src="" alt="Enlarged screenshot" class="modal-content" id="modalImg">
+</div>
+
+<script>
+    function copyCmd(button) {
+        const cmdBlock = button.parentElement;
+        const code = cmdBlock.querySelector('.cmd-code').innerText;
+        navigator.clipboard.writeText(code).then(() => {
+            const originalText = button.innerText;
+            button.innerText = '복사됨!';
+            button.classList.add('copied');
+            setTimeout(() => {
+                button.innerText = originalText;
+                button.classList.remove('copied');
+            }, 2000);
+        });
+    }
+
+    function openModal(container) {
+        const img = container.querySelector('.screen-img');
+        const modal = document.getElementById('imageModal');
+        const modalImg = document.getElementById('modalImg');
+        modalImg.src = img.src;
+        modal.classList.add('active');
+    }
+
+    function closeModal() {
+        document.getElementById('imageModal').classList.remove('active');
+    }
+</script>
+
+</body>
+</html>

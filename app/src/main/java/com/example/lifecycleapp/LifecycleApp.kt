@@ -13,5 +13,6 @@ class LifecycleApp : Application() {
         Log.d("LifecycleLog", "[LifecycleApp] onCreate()")
         CategoryItemRegistry.register(DoorItemRegistry)
         CategoryItemRegistry.register(SeatItemRegistry)
+        VehicleHardwareSimulator.init()
     }
 }

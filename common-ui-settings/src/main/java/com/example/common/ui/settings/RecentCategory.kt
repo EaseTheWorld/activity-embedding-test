@@ -1,21 +1,27 @@
 package com.example.common.ui.settings
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -51,24 +57,77 @@ class RecentCategoryManager(
     }
 
     /**
-     * Checks if an item is eligible for Recent / Quick Controls display
-     * by querying whether a grid card renderer exists in the given [gridRegistry].
+     * Checks if an item is eligible for Recent / Quick Controls display.
+     * Screens have full autonomy over eligibility: by default, compact items (Toggle, Choice, Slider)
+     * are eligible, but a custom predicate can be provided.
      */
-    fun isEligibleForRecent(item: Item, gridRegistry: ItemRendererRegistry): Boolean =
-        gridRegistry.hasRenderer(item::class)
+    fun isEligibleForRecent(
+        item: Item,
+        predicate: (Item) -> Boolean = { it is UiToggleItem || it is UiChoiceItem || it is UiSliderItem }
+    ): Boolean = predicate(item)
+}
+
+/**
+ * Screen-specific compact card presentation for [RecentSettingsScreen].
+ * Each screen independently decides how to render the same Item, while resolving
+ * the shared [com.example.core.item.ItemViewModel] by ID.
+ */
+@Composable
+fun RecentItemCard(
+    item: Item,
+    viewModelRegistry: ItemViewModelRegistry = LocalItemViewModelRegistry.current,
+    modifier: Modifier = Modifier
+) {
+    val isItemVisible by item.isVisible.collectAsState(initial = true)
+    val vm = viewModelRegistry.getViewModel<Any>(item.id)
+    val isVmVisible = (vm?.isVisibleFlow?.collectAsState())?.value ?: true
+    if (!isItemVisible || !isVmVisible) return
+
+    when (item) {
+        is UiToggleItem -> {
+            ToggleGridCard(item = item, viewModelRegistry = viewModelRegistry, modifier = modifier)
+        }
+        is UiChoiceItem -> {
+            ChoiceGridCard(item = item, viewModelRegistry = viewModelRegistry, modifier = modifier)
+        }
+        is UiSliderItem -> {
+            SliderGridCard(item = item, viewModelRegistry = viewModelRegistry, modifier = modifier)
+        }
+        else -> {
+            Card(
+                modifier = modifier
+                    .fillMaxWidth()
+                    .height(110.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(text = item.id, style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+        }
+    }
 }
 
 /**
  * Recent / Quick Controls Screen rendering items in a compact Grid format.
- * Notice: Uses [LocalGridItemRendererRegistry] to render compact grid cards.
- * Items with complex UIs that lack a Grid renderer are automatically and safely excluded!
+ * Notice: Zero ItemRendererRegistry usage! UI rendering is screen-independent,
+ * while ItemViewModel single-source-of-truth is guaranteed by ID.
  */
 @Composable
 fun RecentSettingsScreen(
     recentManager: RecentCategoryManager,
     itemResolver: (String) -> Item?,
     viewModelRegistry: ItemViewModelRegistry = LocalItemViewModelRegistry.current,
-    gridRendererRegistry: ItemRendererRegistry = LocalGridItemRendererRegistry.current,
+    itemCardContent: @Composable (Item, ItemViewModelRegistry) -> Unit = { item, vmRegistry ->
+        RecentItemCard(item = item, viewModelRegistry = vmRegistry)
+    },
     modifier: Modifier = Modifier
 ) {
     val recentKeys by recentManager.recentKeys.collectAsState()
@@ -105,16 +164,12 @@ fun RecentSettingsScreen(
             ) {
                 items(recentKeys, key = { it }) { key ->
                     val item = itemResolver(key)
-                    // Eligibility check: Only render items that have a dedicated Grid renderer!
-                    // Complex items (e.g. 10-band equalizers, 3D seat views) are safely skipped.
-                    if (item != null && gridRendererRegistry.hasRenderer(item::class)) {
-                        gridRendererRegistry.Render(
-                            item = item,
-                            viewModelRegistry = viewModelRegistry
-                        )
+                    if (item != null && recentManager.isEligibleForRecent(item)) {
+                        itemCardContent(item, viewModelRegistry)
                     }
                 }
             }
         }
     }
 }
+

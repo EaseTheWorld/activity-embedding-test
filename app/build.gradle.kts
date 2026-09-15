@@ -39,6 +39,9 @@ android {
     composeOptions {
         kotlinCompilerExtensionVersion = libs.versions.composeCompiler.get()
     }
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
 }
 
 dependencies {
@@ -62,4 +65,7 @@ dependencies {
     implementation(project(":common-ui-settings"))
     implementation(project(":feature-door"))
     implementation(project(":feature-seat"))
+
+    testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
 }

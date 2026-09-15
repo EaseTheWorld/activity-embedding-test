@@ -11,7 +11,8 @@ package com.example.core.item
 data class ValueWithState<T>(
     val id: T,
     val isSelected: Boolean,
-    val isEnabled: Boolean = true
+    val isEnabled: Boolean = true,
+    val isVisible: Boolean = true
 ) {
     /**
      * Alias for [id] representing the option's domain value.

@@ -27,9 +27,8 @@ import com.example.core.item.ItemViewModelRegistry
 
 /**
  * Universal Settings Screen rendered via Jetpack Compose.
- * Notice: ZERO 'when' branching!
- * Every item (whether standard Toggle, Choice, or bespoke 2D/3D custom item)
- * self-renders polymorphically through ComposableItemRenderer.Draw().
+ * Renders standard and domain items directly via declarative Compose rows,
+ * resolving the single-source-of-truth ItemViewModel by item ID.
  */
 @Composable
 fun GenericSettingsScreen(

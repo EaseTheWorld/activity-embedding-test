@@ -141,7 +141,7 @@ open class UiToggleItem(
 /**
  * Composable slot type for rendering an individual option in a ChoiceItem.
  */
-typealias OptionSlot<T> = @Composable (option: UiOption<T>, isSelected: Boolean, onClick: () -> Unit) -> Unit
+typealias OptionSlot<T> = @Composable (option: UiOption<T>, isSelected: Boolean, enabled: Boolean, onClick: () -> Unit) -> Unit
 
 /**
  * Standard Choice UI Item.

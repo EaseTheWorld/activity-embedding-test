@@ -408,6 +408,7 @@ private fun ChoiceItemRowContent(
                     item.optionSlot(
                         option,
                         isSelected,
+                        enabled,
                         { if (enabled) onOptionSelected(option.value) }
                     )
                 }
@@ -483,13 +484,14 @@ private fun ChoiceItemRowWithStates(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            optionStates.forEach { state ->
+            optionStates.filter { it.isVisible }.forEach { state ->
                 val option = item.getOption(state.id)
                 if (option != null) {
                     androidx.compose.foundation.layout.Box(modifier = Modifier.weight(1f)) {
                         item.optionSlot(
                             option,
                             state.isSelected,
+                            state.isEnabled,
                             { if (state.isEnabled) onOptionSelected(state.id) }
                         )
                     }

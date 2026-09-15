@@ -35,7 +35,7 @@ import com.example.core.item.ItemViewModelRegistry
 /**
  * Composable slot type for a category's custom layout.
  * Gives complete layout freedom to features (e.g. dual switches side-by-side, 2D coordinates, 3D views)
- * without constraining them to a 1:1 [ItemRendererRegistry].
+ * with full Compose expressiveness.
  */
 typealias CategoryLayoutSlot = @Composable (items: List<Item>, viewModelRegistry: ItemViewModelRegistry) -> Unit
 
@@ -46,11 +46,9 @@ typealias CategoryLayoutSlot = @Composable (items: List<Item>, viewModelRegistry
  * 1. Top Section: Recent / Quick Controls in a compact 2-column grid.
  * 2. Bottom Section: Actual Categories collected from [CategoryItemProvider]s.
  *
- * Notice on Registry-Free Category Rendering (ADR 0003):
- * The actual categories DO NOT use [ItemRendererRegistry] because their item display layouts
- * must be flexible and domain-specific (custom rows, compound layouts, illustrations, sub-headers).
- * Instead, they compose standard rows ([ToggleItemRow], [ChoiceItemRow], [SliderItemRow]) and custom
- * domain composables directly inside native Jetpack Compose containers.
+ * Notice on Screen-Independent Declarative Composition (ADR 0004 & ADR 0005):
+ * Category screens compose standard rows ([ToggleItemRow], [ChoiceItemRow], [SliderItemRow]) and custom
+ * domain composables directly inside native Jetpack Compose containers, with ItemViewModel guaranteed by ID.
  */
 @Composable
 fun MainSettingsDashboardScreen(
@@ -153,7 +151,7 @@ fun MainSettingsDashboardScreen(
 
 /**
  * Renders an individual category in a rounded Card container.
- * Notice: Zero ItemRendererRegistry usage! Layout is completely declarative Compose.
+ * Notice: Completely declarative Compose layout.
  */
 @Composable
 fun CategoryCardSection(
@@ -202,7 +200,7 @@ fun CategoryCardSection(
 
 /**
  * Default direct Compose layout for category items.
- * Renders items via direct Composable rows without an intermediate ItemRendererRegistry.
+ * Renders items via direct Composable rows.
  */
 @Composable
 fun DefaultCategoryItemsContent(

@@ -59,48 +59,60 @@ class DualContextRenderingTest {
     }
 
     @Test
-    fun `polymorphic ItemRendererRegistry resolves renderer for Item subclasses`() {
-        val registry = ItemRendererRegistry.defaultListRegistry
+    fun `Screen-independent UI rendering allows the same Item to render across different screen contexts`() = runTest {
+        val testScope = TestScope(testScheduler)
+        val viewModelRegistry = ItemViewModelRegistry()
 
-        class TestCustomToggle : UiToggleItem(
-            id = "custom_toggle",
-            nameResId = 1
-        )
+        val autoLockToggle = UiToggleItem(id = "auto_lock", nameResId = 1)
+        val autoLockVm = LocalStorageItemViewModel(initialValue = false, scope = testScope)
+        viewModelRegistry.register("auto_lock", autoLockVm)
 
-        val customItem = TestCustomToggle()
+        // Screen 1: Door Category Screen (renders detailed List Row)
+        val doorScreenVm = viewModelRegistry.getViewModel<Boolean>(autoLockToggle.id)
+        assertNotNull(doorScreenVm)
+        assertEquals(false, doorScreenVm!!.valueFlow.value)
 
-        // Should resolve ToggleListRenderer via superclass UiToggleItem
-        val renderer = registry.findRenderer(customItem::class)
-        assertNotNull("Renderer should be resolved polymorphically for subclasses", renderer)
-        assertTrue("Resolved renderer must be ToggleListRenderer", renderer is ToggleListRenderer)
+        // Screen 2: Main Dashboard (renders Quick Control Card)
+        val dashboardVm = viewModelRegistry.getMutableViewModel<Boolean>(autoLockToggle.id)
+        assertNotNull(dashboardVm)
+
+        // Screen 3: Recent Screen (renders compact Recent Tile)
+        val recentVm = viewModelRegistry.getViewModel<Boolean>(autoLockToggle.id)
+        assertNotNull(recentVm)
+
+        // Mutating from Screen 2 (Dashboard Quick Control) updates Screen 1 and Screen 3 immediately
+        dashboardVm!!.setValue(true)
+        testScope.advanceUntilIdle()
+
+        assertEquals(true, doorScreenVm.valueFlow.value)
+        assertEquals(true, recentVm!!.valueFlow.value)
     }
 
     @Test
-    fun `complex UI items without Grid renderer are rejected from Recent display`() {
-        val listRegistry = ItemRendererRegistry.defaultListRegistry
-        val gridRegistry = ItemRendererRegistry.defaultGridRegistry
+    fun `RecentCategoryManager filters eligibility without ItemRendererRegistry`() {
         val recentManager = RecentCategoryManager()
 
-        // 1. Simple toggle item: supported in both List and Grid
+        // 1. Standard quick-action items are eligible by default
         val toggleItem = UiToggleItem(id = "auto_lock", nameResId = 1)
-        assertTrue("Toggle item must be supported in List", listRegistry.hasRenderer(toggleItem::class))
-        assertTrue("Toggle item must be supported in Grid", gridRegistry.hasRenderer(toggleItem::class))
-        assertTrue("Toggle item must be eligible for Recent", recentManager.isEligibleForRecent(toggleItem, gridRegistry))
+        val choiceItem = UiChoiceItem(id = "mode", nameResId = 2, options = emptyList())
+        val sliderItem = UiSliderItem(id = "brightness", nameResId = 3, min = 0, max = 100)
 
-        // 2. Complex UI item (e.g. 10-Band Equalizer or 3D Seat Calibration)
-        class ComplexEqualizerItem : UiItem(id = "sound_eq", nameResId = 2)
+        assertTrue("Toggle must be eligible for Recent", recentManager.isEligibleForRecent(toggleItem))
+        assertTrue("Choice must be eligible for Recent", recentManager.isEligibleForRecent(choiceItem))
+        assertTrue("Slider must be eligible for Recent", recentManager.isEligibleForRecent(sliderItem))
+
+        // 2. Complex or custom domain item (e.g. 10-band equalizer or 3D seat diagram)
+        class ComplexEqualizerItem : UiItem(id = "sound_eq", nameResId = 4)
         val complexItem = ComplexEqualizerItem()
 
-        // Registered ONLY in List registry (has a rich full-page Composable row)
-        listRegistry.register(ComplexEqualizerItem::class, object : ItemRenderer<ComplexEqualizerItem, Unit> {
-            @androidx.compose.runtime.Composable
-            override fun Render(item: ComplexEqualizerItem, viewModel: com.example.core.item.ItemViewModel<Unit>, modifier: androidx.compose.ui.Modifier) {}
-        })
+        org.junit.Assert.assertFalse(
+            "Complex item without quick-control representation is not eligible by default",
+            recentManager.isEligibleForRecent(complexItem)
+        )
 
-        // Complex item is supported in List, but deliberately NOT in Grid registry!
-        assertTrue(listRegistry.hasRenderer(complexItem::class))
-        org.junit.Assert.assertFalse("Complex item must NOT have a grid renderer", gridRegistry.hasRenderer(complexItem::class))
-        org.junit.Assert.assertFalse("Complex item must NOT be eligible for Recent", recentManager.isEligibleForRecent(complexItem, gridRegistry))
+        // 3. Screen can customize eligibility via custom predicate
+        val allowsAll = recentManager.isEligibleForRecent(complexItem) { true }
+        assertTrue("Screen has full autonomy over eligibility via predicate", allowsAll)
     }
 
     @Test

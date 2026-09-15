@@ -19,7 +19,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.common.ui.settings.ItemRenderer
 import com.example.common.ui.settings.LocalItemViewModelRegistry
 import com.example.core.item.ItemViewModel
 import com.example.core.item.ItemViewModelRegistry
@@ -150,16 +149,3 @@ fun SeatLumbarRow(
     SeatLumbarRow(item = item, viewModel = viewModel, modifier = modifier)
 }
 
-/**
- * ItemRenderer implementation for SeatLumbarSupportItem, enabling dynamic rendering via [ItemRendererRegistry].
- */
-class SeatLumbarRenderer : ItemRenderer<SeatLumbarSupportItem, SeatLumbarSupport> {
-    @Composable
-    override fun Render(
-        item: SeatLumbarSupportItem,
-        viewModel: ItemViewModel<SeatLumbarSupport>,
-        modifier: Modifier
-    ) {
-        SeatLumbarRow(item = item, viewModel = viewModel, modifier = modifier)
-    }
-}

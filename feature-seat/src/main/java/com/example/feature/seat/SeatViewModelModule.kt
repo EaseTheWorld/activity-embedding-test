@@ -25,6 +25,8 @@ object SeatViewModelModule {
     fun provideSeatBindings(
         hardwareStorage: HardwarePropertyStorage,
         disabledMassageOptionsFlow: StateFlow<Set<String>> = MutableStateFlow(emptySet()),
+        hiddenMassageOptionsFlow: StateFlow<Set<String>> = MutableStateFlow(emptySet()),
+        passengerSeatHeatVisibleFlow: StateFlow<Boolean> = MutableStateFlow(true),
         lumbarViewModel: ItemViewModel<SeatLumbarSupport> = SeatItemRegistry.seatLumbarViewModel,
         scope: CoroutineScope = AppScope.scope
     ): Set<ItemViewModelBinding<*>> = setOf(
@@ -33,6 +35,7 @@ object SeatViewModelModule {
             supportedOptionIds = SeatCatalog.massageMode.optionIds,
             storage = hardwareStorage,
             disabledOptionIdsFlow = disabledMassageOptionsFlow,
+            hiddenOptionIdsFlow = hiddenMassageOptionsFlow,
             scope = scope
         ),
         SeatCatalog.driverSeatVent bindsTo ChoiceHardwareItemViewModel(
@@ -51,7 +54,8 @@ object SeatViewModelModule {
             property = SeatVehicleProperties.PASSENGER_HEAT,
             supportedOptionIds = SeatCatalog.passengerSeatHeat.optionIds,
             storage = hardwareStorage,
-            scope = scope
+            scope = scope,
+            isVisibleFlow = passengerSeatHeatVisibleFlow
         ),
         SeatCatalog.easyEntryExit bindsTo LocalStorageItemViewModel(
             initialValue = true,
@@ -74,12 +78,16 @@ object SeatViewModelBinder {
             setInitialValue(SeatVehicleProperties.PASSENGER_HEAT, "OFF")
         },
         disabledMassageOptionsFlow: StateFlow<Set<String>> = MutableStateFlow(emptySet()),
+        hiddenMassageOptionsFlow: StateFlow<Set<String>> = MutableStateFlow(emptySet()),
+        passengerSeatHeatVisibleFlow: StateFlow<Boolean> = MutableStateFlow(true),
         lumbarViewModel: ItemViewModel<SeatLumbarSupport> = SeatItemRegistry.seatLumbarViewModel,
         scope: CoroutineScope = AppScope.scope
     ) {
         val bindings = SeatViewModelModule.provideSeatBindings(
             hardwareStorage = hardwareStorage,
             disabledMassageOptionsFlow = disabledMassageOptionsFlow,
+            hiddenMassageOptionsFlow = hiddenMassageOptionsFlow,
+            passengerSeatHeatVisibleFlow = passengerSeatHeatVisibleFlow,
             lumbarViewModel = lumbarViewModel,
             scope = scope
         )

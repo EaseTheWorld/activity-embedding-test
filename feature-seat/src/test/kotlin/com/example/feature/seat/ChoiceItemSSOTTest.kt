@@ -166,4 +166,50 @@ class ChoiceItemSSOTTest {
         assertEquals(R.string.massage_wave, uiOption!!.labelRes)
         assertEquals("추천", uiOption.badge)
     }
+
+    // ========================================================================
+    // SSOT Test 5: Dynamic Option Visibility and Item Visibility Flows
+    // ========================================================================
+
+    @Test
+    fun `ChoiceItemViewModel supports dynamic option hiding and item visibility`() = runTest {
+        val testScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Unconfined)
+        val hardwareStorage = InMemoryHardwareStorage().apply {
+            setInitialValue(SeatVehicleProperties.MASSAGE_MODE, "OFF")
+            setInitialValue(SeatVehicleProperties.PASSENGER_HEAT, "OFF")
+        }
+        val drivingRestrictions = MutableStateFlow<Set<String>>(emptySet())
+        val hiddenOptions = MutableStateFlow<Set<String>>(emptySet())
+        val passengerHeatVisible = MutableStateFlow(true)
+
+        val registry = ItemViewModelRegistry()
+        SeatViewModelBinder.bindAll(
+            registry = registry,
+            hardwareStorage = hardwareStorage,
+            disabledMassageOptionsFlow = drivingRestrictions,
+            hiddenMassageOptionsFlow = hiddenOptions,
+            passengerSeatHeatVisibleFlow = passengerHeatVisible,
+            scope = testScope
+        )
+
+        val massageVm = registry.getMutableChoiceViewModel<String>(SeatCatalog.massageMode)!!
+        val passengerHeatVm = registry.getMutableChoiceViewModel<String>(SeatCatalog.passengerSeatHeat)!!
+
+        // Initially all options visible
+        assertTrue(massageVm.optionStates.value.all { it.isVisible })
+        assertTrue(passengerHeatVm.isVisibleFlow.value)
+
+        // Hide STRETCH option
+        hiddenOptions.value = setOf("STRETCH")
+        val stretchState = massageVm.optionStates.value.find { it.id == "STRETCH" }!!
+        assertFalse("STRETCH option should have isVisible=false", stretchState.isVisible)
+        assertTrue(massageVm.optionStates.value.find { it.id == "WAVE" }!!.isVisible)
+
+        // Passenger presence sensor toggled -> Item visibility changes
+        passengerHeatVisible.value = false
+        assertFalse(passengerHeatVm.isVisibleFlow.value)
+
+        passengerHeatVisible.value = true
+        assertTrue(passengerHeatVm.isVisibleFlow.value)
+    }
 }

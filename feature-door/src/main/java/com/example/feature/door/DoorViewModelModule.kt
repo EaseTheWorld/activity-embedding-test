@@ -9,6 +9,8 @@ import com.example.core.item.ItemViewModelBinding
 import com.example.core.item.ItemViewModelRegistry
 import com.example.core.item.bindsTo
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 
 // ============================================================================
 // Layer 3: Assembler / DI Module Layer (The Sole Coupling Point)
@@ -21,12 +23,14 @@ import kotlinx.coroutines.CoroutineScope
 object DoorViewModelModule {
     fun provideDoorBindings(
         hardwareStorage: HardwarePropertyStorage,
+        autoLockVisibleFlow: StateFlow<Boolean> = MutableStateFlow(true),
         scope: CoroutineScope = AppScope.scope
     ): Set<ItemViewModelBinding<*>> = setOf(
         DoorCatalog.autoDoorLock bindsTo HardwareItemViewModel(
             property = DoorVehicleProperties.AUTO_LOCK,
             storage = hardwareStorage,
-            scope = scope
+            scope = scope,
+            isVisibleFlow = autoLockVisibleFlow
         ),
         DoorCatalog.childLock bindsTo HardwareItemViewModel(
             property = DoorVehicleProperties.CHILD_LOCK,
@@ -50,9 +54,10 @@ object DoorViewModelBinder {
             setInitialValue(DoorVehicleProperties.AUTO_LOCK, true)
             setInitialValue(DoorVehicleProperties.CHILD_LOCK, false)
         },
+        autoLockVisibleFlow: StateFlow<Boolean> = MutableStateFlow(true),
         scope: CoroutineScope = AppScope.scope
     ) {
-        val bindings = DoorViewModelModule.provideDoorBindings(hardwareStorage, scope)
+        val bindings = DoorViewModelModule.provideDoorBindings(hardwareStorage, autoLockVisibleFlow, scope)
         registry.registerAll(bindings)
     }
 }

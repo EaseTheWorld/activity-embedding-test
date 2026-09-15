@@ -32,11 +32,12 @@ object OptionSlots {
     /**
      * Standard Segmented Button slot with filled selected state and outlined unselected state.
      */
-    val Segmented: OptionSlot<String> = { option, isSelected, onClick ->
+    val Segmented: OptionSlot<String> = { option, isSelected, enabled, onClick ->
         val label = stringResource(option.labelRes)
         if (isSelected) {
             Button(
                 onClick = { /* already selected */ },
+                enabled = enabled,
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6750A4)),
                 shape = RoundedCornerShape(8.dp)
@@ -46,10 +47,15 @@ object OptionSlots {
         } else {
             OutlinedButton(
                 onClick = onClick,
+                enabled = enabled,
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(8.dp)
             ) {
-                OptionContent(option = option, label = label, textColor = Color(0xFF49454F))
+                OptionContent(
+                    option = option,
+                    label = label,
+                    textColor = if (enabled) Color(0xFF49454F) else Color(0xFF9E9E9E)
+                )
             }
         }
     }
@@ -57,10 +63,11 @@ object OptionSlots {
     /**
      * Compact FilterChip slot.
      */
-    val Chip: OptionSlot<String> = { option, isSelected, onClick ->
+    val Chip: OptionSlot<String> = { option, isSelected, enabled, onClick ->
         val label = stringResource(option.labelRes)
         FilterChip(
             selected = isSelected,
+            enabled = enabled,
             onClick = onClick,
             label = { Text(text = label, fontSize = 13.sp) },
             leadingIcon = option.iconRes?.let { iconRes ->
@@ -79,10 +86,11 @@ object OptionSlots {
     /**
      * Icon-only slot.
      */
-    val IconOnly: OptionSlot<String> = { option, isSelected, onClick ->
+    val IconOnly: OptionSlot<String> = { option, isSelected, enabled, onClick ->
         if (isSelected) {
             Button(
                 onClick = { /* already selected */ },
+                enabled = enabled,
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6750A4)),
                 shape = RoundedCornerShape(8.dp)
@@ -98,6 +106,7 @@ object OptionSlots {
         } else {
             OutlinedButton(
                 onClick = onClick,
+                enabled = enabled,
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(8.dp)
             ) {
@@ -106,7 +115,7 @@ object OptionSlots {
                         painter = painterResource(option.iconRes),
                         contentDescription = stringResource(option.labelRes),
                         modifier = Modifier.size(20.dp),
-                        tint = Color(0xFF49454F)
+                        tint = if (enabled) Color(0xFF49454F) else Color(0xFF9E9E9E)
                     )
                 }
             }

@@ -224,30 +224,33 @@ class InMemoryChoiceItemViewModel<T>(
     val supportedOptionIds: List<T>,
     initialSelectedId: T = supportedOptionIds.first(),
     private val disabledOptionIdsFlow: StateFlow<Set<T>> = MutableStateFlow(emptySet()),
-    override val isVisibleFlow: StateFlow<Boolean> = MutableStateFlow(true),
-    scope: CoroutineScope = AppScope.scope
+    private val hiddenOptionIdsFlow: StateFlow<Set<T>> = MutableStateFlow(emptySet()),
+    scope: CoroutineScope = AppScope.scope,
+    override val isVisibleFlow: StateFlow<Boolean> = MutableStateFlow(true)
 ) : MutableChoiceItemViewModel<T> {
     private val _selectedIdFlow = MutableStateFlow(initialSelectedId)
     override val valueFlow: StateFlow<T> = _selectedIdFlow
 
-    private fun computeStates(selectedId: T, disabledSet: Set<T>): List<ValueWithState<T>> =
+    private fun computeStates(selectedId: T, disabledSet: Set<T>, hiddenSet: Set<T>): List<ValueWithState<T>> =
         supportedOptionIds.map { id ->
             ValueWithState(
                 id = id,
                 isSelected = (id == selectedId),
-                isEnabled = !disabledSet.contains(id)
+                isEnabled = !disabledSet.contains(id),
+                isVisible = !hiddenSet.contains(id)
             )
         }
 
     override val optionStates: StateFlow<List<ValueWithState<T>>> = combine(
         _selectedIdFlow,
-        disabledOptionIdsFlow
-    ) { selectedId, disabledSet ->
-        computeStates(selectedId, disabledSet)
+        disabledOptionIdsFlow,
+        hiddenOptionIdsFlow
+    ) { selectedId, disabledSet, hiddenSet ->
+        computeStates(selectedId, disabledSet, hiddenSet)
     }.stateIn(
         scope,
         SharingStarted.Eagerly,
-        computeStates(_selectedIdFlow.value, disabledOptionIdsFlow.value)
+        computeStates(_selectedIdFlow.value, disabledOptionIdsFlow.value, hiddenOptionIdsFlow.value)
     )
 
     override fun setValue(newValue: T) {
@@ -267,31 +270,34 @@ class ChoiceHardwareItemViewModel<DomainT, RawV>(
     val supportedOptionIds: List<DomainT>,
     private val storage: HardwarePropertyStorage,
     private val disabledOptionIdsFlow: StateFlow<Set<DomainT>> = MutableStateFlow(emptySet()),
-    override val isVisibleFlow: StateFlow<Boolean> = MutableStateFlow(true),
-    private val scope: CoroutineScope = AppScope.scope
+    private val hiddenOptionIdsFlow: StateFlow<Set<DomainT>> = MutableStateFlow(emptySet()),
+    private val scope: CoroutineScope = AppScope.scope,
+    override val isVisibleFlow: StateFlow<Boolean> = MutableStateFlow(true)
 ) : MutableChoiceItemViewModel<DomainT> {
 
     private val rawFlow: StateFlow<DomainT> = storage.observe(property)
     override val valueFlow: StateFlow<DomainT> = rawFlow
 
-    private fun computeStates(selectedId: DomainT?, disabledSet: Set<DomainT>): List<ValueWithState<DomainT>> =
+    private fun computeStates(selectedId: DomainT?, disabledSet: Set<DomainT>, hiddenSet: Set<DomainT>): List<ValueWithState<DomainT>> =
         supportedOptionIds.map { id ->
             ValueWithState(
                 id = id,
                 isSelected = (id == selectedId),
-                isEnabled = !disabledSet.contains(id)
+                isEnabled = !disabledSet.contains(id),
+                isVisible = !hiddenSet.contains(id)
             )
         }
 
     override val optionStates: StateFlow<List<ValueWithState<DomainT>>> = combine(
         rawFlow,
-        disabledOptionIdsFlow
-    ) { selectedId, disabledSet ->
-        computeStates(selectedId, disabledSet)
+        disabledOptionIdsFlow,
+        hiddenOptionIdsFlow
+    ) { selectedId, disabledSet, hiddenSet ->
+        computeStates(selectedId, disabledSet, hiddenSet)
     }.stateIn(
         scope,
         SharingStarted.Eagerly,
-        computeStates(rawFlow.value, disabledOptionIdsFlow.value)
+        computeStates(rawFlow.value, disabledOptionIdsFlow.value, hiddenOptionIdsFlow.value)
     )
 
     override fun setValue(newValue: DomainT) {

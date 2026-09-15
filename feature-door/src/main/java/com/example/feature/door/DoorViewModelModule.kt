@@ -73,36 +73,8 @@ object DoorHiltModule {
 }
 
 /**
- * Provides the complete set of [ItemViewModelBinding] for Door settings.
- * Bridges UI Catalog items with their corresponding Hardware/Storage ViewModels.
- */
-object DoorViewModelModule {
-    fun provideDoorBindings(
-        hardwareStorage: HardwarePropertyStorage,
-        autoLockVisibleFlow: StateFlow<Boolean> = MutableStateFlow(true),
-        scope: CoroutineScope = AppScope.scope,
-        doorSettingRepository: DoorSettingRepository = DoorSettingRepositoryImpl()
-    ): Set<ItemViewModelBinding<*>> = setOf(
-        DoorCatalog.autoDoorLock bindsTo HardwareItemViewModel(
-            property = DoorVehicleProperties.AUTO_LOCK,
-            storage = hardwareStorage,
-            scope = scope,
-            isVisibleFlow = autoLockVisibleFlow
-        ),
-        DoorCatalog.childLock bindsTo HardwareItemViewModel(
-            property = DoorVehicleProperties.CHILD_LOCK,
-            storage = hardwareStorage,
-            scope = scope
-        ),
-        DoorCatalog.unlockOnPark bindsTo LocalStorageItemViewModel(
-            repository = doorSettingRepository.unlockOnParkRepository,
-            scope = scope
-        )
-    )
-}
-
-/**
  * Binds ViewModels for Door settings running within an ApplicationScope.
+ * Used by [VehicleHardwareSimulator] for simulator runtime and tests.
  */
 object DoorViewModelBinder {
     fun bindAll(
@@ -115,7 +87,23 @@ object DoorViewModelBinder {
         scope: CoroutineScope = AppScope.scope,
         doorSettingRepository: DoorSettingRepository = DoorSettingRepositoryImpl()
     ) {
-        val bindings = DoorViewModelModule.provideDoorBindings(hardwareStorage, autoLockVisibleFlow, scope, doorSettingRepository)
+        val bindings = setOf(
+            DoorCatalog.autoDoorLock bindsTo HardwareItemViewModel(
+                property = DoorVehicleProperties.AUTO_LOCK,
+                storage = hardwareStorage,
+                scope = scope,
+                isVisibleFlow = autoLockVisibleFlow
+            ),
+            DoorCatalog.childLock bindsTo HardwareItemViewModel(
+                property = DoorVehicleProperties.CHILD_LOCK,
+                storage = hardwareStorage,
+                scope = scope
+            ),
+            DoorCatalog.unlockOnPark bindsTo LocalStorageItemViewModel(
+                repository = doorSettingRepository.unlockOnParkRepository,
+                scope = scope
+            )
+        )
         registry.registerAll(bindings)
     }
 }

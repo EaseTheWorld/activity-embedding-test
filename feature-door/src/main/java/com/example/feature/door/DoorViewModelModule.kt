@@ -16,7 +16,10 @@ import dagger.hilt.components.SingletonComponent
 import dagger.multibindings.IntoSet
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import javax.inject.Singleton
 
 // ============================================================================
@@ -52,16 +55,66 @@ object DoorHiltModule {
         )
 
     @Provides
-    @IntoSet
-    fun provideAutoDoorLockBinding(
+    @Singleton
+    fun provideAutoDoorLockViewModel(
         hardwareStorage: HardwarePropertyStorage,
-        signals: com.example.common.ui.settings.VehicleSignals = com.example.common.ui.settings.DefaultVehicleSignals()
-    ): ItemViewModelBinding<*> =
-        DoorCatalog.autoDoorLock bindsTo HardwareItemViewModel(
+        signals: com.example.common.ui.settings.VehicleSignals = com.example.common.ui.settings.DefaultVehicleSignals(),
+        scope: CoroutineScope = AppScope.scope
+    ): HardwareItemViewModel<Boolean, Int> =
+        HardwareItemViewModel(
             property = DoorVehicleProperties.AUTO_LOCK,
             storage = hardwareStorage,
-            isVisibleFlow = signals.autoLockVisibleFlow
+            isVisibleFlow = signals.autoLockVisibleFlow,
+            scope = scope
         )
+
+    @Provides
+    @IntoSet
+    fun provideAutoDoorLockBinding(
+        autoLockVm: HardwareItemViewModel<Boolean, Int>
+    ): ItemViewModelBinding<*> =
+        DoorCatalog.autoDoorLock bindsTo autoLockVm
+
+    /**
+     * Convenience factory for tests and direct callers.
+     */
+    fun provideAutoDoorLockBinding(
+        hardwareStorage: HardwarePropertyStorage,
+        signals: com.example.common.ui.settings.VehicleSignals = com.example.common.ui.settings.DefaultVehicleSignals(),
+        scope: CoroutineScope = AppScope.scope
+    ): ItemViewModelBinding<*> =
+        DoorCatalog.autoDoorLock bindsTo provideAutoDoorLockViewModel(hardwareStorage, signals, scope)
+
+    /**
+     * Item Visibility Dependency Example:
+     * [DoorCatalog.autoRelock] is only visible when [DoorCatalog.autoDoorLock] is ON (true)
+     * AND when [DoorCatalog.autoDoorLock] itself is visible.
+     */
+    @Provides
+    @IntoSet
+    fun provideAutoRelockBinding(
+        hardwareStorage: HardwarePropertyStorage,
+        autoLockVm: HardwareItemViewModel<Boolean, Int>,
+        scope: CoroutineScope = AppScope.scope
+    ): ItemViewModelBinding<*> {
+        val visibleFlow = combine(
+            autoLockVm.valueFlow,
+            autoLockVm.isVisibleFlow
+        ) { isAutoLockOn, isAutoLockVisible ->
+            isAutoLockOn && isAutoLockVisible
+        }.stateIn(
+            scope,
+            SharingStarted.Eagerly,
+            autoLockVm.valueFlow.value && autoLockVm.isVisibleFlow.value
+        )
+
+        return DoorCatalog.autoRelock bindsTo HardwareItemViewModel(
+            property = DoorVehicleProperties.AUTO_RELOCK,
+            storage = hardwareStorage,
+            isVisibleFlow = visibleFlow,
+            scope = scope
+        )
+    }
 
     @Provides
     @IntoSet
@@ -84,18 +137,40 @@ object DoorViewModelBinder {
         hardwareStorage: HardwarePropertyStorage = InMemoryHardwareStorage().apply {
             setInitialValue(DoorVehicleProperties.AUTO_LOCK, true)
             setInitialValue(DoorVehicleProperties.CHILD_LOCK, false)
+            setInitialValue(DoorVehicleProperties.AUTO_RELOCK, true)
         },
         autoLockVisibleFlow: StateFlow<Boolean> = MutableStateFlow(true),
         scope: CoroutineScope = AppScope.scope,
         doorSettingRepository: DoorSettingRepository = DoorSettingRepositoryImpl()
     ) {
+        val autoLockVm = HardwareItemViewModel(
+            property = DoorVehicleProperties.AUTO_LOCK,
+            storage = hardwareStorage,
+            scope = scope,
+            isVisibleFlow = autoLockVisibleFlow
+        )
+
+        val autoRelockVisibleFlow = combine(
+            autoLockVm.valueFlow,
+            autoLockVm.isVisibleFlow
+        ) { isAutoLockOn, isAutoLockVisible ->
+            isAutoLockOn && isAutoLockVisible
+        }.stateIn(
+            scope,
+            SharingStarted.Eagerly,
+            autoLockVm.valueFlow.value && autoLockVm.isVisibleFlow.value
+        )
+
+        val autoRelockVm = HardwareItemViewModel(
+            property = DoorVehicleProperties.AUTO_RELOCK,
+            storage = hardwareStorage,
+            scope = scope,
+            isVisibleFlow = autoRelockVisibleFlow
+        )
+
         val bindings = setOf(
-            DoorCatalog.autoDoorLock bindsTo HardwareItemViewModel(
-                property = DoorVehicleProperties.AUTO_LOCK,
-                storage = hardwareStorage,
-                scope = scope,
-                isVisibleFlow = autoLockVisibleFlow
-            ),
+            DoorCatalog.autoDoorLock bindsTo autoLockVm,
+            DoorCatalog.autoRelock bindsTo autoRelockVm,
             DoorCatalog.childLock bindsTo HardwareItemViewModel(
                 property = DoorVehicleProperties.CHILD_LOCK,
                 storage = hardwareStorage,

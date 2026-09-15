@@ -21,4 +21,5 @@ object DoorVehicleProperties {
 
     val AUTO_LOCK = booleanProp(0x11400bc0)
     val CHILD_LOCK = booleanProp(0x11400bc1)
+    val AUTO_RELOCK = booleanProp(0x11400bc2)
 }

@@ -11,6 +11,7 @@ import com.example.feature.seat.SeatSettingRepositoryImpl
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -23,6 +24,7 @@ class HiltItemViewModelBindingTest {
         val hardwareStorage = InMemoryHardwareStorage().apply {
             setInitialValue(com.example.feature.door.DoorVehicleProperties.AUTO_LOCK, true)
             setInitialValue(com.example.feature.door.DoorVehicleProperties.CHILD_LOCK, false)
+            setInitialValue(com.example.feature.door.DoorVehicleProperties.AUTO_RELOCK, true)
             setInitialValue(com.example.feature.seat.SeatVehicleProperties.MASSAGE_MODE, "OFF")
             setInitialValue(com.example.feature.seat.SeatVehicleProperties.DRIVER_VENT, "OFF")
             setInitialValue(com.example.feature.seat.SeatVehicleProperties.DRIVER_HEAT, "OFF")
@@ -36,10 +38,16 @@ class HiltItemViewModelBindingTest {
             kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Unconfined
         )
 
+        val autoLockVm = DoorHiltModule.provideAutoDoorLockViewModel(
+            hardwareStorage = hardwareStorage,
+            scope = unconfinedScope
+        )
+
         // 1. Collect multibindings from DoorHiltModule
         val doorBindings: Set<ItemViewModelBinding<*>> = setOf(
             DoorHiltModule.provideUnlockOnParkBinding(doorRepo, unconfinedScope),
-            DoorHiltModule.provideAutoDoorLockBinding(hardwareStorage),
+            DoorHiltModule.provideAutoDoorLockBinding(autoLockVm),
+            DoorHiltModule.provideAutoRelockBinding(hardwareStorage, autoLockVm, unconfinedScope),
             DoorHiltModule.provideChildLockBinding(hardwareStorage)
         )
 
@@ -56,9 +64,14 @@ class HiltItemViewModelBindingTest {
         assertNotNull("unlock_on_park must be registered from Door module", unlockOnParkVm)
         assertEquals(true, unlockOnParkVm!!.valueFlow.value)
 
-        val autoLockVm = registry.getViewModel<Boolean>("auto_lock")
-        assertNotNull("auto_lock must be registered from Door module", autoLockVm)
-        assertEquals(true, autoLockVm!!.valueFlow.value)
+        val autoLockResolved = registry.getViewModel<Boolean>("auto_lock")
+        assertNotNull("auto_lock must be registered from Door module", autoLockResolved)
+        assertEquals(true, autoLockResolved!!.valueFlow.value)
+
+        val autoRelockVm = registry.getViewModel<Boolean>("auto_relock")
+        assertNotNull("auto_relock must be registered from Door module", autoRelockVm)
+        assertEquals(true, autoRelockVm!!.valueFlow.value)
+        assertEquals(true, autoRelockVm.isVisibleFlow.value)
 
         // 5. Verify Seat items are resolved
         val easyEntryVm = registry.getViewModel<Boolean>(com.example.feature.seat.SeatCatalog.easyEntryExit.id)
@@ -87,6 +100,45 @@ class HiltItemViewModelBindingTest {
         testScheduler.advanceUntilIdle()
         assertEquals(true, doorRepo.unlockOnParkRepository.valueFlow.value)
         assertEquals(true, unlockOnParkVm.valueFlow.value)
+    }
+
+    @Test
+    fun testItemVisibilityDependencyAutoRelockDependsOnAutoLock() = runTest {
+        val hardwareStorage = InMemoryHardwareStorage().apply {
+            setInitialValue(com.example.feature.door.DoorVehicleProperties.AUTO_LOCK, true)
+            setInitialValue(com.example.feature.door.DoorVehicleProperties.AUTO_RELOCK, true)
+        }
+        val unconfinedScope = kotlinx.coroutines.CoroutineScope(
+            kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Unconfined
+        )
+
+        val autoLockVm = DoorHiltModule.provideAutoDoorLockViewModel(
+            hardwareStorage = hardwareStorage,
+            signals = com.example.common.ui.settings.DefaultVehicleSignals(),
+            scope = unconfinedScope
+        )
+        val doorBindings = setOf(
+            DoorHiltModule.provideAutoDoorLockBinding(autoLockVm),
+            DoorHiltModule.provideAutoRelockBinding(hardwareStorage, autoLockVm, unconfinedScope)
+        )
+        val registry = CommonSettingsModule.provideItemViewModelRegistry(doorBindings)
+
+        val autoLock = registry.getMutableViewModel<Boolean>("auto_lock")!!
+        val autoRelock = registry.getViewModel<Boolean>("auto_relock")!!
+
+        // 1. Initial State: auto_lock is ON -> auto_relock is visible
+        assertTrue("auto_lock should be ON initially", autoLock.valueFlow.value)
+        assertTrue("auto_relock should be visible when auto_lock is ON", autoRelock.isVisibleFlow.value)
+
+        // 2. User toggles auto_lock OFF -> auto_relock is immediately hidden
+        autoLock.setValue(false)
+        assertFalse("auto_lock should be OFF", autoLock.valueFlow.value)
+        assertFalse("auto_relock must be hidden when auto_lock is OFF", autoRelock.isVisibleFlow.value)
+
+        // 3. User toggles auto_lock back to ON -> auto_relock is restored
+        autoLock.setValue(true)
+        assertTrue("auto_lock should be ON again", autoLock.valueFlow.value)
+        assertTrue("auto_relock must be visible again when auto_lock is ON", autoRelock.isVisibleFlow.value)
     }
 
     @Test

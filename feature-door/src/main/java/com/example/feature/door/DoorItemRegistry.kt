@@ -17,11 +17,13 @@ object DoorItemRegistry : CategoryItemProvider {
     override val titleKey: String = "category_door_title"
 
     val autoDoorLock get() = DoorCatalog.autoDoorLock
+    val autoRelock get() = DoorCatalog.autoRelock
     val childLock get() = DoorCatalog.childLock
     val unlockOnPark get() = DoorCatalog.unlockOnPark
 
     override val items: List<Item> get() = listOf(
         autoDoorLock,
+        autoRelock,
         childLock,
         unlockOnPark
     )

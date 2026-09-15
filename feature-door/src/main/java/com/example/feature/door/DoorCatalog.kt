@@ -53,4 +53,10 @@ object DoorCatalog : SettingCatalog("door") {
         descriptionResId = R.string.door_item_unlockpark_subtitle,
         badgeKey = "SAFE"
     )
+
+    val autoRelock = createToggle(
+        id = "auto_relock",
+        nameResId = R.string.door_item_autorelock_title,
+        descriptionResId = R.string.door_item_autorelock_subtitle
+    )
 }

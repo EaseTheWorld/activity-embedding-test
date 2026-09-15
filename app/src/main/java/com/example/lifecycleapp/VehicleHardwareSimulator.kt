@@ -70,6 +70,7 @@ object VehicleHardwareSimulator : com.example.common.ui.settings.VehicleSignals 
         // Default initial values in simulated hardware HAL
         hardwareStorage.setInitialValue(DoorVehicleProperties.AUTO_LOCK, true)
         hardwareStorage.setInitialValue(DoorVehicleProperties.CHILD_LOCK, false)
+        hardwareStorage.setInitialValue(DoorVehicleProperties.AUTO_RELOCK, true)
         hardwareStorage.setInitialValue(SeatVehicleProperties.MASSAGE_MODE, "OFF")
         hardwareStorage.setInitialValue(SeatVehicleProperties.DRIVER_VENT, "OFF")
         hardwareStorage.setInitialValue(SeatVehicleProperties.DRIVER_HEAT, "OFF")

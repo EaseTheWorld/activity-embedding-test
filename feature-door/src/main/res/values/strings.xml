@@ -11,4 +11,7 @@
     
     <string name="door_item_unlockpark_title">Unlock on Shift to Park</string>
     <string name="door_item_unlockpark_subtitle">Automatically unlock doors when transmission shifts into Park (P)</string>
+
+    <string name="door_item_autorelock_title">30-Second Auto Re-lock</string>
+    <string name="door_item_autorelock_subtitle">Automatically re-locks doors if no door is opened within 30 seconds</string>
 </resources>

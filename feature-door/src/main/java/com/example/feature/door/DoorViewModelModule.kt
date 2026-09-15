@@ -54,11 +54,13 @@ object DoorHiltModule {
     @Provides
     @IntoSet
     fun provideAutoDoorLockBinding(
-        hardwareStorage: HardwarePropertyStorage
+        hardwareStorage: HardwarePropertyStorage,
+        signals: com.example.common.ui.settings.VehicleSignals = com.example.common.ui.settings.DefaultVehicleSignals()
     ): ItemViewModelBinding<*> =
         DoorCatalog.autoDoorLock bindsTo HardwareItemViewModel(
             property = DoorVehicleProperties.AUTO_LOCK,
-            storage = hardwareStorage
+            storage = hardwareStorage,
+            isVisibleFlow = signals.autoLockVisibleFlow
         )
 
     @Provides

@@ -47,12 +47,16 @@ object SeatHiltModule {
     fun provideSeatBindings(
         hardwareStorage: HardwarePropertyStorage,
         repository: SeatSettingRepository,
+        signals: com.example.common.ui.settings.VehicleSignals = com.example.common.ui.settings.DefaultVehicleSignals(),
         scope: CoroutineScope = AppScope.scope
     ): Set<ItemViewModelBinding<*>> = setOf(
         SeatCatalog.massageMode bindsTo ChoiceHardwareItemViewModel(
             property = SeatVehicleProperties.MASSAGE_MODE,
             supportedOptionIds = SeatCatalog.massageMode.optionIds,
-            storage = hardwareStorage
+            storage = hardwareStorage,
+            disabledOptionIdsFlow = signals.disabledMassageOptionsFlow,
+            hiddenOptionIdsFlow = signals.hiddenMassageOptionsFlow,
+            scope = scope
         ),
         SeatCatalog.driverSeatVent bindsTo ChoiceHardwareItemViewModel(
             property = SeatVehicleProperties.DRIVER_VENT,
@@ -67,7 +71,8 @@ object SeatHiltModule {
         SeatCatalog.passengerSeatHeat bindsTo ChoiceHardwareItemViewModel(
             property = SeatVehicleProperties.PASSENGER_HEAT,
             supportedOptionIds = SeatCatalog.passengerSeatHeat.optionIds,
-            storage = hardwareStorage
+            storage = hardwareStorage,
+            isVisibleFlow = signals.passengerOccupiedFlow
         ),
         SeatCatalog.easyEntryExit bindsTo LocalStorageItemViewModel(
             repository = repository.easyEntryExitRepository,

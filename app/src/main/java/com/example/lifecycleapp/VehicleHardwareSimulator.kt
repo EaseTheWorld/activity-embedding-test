@@ -22,20 +22,30 @@ import kotlinx.coroutines.flow.StateFlow
  *
  * Maintains shared vehicle HAL state, option lockout state flows, and item visibility flows.
  */
-object VehicleHardwareSimulator {
+object VehicleHardwareSimulator : com.example.common.ui.settings.VehicleSignals {
     private const val TAG = "HardwareSimulator"
 
     val hardwareStorage = InMemoryHardwareStorage()
-    val viewModelRegistry = ItemViewModelRegistry()
+    var viewModelRegistry: ItemViewModelRegistry = ItemViewModelRegistry()
+        internal set
 
     // High-Level Automotive Sensor Flows
-    val passengerOccupiedFlow = MutableStateFlow(true)
-    val autoLockVisibleFlow = MutableStateFlow(true)
-    val disabledMassageOptionsFlow = MutableStateFlow<Set<String>>(emptySet())
-    val hiddenMassageOptionsFlow = MutableStateFlow<Set<String>>(emptySet())
+    override val passengerOccupiedFlow = MutableStateFlow(true)
+    override val autoLockVisibleFlow = MutableStateFlow(true)
+    override val disabledMassageOptionsFlow = MutableStateFlow<Set<String>>(emptySet())
+    override val hiddenMassageOptionsFlow = MutableStateFlow<Set<String>>(emptySet())
 
     var scope: CoroutineScope = AppScope.scope
     private var initialized = false
+
+    /**
+     * Attaches the Hilt-managed singleton [ItemViewModelRegistry] to the simulator,
+     * ensuring broadcast simulations update the exact ViewModels rendered on screen.
+     */
+    fun attachRegistry(registry: ItemViewModelRegistry) {
+        this.viewModelRegistry = registry
+        Log.i(TAG, "VehicleHardwareSimulator attached to unified Hilt ItemViewModelRegistry!")
+    }
 
     @Synchronized
     fun resetForTesting(testScope: CoroutineScope) {
@@ -45,6 +55,7 @@ object VehicleHardwareSimulator {
         autoLockVisibleFlow.value = true
         disabledMassageOptionsFlow.value = emptySet()
         hiddenMassageOptionsFlow.value = emptySet()
+        viewModelRegistry = ItemViewModelRegistry()
         init(testScope)
     }
 

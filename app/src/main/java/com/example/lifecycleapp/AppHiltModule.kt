@@ -20,4 +20,10 @@ object AppHiltModule {
         VehicleHardwareSimulator.init()
         return VehicleHardwareSimulator.hardwareStorage
     }
+
+    @Provides
+    @Singleton
+    fun provideVehicleSignals(): com.example.common.ui.settings.VehicleSignals {
+        return VehicleHardwareSimulator
+    }
 }

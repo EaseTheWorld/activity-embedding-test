@@ -32,16 +32,20 @@ class HiltItemViewModelBindingTest {
         val doorRepo = DoorSettingRepositoryImpl()
         val seatRepo = SeatSettingRepositoryImpl()
 
+        val unconfinedScope = kotlinx.coroutines.CoroutineScope(
+            kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Unconfined
+        )
+
         // 1. Collect multibindings from DoorHiltModule
         val doorBindings: Set<ItemViewModelBinding<*>> = setOf(
-            DoorHiltModule.provideUnlockOnParkBinding(doorRepo, this),
+            DoorHiltModule.provideUnlockOnParkBinding(doorRepo, unconfinedScope),
             DoorHiltModule.provideAutoDoorLockBinding(hardwareStorage),
             DoorHiltModule.provideChildLockBinding(hardwareStorage)
         )
 
         // 2. Collect multibindings from SeatHiltModule
         val seatBindings: Set<ItemViewModelBinding<*>> =
-            SeatHiltModule.provideSeatBindings(hardwareStorage, seatRepo, this)
+            SeatHiltModule.provideSeatBindings(hardwareStorage, seatRepo, scope = unconfinedScope)
 
         // 3. Assemble all multibindings into CommonSettingsModule
         val allBindings: Set<ItemViewModelBinding<*>> = doorBindings + seatBindings
@@ -83,5 +87,63 @@ class HiltItemViewModelBindingTest {
         testScheduler.advanceUntilIdle()
         assertEquals(true, doorRepo.unlockOnParkRepository.valueFlow.value)
         assertEquals(true, unlockOnParkVm.valueFlow.value)
+    }
+
+    @Test
+    fun testHiltBindingsReactToVehicleSignalsSimulation() = runTest {
+        val hardwareStorage = InMemoryHardwareStorage().apply {
+            setInitialValue(com.example.feature.door.DoorVehicleProperties.AUTO_LOCK, true)
+            setInitialValue(com.example.feature.seat.SeatVehicleProperties.MASSAGE_MODE, "OFF")
+            setInitialValue(com.example.feature.seat.SeatVehicleProperties.PASSENGER_HEAT, "OFF")
+        }
+        val doorRepo = DoorSettingRepositoryImpl()
+        val seatRepo = SeatSettingRepositoryImpl()
+
+        val unconfinedScope = kotlinx.coroutines.CoroutineScope(
+            kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Unconfined
+        )
+        // Reset simulator signals to baseline
+        VehicleHardwareSimulator.resetForTesting(unconfinedScope)
+
+        val doorBindings = setOf(
+            DoorHiltModule.provideAutoDoorLockBinding(hardwareStorage, VehicleHardwareSimulator),
+            DoorHiltModule.provideUnlockOnParkBinding(doorRepo, unconfinedScope)
+        )
+        val seatBindings = SeatHiltModule.provideSeatBindings(
+            hardwareStorage = hardwareStorage,
+            repository = seatRepo,
+            signals = VehicleHardwareSimulator,
+            scope = unconfinedScope
+        )
+
+        // Assemble unified registry and attach to VehicleHardwareSimulator
+        val registry = CommonSettingsModule.provideItemViewModelRegistry(doorBindings + seatBindings)
+        VehicleHardwareSimulator.attachRegistry(registry)
+
+        val autoLockVm = registry.getViewModel<Boolean>("auto_lock")!!
+        val passengerHeatVm = registry.getChoiceViewModel<String>(com.example.feature.seat.SeatCatalog.passengerSeatHeat)!!
+        val massageVm = registry.getMutableChoiceViewModel<String>(com.example.feature.seat.SeatCatalog.massageMode)!!
+
+        // 1. Initial State
+        assertTrue(autoLockVm.isVisibleFlow.value)
+        assertTrue(passengerHeatVm.isVisibleFlow.value)
+
+        // 2. Simulate adb: auto_lock visible = false
+        VehicleHardwareSimulator.applySimulation(itemId = "auto_lock", visible = false)
+        assertEquals(false, autoLockVm.isVisibleFlow.value)
+
+        // 3. Simulate adb: passenger_present = false
+        VehicleHardwareSimulator.applySimulation(passengerPresent = false)
+        assertEquals(false, passengerHeatVm.isVisibleFlow.value)
+
+        // 4. Simulate adb: speed = 60 km/h (speed lockout)
+        VehicleHardwareSimulator.applySimulation(speed = 60)
+        val states = massageVm.optionStates.value
+        val stretchOption = states.find { it.id == "STRETCH" }
+        assertEquals(false, stretchOption?.isEnabled)
+
+        // 5. Simulate adb: direct value mutation
+        VehicleHardwareSimulator.applySimulation(itemId = "seat_massage", value = "WAVE")
+        assertEquals("WAVE", massageVm.valueFlow.value)
     }
 }

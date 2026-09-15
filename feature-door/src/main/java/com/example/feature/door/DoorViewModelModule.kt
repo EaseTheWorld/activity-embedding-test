@@ -8,13 +8,69 @@ import com.example.common.ui.settings.LocalStorageItemViewModel
 import com.example.core.item.ItemViewModelBinding
 import com.example.core.item.ItemViewModelRegistry
 import com.example.core.item.bindsTo
+import dagger.Binds
+import dagger.Module
+import dagger.Provides
+import dagger.hilt.InstallIn
+import dagger.hilt.components.SingletonComponent
+import dagger.multibindings.IntoSet
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import javax.inject.Singleton
 
 // ============================================================================
-// Layer 3: Assembler / DI Module Layer (The Sole Coupling Point)
+// Layer 3: Assembler / Hilt DI Module Layer
 // ============================================================================
+
+@Module
+@InstallIn(SingletonComponent::class)
+abstract class DoorRepositoryModule {
+    @Binds
+    @Singleton
+    abstract fun bindDoorSettingRepository(
+        impl: DoorSettingRepositoryImpl
+    ): DoorSettingRepository
+}
+
+/**
+ * Hilt DI module providing Door [ItemViewModelBinding] multibindings to the global registry.
+ */
+@Module
+@InstallIn(SingletonComponent::class)
+object DoorHiltModule {
+
+    @Provides
+    @IntoSet
+    fun provideUnlockOnParkBinding(
+        repository: DoorSettingRepository,
+        scope: CoroutineScope = AppScope.scope
+    ): ItemViewModelBinding<*> =
+        DoorCatalog.unlockOnPark bindsTo LocalStorageItemViewModel(
+            repository = repository.unlockOnParkRepository,
+            scope = scope
+        )
+
+    @Provides
+    @IntoSet
+    fun provideAutoDoorLockBinding(
+        hardwareStorage: HardwarePropertyStorage
+    ): ItemViewModelBinding<*> =
+        DoorCatalog.autoDoorLock bindsTo HardwareItemViewModel(
+            property = DoorVehicleProperties.AUTO_LOCK,
+            storage = hardwareStorage
+        )
+
+    @Provides
+    @IntoSet
+    fun provideChildLockBinding(
+        hardwareStorage: HardwarePropertyStorage
+    ): ItemViewModelBinding<*> =
+        DoorCatalog.childLock bindsTo HardwareItemViewModel(
+            property = DoorVehicleProperties.CHILD_LOCK,
+            storage = hardwareStorage
+        )
+}
 
 /**
  * Provides the complete set of [ItemViewModelBinding] for Door settings.
@@ -24,7 +80,8 @@ object DoorViewModelModule {
     fun provideDoorBindings(
         hardwareStorage: HardwarePropertyStorage,
         autoLockVisibleFlow: StateFlow<Boolean> = MutableStateFlow(true),
-        scope: CoroutineScope = AppScope.scope
+        scope: CoroutineScope = AppScope.scope,
+        doorSettingRepository: DoorSettingRepository = DoorSettingRepositoryImpl()
     ): Set<ItemViewModelBinding<*>> = setOf(
         DoorCatalog.autoDoorLock bindsTo HardwareItemViewModel(
             property = DoorVehicleProperties.AUTO_LOCK,
@@ -38,7 +95,7 @@ object DoorViewModelModule {
             scope = scope
         ),
         DoorCatalog.unlockOnPark bindsTo LocalStorageItemViewModel(
-            initialValue = true,
+            repository = doorSettingRepository.unlockOnParkRepository,
             scope = scope
         )
     )
@@ -55,9 +112,10 @@ object DoorViewModelBinder {
             setInitialValue(DoorVehicleProperties.CHILD_LOCK, false)
         },
         autoLockVisibleFlow: StateFlow<Boolean> = MutableStateFlow(true),
-        scope: CoroutineScope = AppScope.scope
+        scope: CoroutineScope = AppScope.scope,
+        doorSettingRepository: DoorSettingRepository = DoorSettingRepositoryImpl()
     ) {
-        val bindings = DoorViewModelModule.provideDoorBindings(hardwareStorage, autoLockVisibleFlow, scope)
+        val bindings = DoorViewModelModule.provideDoorBindings(hardwareStorage, autoLockVisibleFlow, scope, doorSettingRepository)
         registry.registerAll(bindings)
     }
 }

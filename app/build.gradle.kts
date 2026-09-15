@@ -1,6 +1,8 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.hilt.android)
+    alias(libs.plugins.ksp)
 }
 
 android {
@@ -65,6 +67,10 @@ dependencies {
     implementation(project(":common-ui-settings"))
     implementation(project(":feature-door"))
     implementation(project(":feature-seat"))
+
+    // Dependency Injection: Hilt
+    implementation(libs.hilt.android)
+    ksp(libs.hilt.compiler)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

@@ -5,7 +5,9 @@ import android.util.Log
 import com.example.core.item.CategoryItemRegistry
 import com.example.feature.door.DoorItemRegistry
 import com.example.feature.seat.SeatItemRegistry
+import dagger.hilt.android.HiltAndroidApp
 
+@HiltAndroidApp
 class LifecycleApp : Application() {
 
     override fun onCreate() {

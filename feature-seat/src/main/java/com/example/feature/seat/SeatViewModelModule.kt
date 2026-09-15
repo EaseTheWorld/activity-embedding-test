@@ -13,9 +13,69 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
+import dagger.Binds
+import dagger.Module
+import dagger.Provides
+import dagger.hilt.InstallIn
+import dagger.hilt.components.SingletonComponent
+import dagger.multibindings.ElementsIntoSet
+import javax.inject.Singleton
+
 // ============================================================================
-// Layer 3: Assembler / DI Module Layer (The Sole Coupling Point)
+// Layer 3: Assembler / Hilt DI Module Layer
 // ============================================================================
+
+@Module
+@InstallIn(SingletonComponent::class)
+abstract class SeatRepositoryModule {
+    @Binds
+    @Singleton
+    abstract fun bindSeatSettingRepository(
+        impl: SeatSettingRepositoryImpl
+    ): SeatSettingRepository
+}
+
+/**
+ * Hilt DI module providing Seat [ItemViewModelBinding] multibindings to the global registry.
+ */
+@Module
+@InstallIn(SingletonComponent::class)
+object SeatHiltModule {
+
+    @Provides
+    @ElementsIntoSet
+    fun provideSeatBindings(
+        hardwareStorage: HardwarePropertyStorage,
+        repository: SeatSettingRepository,
+        scope: CoroutineScope = AppScope.scope
+    ): Set<ItemViewModelBinding<*>> = setOf(
+        SeatCatalog.massageMode bindsTo ChoiceHardwareItemViewModel(
+            property = SeatVehicleProperties.MASSAGE_MODE,
+            supportedOptionIds = SeatCatalog.massageMode.optionIds,
+            storage = hardwareStorage
+        ),
+        SeatCatalog.driverSeatVent bindsTo ChoiceHardwareItemViewModel(
+            property = SeatVehicleProperties.DRIVER_VENT,
+            supportedOptionIds = SeatCatalog.driverSeatVent.optionIds,
+            storage = hardwareStorage
+        ),
+        SeatCatalog.driverSeatHeat bindsTo ChoiceHardwareItemViewModel(
+            property = SeatVehicleProperties.DRIVER_HEAT,
+            supportedOptionIds = SeatCatalog.driverSeatHeat.optionIds,
+            storage = hardwareStorage
+        ),
+        SeatCatalog.passengerSeatHeat bindsTo ChoiceHardwareItemViewModel(
+            property = SeatVehicleProperties.PASSENGER_HEAT,
+            supportedOptionIds = SeatCatalog.passengerSeatHeat.optionIds,
+            storage = hardwareStorage
+        ),
+        SeatCatalog.easyEntryExit bindsTo LocalStorageItemViewModel(
+            repository = repository.easyEntryExitRepository,
+            scope = scope
+        ),
+        SeatCatalog.seatLumbar bindsTo SeatItemRegistry.seatLumbarViewModel
+    )
+}
 
 /**
  * Provides the complete set of [ItemViewModelBinding] for Seat settings.
@@ -28,7 +88,8 @@ object SeatViewModelModule {
         hiddenMassageOptionsFlow: StateFlow<Set<String>> = MutableStateFlow(emptySet()),
         passengerSeatHeatVisibleFlow: StateFlow<Boolean> = MutableStateFlow(true),
         lumbarViewModel: ItemViewModel<SeatLumbarSupport> = SeatItemRegistry.seatLumbarViewModel,
-        scope: CoroutineScope = AppScope.scope
+        scope: CoroutineScope = AppScope.scope,
+        seatSettingRepository: SeatSettingRepository = SeatSettingRepositoryImpl()
     ): Set<ItemViewModelBinding<*>> = setOf(
         SeatCatalog.massageMode bindsTo ChoiceHardwareItemViewModel(
             property = SeatVehicleProperties.MASSAGE_MODE,
@@ -58,7 +119,7 @@ object SeatViewModelModule {
             isVisibleFlow = passengerSeatHeatVisibleFlow
         ),
         SeatCatalog.easyEntryExit bindsTo LocalStorageItemViewModel(
-            initialValue = true,
+            repository = seatSettingRepository.easyEntryExitRepository,
             scope = scope
         ),
         SeatCatalog.seatLumbar bindsTo lumbarViewModel

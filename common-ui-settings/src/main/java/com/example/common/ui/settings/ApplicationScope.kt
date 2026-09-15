@@ -69,24 +69,37 @@ class InMemoryItemViewModel<T>(
 }
 
 /**
- * DataStore/Local Persistence simulation ViewModel running within an ApplicationScope.
- * Guarantees that local storage writes are completed even if UI compositions are disposed.
+ * DataStore/Local Persistence ViewModel running within an ApplicationScope.
+ * Clean Architecture compliant: Injects [SettingRepository] or UseCases,
+ * while providing convenience constructors for backward compatibility and testing.
  */
 class LocalStorageItemViewModel<T>(
-    initialValue: T,
+    private val repository: SettingRepository<T>,
     private val scope: CoroutineScope = AppScope.scope,
-    override val isVisibleFlow: StateFlow<Boolean> = MutableStateFlow(true),
-    private val onPersist: suspend (T) -> Unit = {}
+    override val isVisibleFlow: StateFlow<Boolean> = MutableStateFlow(true)
 ) : MutableItemViewModel<T> {
-    private val _valueFlow = MutableStateFlow(initialValue)
-    override val valueFlow: StateFlow<T> = _valueFlow.asStateFlow()
+
+    override val valueFlow: StateFlow<T> = repository.valueFlow
 
     override fun setValue(newValue: T) {
-        _valueFlow.value = newValue
         scope.launch {
-            onPersist(newValue)
+            repository.save(newValue)
         }
     }
+
+    /**
+     * Backward-compatible convenience constructor for testing and inline persistence simulation.
+     */
+    constructor(
+        initialValue: T,
+        scope: CoroutineScope = AppScope.scope,
+        isVisibleFlow: StateFlow<Boolean> = MutableStateFlow(true),
+        onPersist: suspend (T) -> Unit = {}
+    ) : this(
+        repository = InMemorySettingRepository(initialValue, onPersist),
+        scope = scope,
+        isVisibleFlow = isVisibleFlow
+    )
 }
 
 /**

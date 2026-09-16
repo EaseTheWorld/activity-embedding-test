@@ -28,6 +28,7 @@ object SettingsNavigation {
     const val ROUTE_DASHBOARD = "dashboard"
     const val ROUTE_CATEGORY = "navigate/{categoryId}"
     const val ROUTE_ITEM_DETAIL = "navigate/{categoryId}/{itemId}"
+    const val ROUTE_SEAT_LUMBAR = "navigate/seat/seat_lumbar"
 
     const val DEEP_LINK_SCHEME = "myapp"
     const val DEEP_LINK_HOST = "navigate"
@@ -144,7 +145,40 @@ fun SettingsNavHost(
         }
 
         // ====================================================================
-        // 3. Intra-Category Destination (Item Detail Screen)
+        // 3. Dedicated Detail Destination: Seat Lumbar Support (Fixed Route)
+        // ====================================================================
+        composable(
+            route = SettingsNavigation.ROUTE_SEAT_LUMBAR,
+            deepLinks = listOf(
+                navDeepLink {
+                    uriPattern = "${SettingsNavigation.DEEP_LINK_SCHEME}://${SettingsNavigation.DEEP_LINK_HOST}/seat/seat_lumbar"
+                }
+            )
+        ) {
+            val provider = CategoryItemRegistry.getProvider("seat")
+            val item = provider?.findItem("seat_lumbar")
+            val titleRes = provider?.titleKey?.let { key ->
+                context.resources.getIdentifier(key, "string", context.packageName)
+            } ?: 0
+            val categoryTitle = if (titleRes != 0) context.getString(titleRes) else "Seat"
+
+            ItemDetailScreen(
+                categoryId = "seat",
+                categoryTitle = categoryTitle,
+                item = item,
+                viewModelRegistry = viewModelRegistry,
+                onNavigateBack = {
+                    if (!navController.popBackStack()) {
+                        navController.navigate(SettingsNavigation.categoryRoute("seat")) {
+                            popUpTo(SettingsNavigation.categoryRoute("seat")) { inclusive = true }
+                        }
+                    }
+                }
+            )
+        }
+
+        // ====================================================================
+        // 4. Category Destination with Item Anchor (Wildcard Route)
         // ====================================================================
         composable(
             route = SettingsNavigation.ROUTE_ITEM_DETAIL,
@@ -161,50 +195,36 @@ fun SettingsNavHost(
             val categoryId = backStackEntry.arguments?.getString("categoryId") ?: ""
             val itemId = backStackEntry.arguments?.getString("itemId") ?: ""
 
+            if (categoryId.equals("light", ignoreCase = true)) {
+                onNavigateExternal(categoryId)
+                return@composable
+            }
+
             val provider = CategoryItemRegistry.getProvider(categoryId)
-            val item = provider?.findItem(itemId)
             val titleRes = provider?.titleKey?.let { key ->
                 context.resources.getIdentifier(key, "string", context.packageName)
             } ?: 0
             val categoryTitle = if (titleRes != 0) context.getString(titleRes) else (provider?.titleKey ?: categoryId)
 
-            if (item != null && item.hasDetailScreen) {
-                // Case 1: Item has dedicated detail screen (e.g. seat_lumbar)
-                ItemDetailScreen(
-                    categoryId = categoryId,
-                    categoryTitle = categoryTitle,
-                    item = item,
-                    viewModelRegistry = viewModelRegistry,
-                    onNavigateBack = {
-                        if (!navController.popBackStack()) {
-                            navController.navigate(SettingsNavigation.categoryRoute(categoryId)) {
-                                popUpTo(SettingsNavigation.categoryRoute(categoryId)) { inclusive = true }
-                            }
+            GenericSettingsScreen(
+                title = categoryTitle,
+                subtitle = "Settings for $categoryTitle",
+                items = provider?.items ?: emptyList(),
+                targetItemId = itemId,
+                viewModelRegistry = viewModelRegistry,
+                onNavigateBack = {
+                    if (!navController.popBackStack()) {
+                        navController.navigate(SettingsNavigation.ROUTE_DASHBOARD) {
+                            popUpTo(SettingsNavigation.ROUTE_DASHBOARD) { inclusive = true }
                         }
                     }
-                )
-            } else {
-                // Case 2: Standard inline item (e.g. item1, driver_seat_heat) -> Scroll to anchor on Category screen
-                GenericSettingsScreen(
-                    title = categoryTitle,
-                    subtitle = "Settings for $categoryTitle",
-                    items = provider?.items ?: emptyList(),
-                    targetItemId = itemId,
-                    viewModelRegistry = viewModelRegistry,
-                    onNavigateBack = {
-                        if (!navController.popBackStack()) {
-                            navController.navigate(SettingsNavigation.ROUTE_DASHBOARD) {
-                                popUpTo(SettingsNavigation.ROUTE_DASHBOARD) { inclusive = true }
-                            }
-                        }
-                    },
-                    onItemClick = { clickedItem ->
-                        if (clickedItem.hasDetailScreen) {
-                            navController.navigate(SettingsNavigation.itemDetailRoute(categoryId, clickedItem.id))
-                        }
+                },
+                onItemClick = { clickedItem ->
+                    if (clickedItem.hasDetailScreen) {
+                        navController.navigate(SettingsNavigation.itemDetailRoute(categoryId, clickedItem.id))
                     }
-                )
-            }
+                }
+            )
         }
     }
 }

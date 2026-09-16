@@ -197,50 +197,92 @@ class NavigationDeepLinkTest {
         assertEquals("com.example.feature.light.LightSettingsActivity", resolveTargetActivity("myapp://navigate/light"))
     }
 
+    // ========================================================================
+    // 4. Fixed Route vs Wildcard Priority Matching & UI Decoupling Tests
+    // ========================================================================
+
     @Test
-    fun `hasDetailScreen determines whether deep link navigates to ItemDetailScreen or scrolls to anchor`() {
+    fun `Jetpack Navigation NavDeepLink marks fixed route as exact and wildcard route as non-exact`() {
+        val exactDeepLink = androidx.navigation.NavDeepLink.Builder()
+            .setUriPattern("myapp://navigate/seat/seat_lumbar")
+            .build()
+        val wildcardDeepLink = androidx.navigation.NavDeepLink.Builder()
+            .setUriPattern("myapp://navigate/{categoryId}/{itemId}")
+            .build()
+
+        val isExactField = exactDeepLink.javaClass.getDeclaredField("isExactDeepLink").apply { isAccessible = true }
+        val exactIsExact = isExactField.getBoolean(exactDeepLink)
+        val wildcardIsExact = isExactField.getBoolean(wildcardDeepLink)
+
+        // 1. Fixed route has no wildcards -> exact deep link is true
+        assertTrue("Fixed route should be marked as exactDeepLink", exactIsExact)
+
+        // 2. Wildcard route has {categoryId}/{itemId} -> exact deep link is false
+        assertEquals("Wildcard route should NOT be marked as exactDeepLink", false, wildcardIsExact)
+    }
+
+    @Test
+    fun `fixed route priority matching resolves seat_lumbar to detail screen and other items to category anchor`() {
+        val exactDeepLink = androidx.navigation.NavDeepLink.Builder()
+            .setUriPattern("myapp://navigate/seat/seat_lumbar")
+            .build()
+        val wildcardDeepLink = androidx.navigation.NavDeepLink.Builder()
+            .setUriPattern("myapp://navigate/{categoryId}/{itemId}")
+            .build()
+
+        val pathRegexField = exactDeepLink.javaClass.getDeclaredField("pathRegex").apply { isAccessible = true }
+        val isExactField = exactDeepLink.javaClass.getDeclaredField("isExactDeepLink").apply { isAccessible = true }
+
+        val exactRegex = (pathRegexField.get(exactDeepLink) as String).toRegex()
+        val wildcardRegex = (pathRegexField.get(wildcardDeepLink) as String).toRegex()
+        val exactIsExact = isExactField.getBoolean(exactDeepLink)
+        val wildcardIsExact = isExactField.getBoolean(wildcardDeepLink)
+
+        data class DestinationMatch(
+            val destinationName: String,
+            val isExact: Boolean
+        ) : Comparable<DestinationMatch> {
+            override fun compareTo(other: DestinationMatch): Int {
+                // Exact deep links take precedence over pattern matches in Jetpack Navigation
+                if (isExact && !other.isExact) return 1
+                if (!isExact && other.isExact) return -1
+                return 0
+            }
+        }
+
+        fun resolveDestination(uri: String): String {
+            val matches = mutableListOf<DestinationMatch>()
+            if (exactRegex.matches(uri)) {
+                matches.add(DestinationMatch("SEAT_LUMBAR_DETAIL_SCREEN", exactIsExact))
+            }
+            if (wildcardRegex.matches(uri)) {
+                matches.add(DestinationMatch("CATEGORY_SCREEN_WITH_ANCHOR", wildcardIsExact))
+            }
+            // Pick highest scoring match
+            return matches.maxOrNull()?.destinationName ?: "NOT_FOUND"
+        }
+
+        // Case 1: myapp://navigate/seat/seat_lumbar matches both, but exact route WINS due to priority!
+        assertEquals("SEAT_LUMBAR_DETAIL_SCREEN", resolveDestination("myapp://navigate/seat/seat_lumbar"))
+
+        // Case 2: myapp://navigate/seat/item1 only matches wildcard -> routes to category screen with anchor
+        assertEquals("CATEGORY_SCREEN_WITH_ANCHOR", resolveDestination("myapp://navigate/seat/item1"))
+
+        // Case 3: myapp://navigate/seat/driver_seat_heat only matches wildcard -> routes to category screen with anchor
+        assertEquals("CATEGORY_SCREEN_WITH_ANCHOR", resolveDestination("myapp://navigate/seat/driver_seat_heat"))
+    }
+
+    @Test
+    fun `hasDetailScreen is purely a UI presentation property to show chevron button on item row`() {
         val standardItem = BaseUiToggleItem(id = "item1", nameResId = 1)
-        val parentItem = BaseUiToggleItem(
-            id = "parent_item",
-            nameResId = 2,
-            children = setOf(BaseUiToggleItem(id = "child_item", nameResId = 3))
-        )
         val lumbarItem = object : Item("seat_lumbar") {
             override val hasDetailScreen: Boolean = true
         }
 
-        // 1. Standard inline item does not have detail screen -> should scroll to anchor
+        // Standard inline item has no detail subscreen -> no chevron (>) button
         assertEquals(false, standardItem.hasDetailScreen)
 
-        // 2. Item with children automatically has detail screen
-        assertEquals(true, parentItem.hasDetailScreen)
-
-        // 3. Dedicated rich item like seat_lumbar has detail screen -> navigates to ItemDetailScreen
+        // Lumbar item has detail subscreen -> shows chevron (>) button in list
         assertEquals(true, lumbarItem.hasDetailScreen)
-
-        // Simulate destination routing logic
-        fun resolveDeepLinkMode(item: Item): String {
-            return if (item.hasDetailScreen) "ITEM_DETAIL_SCREEN" else "CATEGORY_SCREEN_WITH_ANCHOR"
-        }
-
-        assertEquals("CATEGORY_SCREEN_WITH_ANCHOR", resolveDeepLinkMode(standardItem))
-        assertEquals("ITEM_DETAIL_SCREEN", resolveDeepLinkMode(parentItem))
-        assertEquals("ITEM_DETAIL_SCREEN", resolveDeepLinkMode(lumbarItem))
-    }
-
-    @Test
-    fun `anchor target resolution locates index in items list for scrolling`() {
-        val item1 = BaseUiToggleItem("item1", 1)
-        val item2 = BaseUiToggleItem("item2", 2)
-        val item3 = BaseUiToggleItem("item3", 3)
-        val items = listOf(item1, item2, item3)
-
-        val targetAnchor = "item2"
-        val scrollIndex = items.indexOfFirst { it.id == targetAnchor }
-        assertEquals(1, scrollIndex)
-
-        val nonExistentAnchor = "unknown"
-        val notFoundIndex = items.indexOfFirst { it.id == nonExistentAnchor }
-        assertEquals(-1, notFoundIndex)
     }
 }

@@ -228,6 +228,7 @@ class PrimaryActivity : BaseLoggingActivity() {
         }
 
         if (intent != null) {
+            intent.action = ACTION_SETTINGS_EMBED
             intent.putExtra(GenericSettingsActivity.EXTRA_CATEGORY_ID, category.id)
             intent.putExtra(GenericSettingsActivity.EXTRA_AUTHORITY, category.authority)
             intent.putExtra(GenericSettingsActivity.EXTRA_TITLE, category.title)

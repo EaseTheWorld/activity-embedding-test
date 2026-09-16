@@ -25,7 +25,8 @@ enum class ItemType {
 open class Item(
     open val id: String,
     open val children: Set<Item> = emptySet(),
-    open val isVisible: Flow<Boolean> = flowOf(true)
+    open val isVisible: Flow<Boolean> = flowOf(true),
+    open val hasDetailScreen: Boolean = children.isNotEmpty()
 ) {
     init {
         require(id.isNotBlank()) { "Item id cannot be blank" }

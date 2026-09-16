@@ -168,19 +168,43 @@ fun SettingsNavHost(
             } ?: 0
             val categoryTitle = if (titleRes != 0) context.getString(titleRes) else (provider?.titleKey ?: categoryId)
 
-            ItemDetailScreen(
-                categoryId = categoryId,
-                categoryTitle = categoryTitle,
-                item = item,
-                viewModelRegistry = viewModelRegistry,
-                onNavigateBack = {
-                    if (!navController.popBackStack()) {
-                        navController.navigate(SettingsNavigation.categoryRoute(categoryId)) {
-                            popUpTo(SettingsNavigation.categoryRoute(categoryId)) { inclusive = true }
+            if (item != null && item.hasDetailScreen) {
+                // Case 1: Item has dedicated detail screen (e.g. seat_lumbar)
+                ItemDetailScreen(
+                    categoryId = categoryId,
+                    categoryTitle = categoryTitle,
+                    item = item,
+                    viewModelRegistry = viewModelRegistry,
+                    onNavigateBack = {
+                        if (!navController.popBackStack()) {
+                            navController.navigate(SettingsNavigation.categoryRoute(categoryId)) {
+                                popUpTo(SettingsNavigation.categoryRoute(categoryId)) { inclusive = true }
+                            }
                         }
                     }
-                }
-            )
+                )
+            } else {
+                // Case 2: Standard inline item (e.g. item1, driver_seat_heat) -> Scroll to anchor on Category screen
+                GenericSettingsScreen(
+                    title = categoryTitle,
+                    subtitle = "Settings for $categoryTitle",
+                    items = provider?.items ?: emptyList(),
+                    targetItemId = itemId,
+                    viewModelRegistry = viewModelRegistry,
+                    onNavigateBack = {
+                        if (!navController.popBackStack()) {
+                            navController.navigate(SettingsNavigation.ROUTE_DASHBOARD) {
+                                popUpTo(SettingsNavigation.ROUTE_DASHBOARD) { inclusive = true }
+                            }
+                        }
+                    },
+                    onItemClick = { clickedItem ->
+                        if (clickedItem.hasDetailScreen) {
+                            navController.navigate(SettingsNavigation.itemDetailRoute(categoryId, clickedItem.id))
+                        }
+                    }
+                )
+            }
         }
     }
 }

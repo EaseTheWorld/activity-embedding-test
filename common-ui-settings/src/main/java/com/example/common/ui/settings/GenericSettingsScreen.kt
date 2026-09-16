@@ -35,26 +35,44 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.ui.Alignment
 
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+
 /**
  * Universal Settings Screen rendered via Jetpack Compose.
  * Renders standard and domain items directly via declarative Compose rows,
  * resolving the single-source-of-truth ItemViewModel by item ID.
  *
- * Supports navigation back via [onNavigateBack] and intra-category item drill-down via [onItemClick].
+ * Supports navigation back via [onNavigateBack], anchor scrolling to [targetItemId],
+ * and intra-category item drill-down via [onItemClick] for items with detail screens.
  */
 @Composable
 fun GenericSettingsScreen(
     title: String,
     subtitle: String,
     items: List<Item>,
+    targetItemId: String? = null,
     onNavigateBack: (() -> Unit)? = null,
     onItemClick: ((Item) -> Unit)? = null,
     viewModelRegistry: ItemViewModelRegistry = LocalItemViewModelRegistry.current
 ) {
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = Color(0xFFF6F7FB)
-    ) {
+    val listState = rememberLazyListState()
+
+    LaunchedEffect(targetItemId) {
+        if (!targetItemId.isNullOrEmpty()) {
+            val targetIndex = items.indexOfFirst { it.id == targetItemId }
+            if (targetIndex >= 0) {
+                listState.animateScrollToItem(targetIndex)
+            }
+        }
+    }
+
+    CompositionLocalProvider(LocalAnchorTarget provides targetItemId) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = Color(0xFFF6F7FB)
+        ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -100,6 +118,7 @@ fun GenericSettingsScreen(
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
                 LazyColumn(
+                    state = listState,
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 20.dp, vertical = 12.dp)
@@ -110,7 +129,9 @@ fun GenericSettingsScreen(
                         val isVmVisible = (vm?.isVisibleFlow?.collectAsState())?.value ?: true
                         if (isItemVisible && isVmVisible) {
                             Row(
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .anchor(item.id),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Box(modifier = Modifier.weight(1f)) {
@@ -133,7 +154,7 @@ fun GenericSettingsScreen(
                                         }
                                     }
                                 }
-                                if (onItemClick != null) {
+                                if (onItemClick != null && item.hasDetailScreen) {
                                     IconButton(
                                         onClick = { onItemClick(item) },
                                         modifier = Modifier.padding(start = 4.dp)
@@ -156,4 +177,5 @@ fun GenericSettingsScreen(
             }
         }
     }
+}
 }

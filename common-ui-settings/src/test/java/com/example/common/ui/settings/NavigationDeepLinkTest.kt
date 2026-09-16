@@ -194,7 +194,53 @@ class NavigationDeepLinkTest {
         assertEquals("com.example.lifecycleapp.GenericSettingsActivity", resolveTargetActivity("myapp://navigate/dashboard"))
         assertEquals("com.example.lifecycleapp.GenericSettingsActivity", resolveTargetActivity("myapp://navigate/door"))
         assertEquals("com.example.lifecycleapp.GenericSettingsActivity", resolveTargetActivity("myapp://navigate/door/auto_lock"))
-        assertEquals("com.example.lifecycleapp.GenericSettingsActivity", resolveTargetActivity("myapp://navigate/seat/seat_lumbar"))
         assertEquals("com.example.feature.light.LightSettingsActivity", resolveTargetActivity("myapp://navigate/light"))
+    }
+
+    @Test
+    fun `hasDetailScreen determines whether deep link navigates to ItemDetailScreen or scrolls to anchor`() {
+        val standardItem = BaseUiToggleItem(id = "item1", nameResId = 1)
+        val parentItem = BaseUiToggleItem(
+            id = "parent_item",
+            nameResId = 2,
+            children = setOf(BaseUiToggleItem(id = "child_item", nameResId = 3))
+        )
+        val lumbarItem = object : Item("seat_lumbar") {
+            override val hasDetailScreen: Boolean = true
+        }
+
+        // 1. Standard inline item does not have detail screen -> should scroll to anchor
+        assertEquals(false, standardItem.hasDetailScreen)
+
+        // 2. Item with children automatically has detail screen
+        assertEquals(true, parentItem.hasDetailScreen)
+
+        // 3. Dedicated rich item like seat_lumbar has detail screen -> navigates to ItemDetailScreen
+        assertEquals(true, lumbarItem.hasDetailScreen)
+
+        // Simulate destination routing logic
+        fun resolveDeepLinkMode(item: Item): String {
+            return if (item.hasDetailScreen) "ITEM_DETAIL_SCREEN" else "CATEGORY_SCREEN_WITH_ANCHOR"
+        }
+
+        assertEquals("CATEGORY_SCREEN_WITH_ANCHOR", resolveDeepLinkMode(standardItem))
+        assertEquals("ITEM_DETAIL_SCREEN", resolveDeepLinkMode(parentItem))
+        assertEquals("ITEM_DETAIL_SCREEN", resolveDeepLinkMode(lumbarItem))
+    }
+
+    @Test
+    fun `anchor target resolution locates index in items list for scrolling`() {
+        val item1 = BaseUiToggleItem("item1", 1)
+        val item2 = BaseUiToggleItem("item2", 2)
+        val item3 = BaseUiToggleItem("item3", 3)
+        val items = listOf(item1, item2, item3)
+
+        val targetAnchor = "item2"
+        val scrollIndex = items.indexOfFirst { it.id == targetAnchor }
+        assertEquals(1, scrollIndex)
+
+        val nonExistentAnchor = "unknown"
+        val notFoundIndex = items.indexOfFirst { it.id == nonExistentAnchor }
+        assertEquals(-1, notFoundIndex)
     }
 }

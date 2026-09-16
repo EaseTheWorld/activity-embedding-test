@@ -13,6 +13,8 @@ import androidx.window.embedding.SplitPairRule
 import androidx.window.embedding.SplitPlaceholderRule
 import androidx.window.embedding.SplitRule
 
+const val ACTION_SETTINGS_EMBED = "com.example.carsettings.ACTION_SETTINGS_EMBED"
+
 class SplitInitializer : Initializer<RuleController> {
 
     override fun create(context: Context): RuleController {
@@ -20,8 +22,7 @@ class SplitInitializer : Initializer<RuleController> {
         // Match any activity from any package/module for cross-app embedding
 
         val filters = setOf(
-            SplitPairFilter(primaryComponent, ComponentName("com.example.carsettings.light", "com.example.feature.light.LightSettingsActivity"), null),
-            SplitPairFilter(primaryComponent, ComponentName(context, GenericSettingsActivity::class.java), null)
+            SplitPairFilter(primaryComponent, ComponentName("*", "*"), ACTION_SETTINGS_EMBED)
         )
 
         val defaultSplitAttributes = SplitAttributes.Builder()

@@ -127,6 +127,7 @@ class SeatLumbarSupportItem(
     descriptionResId = descriptionResId
 ) {
     override val type: ItemType get() = ItemType.CUSTOM
+    override val hasDetailScreen: Boolean get() = true
 }
 
 // ============================================================================

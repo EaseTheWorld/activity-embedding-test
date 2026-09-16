@@ -85,9 +85,7 @@ class PrimaryActivity : BaseLoggingActivity() {
         }
 
         if (savedInstanceState == null) {
-            if (intent?.action == "com.example.lifecycleapp.open") {
-                handleIntent(intent)
-            }
+            handleIntent(intent)
         }
     }
 
@@ -218,7 +216,7 @@ class PrimaryActivity : BaseLoggingActivity() {
         return sortedCategories
     }
 
-    private fun launchCategory(category: SettingCategory) {
+    private fun launchCategory(category: SettingCategory, deepLinkUri: Uri? = null) {
         val intent = when {
             !category.targetPackage.isNullOrEmpty() && !category.targetActivity.isNullOrEmpty() -> {
                 Intent().setComponent(ComponentName(category.targetPackage, category.targetActivity))
@@ -233,15 +231,13 @@ class PrimaryActivity : BaseLoggingActivity() {
             intent.putExtra(GenericSettingsActivity.EXTRA_CATEGORY_ID, category.id)
             intent.putExtra(GenericSettingsActivity.EXTRA_AUTHORITY, category.authority)
             intent.putExtra(GenericSettingsActivity.EXTRA_TITLE, category.title)
-            if (category.targetPackage == packageName) {
-                val uri = if (category.id == "dashboard") {
-                    Uri.parse("myapp://navigate/dashboard")
-                } else {
-                    Uri.parse("myapp://navigate/${category.id}")
-                }
-                intent.data = uri
+            val uriToPass = deepLinkUri ?: if (category.id == "dashboard") {
+                Uri.parse("myapp://navigate/dashboard")
+            } else {
+                Uri.parse("myapp://navigate/${category.id}")
             }
-            Log.d(tag, "[$activityName] Launching category ${category.title} via $intent")
+            intent.data = uriToPass
+            Log.d(tag, "[$activityName] Launching category ${category.title} via $intent (data=$uriToPass)")
             startActivity(intent)
         } else {
             Log.w(tag, "[$activityName] No target intent for category ${category.title}")
@@ -251,11 +247,19 @@ class PrimaryActivity : BaseLoggingActivity() {
     private fun handleIntent(intent: Intent?) {
         if (intent == null) return
         val action = intent.action
-        Log.d(tag, "[$activityName] handleIntent: action=$action, extras=${intent.extras}")
+        val dataUri = intent.data
+        Log.d(tag, "[$activityName] handleIntent: action=$action, data=$dataUri, extras=${intent.extras}")
 
+        // 1. First-class DeepLink handling: myapp://navigate/...
+        if (dataUri != null && dataUri.scheme == "myapp" && dataUri.host == "navigate") {
+            handleDeepLink(dataUri)
+            return
+        }
+
+        // 2. Legacy action: com.example.lifecycleapp.open
         if (action == "com.example.lifecycleapp.open") {
             intent.action = null
-            val categoryKey = intent.getStringExtra("category") ?: when (val idExtra = intent.extras?.get("id")) {
+            val categoryKey = intent.getStringExtra("category") ?: when (intent.extras?.get("id")) {
                 1, "1" -> "light"
                 2, "2" -> "sound"
                 3, "3" -> "display"
@@ -270,6 +274,43 @@ class PrimaryActivity : BaseLoggingActivity() {
                     Log.w(tag, "[$activityName] Deeplink category key not found: $categoryKey")
                 }
             }
+        }
+    }
+
+    private fun handleDeepLink(uri: Uri) {
+        val segments = uri.pathSegments
+        val categoryId = when {
+            segments.isEmpty() || segments[0].equals("dashboard", ignoreCase = true) -> "dashboard"
+            else -> segments[0]
+        }
+
+        Log.d(tag, "[$activityName] handleDeepLink: uri=$uri, resolved categoryId=$categoryId")
+
+        val matched = categories.find { it.id.equals(categoryId, ignoreCase = true) }
+        if (matched != null) {
+            launchCategory(matched, deepLinkUri = uri)
+            return
+        }
+
+        // Fallback if category was not discovered yet via ContentProvider
+        if (categoryId.equals("light", ignoreCase = true)) {
+            val extIntent = Intent("com.example.carsettings.light.OPEN").apply {
+                setClassName("com.example.carsettings.light", "com.example.feature.light.LightSettingsActivity")
+                data = uri
+            }
+            try {
+                startActivity(extIntent)
+                Log.d(tag, "[$activityName] Launched external light category fallback via $uri")
+            } catch (e: Exception) {
+                Log.e(tag, "[$activityName] Failed to launch external light activity: $e")
+            }
+        } else {
+            val settingsIntent = Intent(this, GenericSettingsActivity::class.java).apply {
+                data = uri
+                putExtra(GenericSettingsActivity.EXTRA_CATEGORY_ID, categoryId)
+            }
+            startActivity(settingsIntent)
+            Log.d(tag, "[$activityName] Launched GenericSettingsActivity fallback for $categoryId via $uri")
         }
     }
 }

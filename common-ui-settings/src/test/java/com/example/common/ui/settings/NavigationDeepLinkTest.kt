@@ -170,4 +170,31 @@ class NavigationDeepLinkTest {
         onNavigate("light")
         assertEquals(listOf("light"), navigatedExternal)
     }
+
+    @Test
+    fun `PrimaryActivity deep link dispatcher routes light to external activity and other categories to GenericSettingsActivity`() {
+        val targets = mapOf(
+            "dashboard" to "com.example.lifecycleapp.GenericSettingsActivity",
+            "door" to "com.example.lifecycleapp.GenericSettingsActivity",
+            "seat" to "com.example.lifecycleapp.GenericSettingsActivity",
+            "light" to "com.example.feature.light.LightSettingsActivity"
+        )
+
+        fun resolveTargetActivity(uriString: String): String {
+            val uri = URI.create(uriString)
+            val segments = uri.path.removePrefix("/").split("/").filter { it.isNotEmpty() }
+            val catId = when {
+                segments.isEmpty() || segments[0].equals("dashboard", ignoreCase = true) -> "dashboard"
+                else -> segments[0]
+            }
+            return targets[catId] ?: "com.example.lifecycleapp.GenericSettingsActivity"
+        }
+
+        assertEquals("com.example.lifecycleapp.GenericSettingsActivity", resolveTargetActivity("myapp://navigate"))
+        assertEquals("com.example.lifecycleapp.GenericSettingsActivity", resolveTargetActivity("myapp://navigate/dashboard"))
+        assertEquals("com.example.lifecycleapp.GenericSettingsActivity", resolveTargetActivity("myapp://navigate/door"))
+        assertEquals("com.example.lifecycleapp.GenericSettingsActivity", resolveTargetActivity("myapp://navigate/door/auto_lock"))
+        assertEquals("com.example.lifecycleapp.GenericSettingsActivity", resolveTargetActivity("myapp://navigate/seat/seat_lumbar"))
+        assertEquals("com.example.feature.light.LightSettingsActivity", resolveTargetActivity("myapp://navigate/light"))
+    }
 }

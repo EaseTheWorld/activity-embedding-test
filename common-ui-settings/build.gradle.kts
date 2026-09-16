@@ -29,6 +29,7 @@ android {
 
 dependencies {
     api(project(":core-item-contract"))
+    api(libs.androidx.navigation.compose)
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)

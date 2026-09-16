@@ -25,16 +25,30 @@ import androidx.compose.ui.unit.dp
 import com.example.core.item.Item
 import com.example.core.item.ItemViewModelRegistry
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.ui.Alignment
+
 /**
  * Universal Settings Screen rendered via Jetpack Compose.
  * Renders standard and domain items directly via declarative Compose rows,
  * resolving the single-source-of-truth ItemViewModel by item ID.
+ *
+ * Supports navigation back via [onNavigateBack] and intra-category item drill-down via [onItemClick].
  */
 @Composable
 fun GenericSettingsScreen(
     title: String,
     subtitle: String,
     items: List<Item>,
+    onNavigateBack: (() -> Unit)? = null,
+    onItemClick: ((Item) -> Unit)? = null,
     viewModelRegistry: ItemViewModelRegistry = LocalItemViewModelRegistry.current
 ) {
     Surface(
@@ -46,20 +60,37 @@ fun GenericSettingsScreen(
                 .fillMaxSize()
                 .padding(24.dp)
         ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.headlineMedium.copy(
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF1E1E2E)
-                )
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    color = Color(0xFF6B7280)
-                )
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                if (onNavigateBack != null) {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = Color(0xFF1E1E2E)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                }
+                Column {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.headlineMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF1E1E2E)
+                        )
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            color = Color(0xFF6B7280)
+                        )
+                    )
+                }
+            }
             Spacer(modifier = Modifier.height(20.dp))
 
             Card(
@@ -78,22 +109,41 @@ fun GenericSettingsScreen(
                         val vm = viewModelRegistry.getViewModel<Any>(item.id)
                         val isVmVisible = (vm?.isVisibleFlow?.collectAsState())?.value ?: true
                         if (isItemVisible && isVmVisible) {
-                            when (item) {
-                                is UiToggleItem -> ToggleItemRow(item = item, viewModelRegistry = viewModelRegistry)
-                                is UiChoiceItem -> ChoiceItemRow(item = item, viewModelRegistry = viewModelRegistry)
-                                is UiSliderItem -> SliderItemRow(item = item, viewModelRegistry = viewModelRegistry)
-                                is UiItem -> {
-                                    Text(
-                                        text = androidx.compose.ui.res.stringResource(item.nameResId),
-                                        style = MaterialTheme.typography.titleMedium
-                                    )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(modifier = Modifier.weight(1f)) {
+                                    when (item) {
+                                        is UiToggleItem -> ToggleItemRow(item = item, viewModelRegistry = viewModelRegistry)
+                                        is UiChoiceItem -> ChoiceItemRow(item = item, viewModelRegistry = viewModelRegistry)
+                                        is UiSliderItem -> SliderItemRow(item = item, viewModelRegistry = viewModelRegistry)
+                                        is UiItem -> {
+                                            Text(
+                                                text = androidx.compose.ui.res.stringResource(item.nameResId),
+                                                style = MaterialTheme.typography.titleMedium
+                                            )
+                                        }
+                                        else -> {
+                                            Text(
+                                                text = "Item: ${item.id}",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = MaterialTheme.colorScheme.error
+                                            )
+                                        }
+                                    }
                                 }
-                                else -> {
-                                    Text(
-                                        text = "Item: ${item.id}",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.error
-                                    )
+                                if (onItemClick != null) {
+                                    IconButton(
+                                        onClick = { onItemClick(item) },
+                                        modifier = Modifier.padding(start = 4.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                            contentDescription = "View details for ${item.id}",
+                                            tint = Color(0xFF9E9E9E)
+                                        )
+                                    }
                                 }
                             }
                             HorizontalDivider(

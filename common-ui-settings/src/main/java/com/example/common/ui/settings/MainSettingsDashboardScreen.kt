@@ -15,6 +15,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -55,6 +59,7 @@ fun MainSettingsDashboardScreen(
     recentManager: RecentCategoryManager,
     providers: List<CategoryItemProvider>,
     itemResolver: (String) -> Item?,
+    onCategoryClick: ((String) -> Unit)? = null,
     viewModelRegistry: ItemViewModelRegistry = LocalItemViewModelRegistry.current,
     customCategoryLayouts: Map<String, CategoryLayoutSlot> = emptyMap(),
     modifier: Modifier = Modifier
@@ -141,7 +146,8 @@ fun MainSettingsDashboardScreen(
                 CategoryCardSection(
                     provider = provider,
                     viewModelRegistry = viewModelRegistry,
-                    customContent = customCategoryLayouts[provider.categoryId]
+                    customContent = customCategoryLayouts[provider.categoryId],
+                    onCategoryClick = onCategoryClick
                 )
                 Spacer(modifier = Modifier.height(16.dp))
             }
@@ -158,6 +164,7 @@ fun CategoryCardSection(
     provider: CategoryItemProvider,
     viewModelRegistry: ItemViewModelRegistry = LocalItemViewModelRegistry.current,
     customContent: CategoryLayoutSlot? = null,
+    onCategoryClick: ((String) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -176,13 +183,30 @@ fun CategoryCardSection(
             val titleRes = context.resources.getIdentifier(provider.titleKey, "string", context.packageName)
             val titleText = if (titleRes != 0) context.getString(titleRes) else provider.titleKey
 
-            Text(
-                text = titleText,
-                style = MaterialTheme.typography.titleLarge.copy(
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF1E1E2E)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = titleText,
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF1E1E2E)
+                    )
                 )
-            )
+                if (onCategoryClick != null) {
+                    IconButton(
+                        onClick = { onCategoryClick(provider.categoryId) }
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                            contentDescription = "Open $titleText",
+                            tint = Color(0xFF6750A4)
+                        )
+                    }
+                }
+            }
             Spacer(modifier = Modifier.height(12.dp))
 
             // Items Content: Either a domain-specific custom layout or default direct Compose rows

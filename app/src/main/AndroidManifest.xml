@@ -64,11 +64,21 @@
         <activity
             android:name=".GenericSettingsActivity"
             android:exported="true"
+            android:launchMode="singleTop"
             android:label="Settings">
             <intent-filter>
                 <action android:name="com.example.carsettings.door.OPEN" />
                 <action android:name="com.example.carsettings.seat.OPEN" />
                 <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <!-- Navigation 2.x Deep Link Intent Filter for myapp://navigate -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="myapp"
+                    android:host="navigate" />
             </intent-filter>
         </activity>
 

@@ -233,6 +233,14 @@ class PrimaryActivity : BaseLoggingActivity() {
             intent.putExtra(GenericSettingsActivity.EXTRA_CATEGORY_ID, category.id)
             intent.putExtra(GenericSettingsActivity.EXTRA_AUTHORITY, category.authority)
             intent.putExtra(GenericSettingsActivity.EXTRA_TITLE, category.title)
+            if (category.targetPackage == packageName) {
+                val uri = if (category.id == "dashboard") {
+                    Uri.parse("myapp://navigate/dashboard")
+                } else {
+                    Uri.parse("myapp://navigate/${category.id}")
+                }
+                intent.data = uri
+            }
             Log.d(tag, "[$activityName] Launching category ${category.title} via $intent")
             startActivity(intent)
         } else {

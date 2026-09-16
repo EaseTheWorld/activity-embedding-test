@@ -1,29 +1,30 @@
 package com.example.common.ui.settings
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import com.example.core.item.CategoryItemProvider
-import com.example.core.item.CategoryItemRegistry
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.rememberNavController
 import com.example.core.item.ItemViewModelRegistry
 
 /**
- * Universal Data-Driven Settings Activity powered by Jetpack Compose.
- * Renders any category's items dynamically via declarative Compose UI.
+ * Universal Data-Driven Settings Activity powered by Jetpack Navigation 2.x and Jetpack Compose.
+ * Supports:
+ * 1. Root dashboard overview.
+ * 2. Inter-category and intra-category item drill-down navigation.
+ * 3. Deep link parsing for `myapp://navigate/{categoryId}/{itemId}`.
+ * 4. External Activity Embedding delegation for external apps (e.g. Lights).
  */
 open class GenericSettingsActivity : AppCompatActivity() {
 
     private val tag = "GenericSettingsActivity"
-    private var isDashboard by mutableStateOf(false)
-    private var currentProvider by mutableStateOf<CategoryItemProvider?>(null)
-    private var currentTitle by mutableStateOf("Settings")
-    private var currentSubtitle by mutableStateOf("Data-driven items rendered via Jetpack Compose")
+    private var pendingIntent = mutableStateOf<Intent?>(null)
 
     protected open fun getViewModelRegistry(): ItemViewModelRegistry = defaultViewModelRegistry
 
@@ -35,33 +36,28 @@ open class GenericSettingsActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        resolveCategory(intent)
+        pendingIntent.value = intent
 
         setContent {
+            val navController = rememberNavController()
+
+            // Handle incoming deep links or intent actions
+            LaunchedEffect(pendingIntent.value) {
+                val targetIntent = pendingIntent.value ?: return@LaunchedEffect
+                handleIntentNavigation(targetIntent, navController)
+            }
+
             CompositionLocalProvider(
                 LocalItemViewModelRegistry provides getViewModelRegistry()
             ) {
-                if (isDashboard) {
-                    val providers = CategoryItemRegistry.getAllProviders().toList()
-                    val itemResolver: (String) -> com.example.core.item.Item? = { key ->
-                        providers.firstNotNullOfOrNull { it.findItem(key) }
+                SettingsNavHost(
+                    navController = navController,
+                    viewModelRegistry = getViewModelRegistry(),
+                    recentManager = recentManager,
+                    onNavigateExternal = { categoryId ->
+                        launchExternalCategory(categoryId)
                     }
-                    MainSettingsDashboardScreen(
-                        recentManager = recentManager,
-                        providers = providers,
-                        itemResolver = itemResolver
-                    )
-                } else {
-                    val provider = currentProvider
-                    if (provider != null) {
-                        GenericSettingsScreen(
-                            title = currentTitle,
-                            subtitle = currentSubtitle,
-                            items = provider.items
-                        )
-                    }
-                }
+                )
             }
         }
     }
@@ -69,46 +65,55 @@ open class GenericSettingsActivity : AppCompatActivity() {
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
         setIntent(intent)
-        resolveCategory(intent)
+        pendingIntent.value = intent
     }
 
-    private fun resolveCategory(intent: Intent?) {
-        val extraCat = intent?.getStringExtra(EXTRA_CATEGORY_ID)
-        val action = intent?.action
+    private fun handleIntentNavigation(intent: Intent, navController: NavHostController) {
+        val uri: Uri? = intent.data
+        if (uri != null && uri.scheme == SettingsNavigation.DEEP_LINK_SCHEME) {
+            Log.d(tag, "Navigating via deep link: $uri")
+            try {
+                navController.navigate(uri)
+                return
+            } catch (e: Exception) {
+                Log.w(tag, "Failed to navigate directly to uri $uri, attempting fallback: $e")
+            }
+        }
 
+        // Fallback for legacy intent actions and extras
+        val extraCat = intent.getStringExtra(EXTRA_CATEGORY_ID)
+        val action = intent.action
         val categoryId = when {
             !extraCat.isNullOrEmpty() -> extraCat
-            action == "com.example.carsettings.DASHBOARD" -> "dashboard"
             action == "com.example.carsettings.door.OPEN" -> "door"
             action == "com.example.carsettings.seat.OPEN" -> "seat"
-            else -> "dashboard"
+            action == "com.example.carsettings.DASHBOARD" -> "dashboard"
+            else -> null
         }
 
-        if (categoryId.equals("dashboard", ignoreCase = true)) {
-            isDashboard = true
-            currentTitle = "Vehicle Settings"
-            currentSubtitle = "Quick Controls and Category Overview"
-            Log.d(tag, "Rendered dashboard via Compose")
-            return
+        if (categoryId != null) {
+            if (categoryId.equals("dashboard", ignoreCase = true)) {
+                navController.navigate(SettingsNavigation.ROUTE_DASHBOARD)
+            } else if (categoryId.equals("light", ignoreCase = true)) {
+                launchExternalCategory(categoryId)
+            } else {
+                navController.navigate(SettingsNavigation.categoryRoute(categoryId))
+            }
         }
+    }
 
-        isDashboard = false
-        val provider = CategoryItemRegistry.getProvider(categoryId)
-        if (provider == null) {
-            Log.e(tag, "No CategoryItemProvider found for categoryId: $categoryId")
-            currentProvider = null
-            currentTitle = "Settings"
-            currentSubtitle = "Category not found: $categoryId"
-            return
+    private fun launchExternalCategory(categoryId: String) {
+        if (categoryId.equals("light", ignoreCase = true)) {
+            val extIntent = Intent("com.example.carsettings.light.OPEN").apply {
+                setClassName("com.example.carsettings.light", "com.example.feature.light.LightSettingsActivity")
+            }
+            try {
+                startActivity(extIntent)
+                Log.d(tag, "Launched external category activity for $categoryId")
+            } catch (e: Exception) {
+                Log.e(tag, "Failed to launch external activity for $categoryId: $e")
+            }
         }
-
-        val extraTitle = intent?.getStringExtra(EXTRA_TITLE)
-        val resId = resources.getIdentifier(provider.titleKey, "string", packageName)
-        currentTitle = extraTitle ?: if (resId != 0) getString(resId) else provider.titleKey
-        currentSubtitle = "Data-driven items rendered via Jetpack Compose"
-        currentProvider = provider
-
-        Log.d(tag, "Rendered category via Compose: $categoryId with ${provider.items.size} items")
     }
 
     companion object {

@@ -4,6 +4,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ResolveInfo
+import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
@@ -30,7 +31,7 @@ data class SettingCategory(
     val subtitleResId: Int = 0,
     val iconResId: Int = 0,
     val authority: String,
-    val contentUri: Uri
+    val contentUri: Uri? = null
 )
 
 class PrimaryActivity : BaseLoggingActivity() {
@@ -80,12 +81,22 @@ class PrimaryActivity : BaseLoggingActivity() {
         listViewCategories.adapter = categoryAdapter
 
         listViewCategories.setOnItemClickListener { _, _, position, _ ->
+            categoryAdapter?.selectedPosition = position
+            categoryAdapter?.notifyDataSetChanged()
             val selectedCategory = categories[position]
             launchCategory(selectedCategory)
         }
 
         if (savedInstanceState == null) {
-            handleIntent(intent)
+            if (intent?.data != null || intent?.action == "com.example.lifecycleapp.open") {
+                handleIntent(intent)
+            } else {
+                categories.firstOrNull()?.let { firstCategory ->
+                    categoryAdapter?.selectedPosition = 0
+                    categoryAdapter?.notifyDataSetChanged()
+                    launchCategory(firstCategory)
+                }
+            }
         }
     }
 
@@ -171,6 +182,18 @@ class PrimaryActivity : BaseLoggingActivity() {
                 Log.e(tag, "[$activityName] Failed to query category from $authority: $e")
             }
         }
+        val homeCategory = SettingCategory(
+            id = "home",
+            title = "Home",
+            subtitle = "Search & Quick access",
+            order = -10,
+            targetAction = "com.example.carsettings.HOME",
+            targetPackage = packageName,
+            targetActivity = "com.example.feature.home.HomeActivity",
+            iconName = "ic_feature_home",
+            authority = "local",
+            contentUri = Uri.EMPTY
+        )
         val dashboardCategory = SettingCategory(
             id = "dashboard",
             title = "Quick Controls & All",
@@ -183,7 +206,7 @@ class PrimaryActivity : BaseLoggingActivity() {
             authority = "local",
             contentUri = Uri.EMPTY
         )
-        val sortedCategories = (listOf(dashboardCategory) + discovered).sortedBy { it.order }
+        val sortedCategories = (listOf(homeCategory, dashboardCategory) + discovered).sortedBy { it.order }
 
         val ruleController = androidx.window.embedding.RuleController.getInstance(this)
         val primaryComponent = ComponentName(this, PrimaryActivity::class.java)
@@ -232,10 +255,10 @@ class PrimaryActivity : BaseLoggingActivity() {
             intent.putExtra(GenericSettingsActivity.EXTRA_CATEGORY_ID, category.id)
             intent.putExtra(GenericSettingsActivity.EXTRA_AUTHORITY, category.authority)
             intent.putExtra(GenericSettingsActivity.EXTRA_TITLE, category.title)
-            val uriToPass = deepLinkUri ?: if (category.id == "dashboard") {
-                Uri.parse("myapp://navigate/dashboard")
-            } else {
-                Uri.parse("myapp://navigate/${category.id}")
+            val uriToPass = deepLinkUri ?: when (category.id) {
+                "home" -> Uri.parse("myapp://navigate/home")
+                "dashboard" -> Uri.parse("myapp://navigate/dashboard")
+                else -> Uri.parse("myapp://navigate/${category.id}")
             }
             intent.data = uriToPass
             Log.d(tag, "[$activityName] Launching category ${category.title} via $intent (data=$uriToPass)")
@@ -281,15 +304,19 @@ class PrimaryActivity : BaseLoggingActivity() {
     private fun handleDeepLink(uri: Uri) {
         val segments = uri.pathSegments
         val categoryId = when {
-            segments.isEmpty() || segments[0].equals("dashboard", ignoreCase = true) -> "dashboard"
+            segments.isEmpty() -> "home"
+            segments[0].equals("home", ignoreCase = true) -> "home"
+            segments[0].equals("dashboard", ignoreCase = true) -> "dashboard"
             else -> segments[0]
         }
 
         Log.d(tag, "[$activityName] handleDeepLink: uri=$uri, resolved categoryId=$categoryId")
 
-        val matched = categories.find { it.id.equals(categoryId, ignoreCase = true) }
-        if (matched != null) {
-            launchCategory(matched, deepLinkUri = uri)
+        val matchedIndex = categories.indexOfFirst { it.id.equals(categoryId, ignoreCase = true) }
+        if (matchedIndex >= 0) {
+            categoryAdapter?.selectedPosition = matchedIndex
+            categoryAdapter?.notifyDataSetChanged()
+            launchCategory(categories[matchedIndex], deepLinkUri = uri)
             return
         }
 
@@ -321,9 +348,17 @@ private class CategoryAdapter(
     private val categories: List<SettingCategory>
 ) : ArrayAdapter<SettingCategory>(context, 0, categories) {
 
+    var selectedPosition: Int = 0
+
     override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
         val view = convertView ?: LayoutInflater.from(context).inflate(R.layout.item_list, parent, false)
         val category = categories[position]
+
+        if (position == selectedPosition) {
+            view.setBackgroundColor(Color.parseColor("#E8DEF8"))
+        } else {
+            view.setBackgroundColor(Color.TRANSPARENT)
+        }
 
         val ivIcon = view.findViewById<ImageView>(R.id.ivCategoryIcon)
         val tvTitle = view.findViewById<TextView>(R.id.tvCategoryTitle)

@@ -26,4 +26,5 @@ include(":core-item-contract")
 include(":common-ui-settings")
 include(":feature-door")
 include(":feature-seat")
+include(":feature-home")
 

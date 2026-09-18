@@ -1,22 +1,16 @@
 plugins {
-    alias(libs.plugins.android.application)
+    alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
-    alias(libs.plugins.hilt.android)
     alias(libs.plugins.ksp)
 }
 
 android {
-    namespace = "com.example.lifecycleapp"
+    namespace = "com.example.feature.home"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.example.lifecycleapp"
         minSdk = 24
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
-
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
@@ -41,33 +35,23 @@ android {
     composeOptions {
         kotlinCompilerExtensionVersion = libs.versions.composeCompiler.get()
     }
-    testOptions {
-        unitTests.isReturnDefaultValues = true
-    }
 }
 
 dependencies {
+    implementation(project(":core-item-contract"))
+    implementation(project(":common-ui-settings"))
+    implementation(libs.kotlinx.coroutines.android)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
+    implementation(libs.androidx.activity.compose)
     implementation(libs.material)
-    implementation(libs.androidx.constraintlayout)
-    implementation(libs.androidx.window)
-    implementation(libs.androidx.startup)
 
     // Jetpack Compose
-    implementation(libs.androidx.activity.compose)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
-
-    // Internal Common UI & Feature Libraries (Item architecture)
-    implementation(project(":core-item-contract"))
-    implementation(project(":common-ui-settings"))
-    implementation(project(":feature-door"))
-    implementation(project(":feature-seat"))
-    implementation(project(":feature-home"))
 
     // Dependency Injection: Hilt
     implementation(libs.hilt.android)

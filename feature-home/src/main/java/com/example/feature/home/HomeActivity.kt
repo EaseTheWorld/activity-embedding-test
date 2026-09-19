@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 
 class HomeActivity : ComponentActivity() {
@@ -15,6 +16,13 @@ class HomeActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Log.d(tag, "HomeActivity created in Secondary pane")
+
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                Log.d(tag, "Back pressed at Home (Root of App) -> finishAffinity to exit")
+                finishAffinity()
+            }
+        })
 
         setContent {
             HomeScreen(
@@ -39,6 +47,7 @@ class HomeActivity : ComponentActivity() {
             data = targetUri
             putExtra("category_id", item.categoryId)
             putExtra("target_item_id", item.itemId)
+            putExtra("from_home_search", true)
         }
 
         Log.d(tag, "Launching target setting from Home search: $targetComponent, uri=$targetUri")

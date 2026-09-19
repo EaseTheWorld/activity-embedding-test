@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.runtime.CompositionLocalProvider
@@ -47,6 +48,12 @@ open class GenericSettingsActivity : AppCompatActivity() {
                 handleIntentNavigation(targetIntent, navController)
             }
 
+            BackHandler {
+                if (!navController.popBackStack()) {
+                    handleRootBackPress()
+                }
+            }
+
             CompositionLocalProvider(
                 LocalItemViewModelRegistry provides getViewModelRegistry()
             ) {
@@ -59,6 +66,26 @@ open class GenericSettingsActivity : AppCompatActivity() {
                     }
                 )
             }
+        }
+    }
+
+    private fun handleRootBackPress() {
+        val fromHomeSearch = intent.getBooleanExtra("from_home_search", false)
+        Log.d(tag, "handleRootBackPress: fromHomeSearch=$fromHomeSearch")
+        if (fromHomeSearch) {
+            finish()
+        } else {
+            val homeIntent = Intent("com.example.carsettings.ACTION_SETTINGS_EMBED").apply {
+                setClassName(packageName, "com.example.lifecycleapp.PrimaryActivity")
+                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                data = Uri.parse("myapp://navigate/home")
+            }
+            try {
+                startActivity(homeIntent)
+            } catch (e: Exception) {
+                Log.w(tag, "Failed to start PrimaryActivity for Home: $e")
+            }
+            finish()
         }
     }
 

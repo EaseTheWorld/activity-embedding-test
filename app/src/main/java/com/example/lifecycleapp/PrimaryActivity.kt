@@ -15,8 +15,13 @@ import android.widget.ArrayAdapter
 import android.widget.ImageView
 import android.widget.ListView
 import android.widget.TextView
+import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.core.content.res.ResourcesCompat
+import androidx.lifecycle.lifecycleScope
+import androidx.window.embedding.SplitController
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 
 data class SettingCategory(
     val id: String,
@@ -96,6 +101,44 @@ class PrimaryActivity : BaseLoggingActivity() {
                     categoryAdapter?.notifyDataSetChanged()
                     launchCategory(firstCategory)
                 }
+            }
+        }
+
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                val currentPos = categoryAdapter?.selectedPosition ?: 0
+                Log.d(tag, "[$activityName] Back pressed in PrimaryActivity: selectedPosition=$currentPos")
+                if (currentPos != 0) {
+                    categoryAdapter?.selectedPosition = 0
+                    categoryAdapter?.notifyDataSetChanged()
+                    categories.firstOrNull()?.let { homeCat ->
+                        launchCategory(homeCat)
+                    }
+                } else {
+                    isEnabled = false
+                    finish()
+                }
+            }
+        })
+
+        lifecycleScope.launch {
+            try {
+                SplitController.getInstance(this@PrimaryActivity)
+                    .splitInfoList(this@PrimaryActivity)
+                    .collectLatest { splitInfoList ->
+                        val hasSecondary = splitInfoList.any { !it.secondaryActivityStack.isEmpty }
+                        val currentPos = categoryAdapter?.selectedPosition ?: 0
+                        Log.d(tag, "[$activityName] splitInfoList update: hasSecondary=$hasSecondary, currentPos=$currentPos")
+                        if (!hasSecondary && currentPos != 0) {
+                            categoryAdapter?.selectedPosition = 0
+                            categoryAdapter?.notifyDataSetChanged()
+                            categories.firstOrNull()?.let { homeCat ->
+                                launchCategory(homeCat)
+                            }
+                        }
+                    }
+            } catch (e: Exception) {
+                Log.w(tag, "[$activityName] Failed to observe splitInfoList: $e")
             }
         }
     }

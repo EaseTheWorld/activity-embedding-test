@@ -39,10 +39,21 @@ class HomeActivity : ComponentActivity() {
         handleTargetLaunch(intent)
     }
 
+    private var isLaunchingTarget = false
+
     override fun onResume() {
         super.onResume()
-        Log.d(tag, "HomeActivity onResume: revealed in Secondary pane")
+        if (isLaunchingTarget) {
+            Log.d(tag, "HomeActivity onResume: skipped bridge notification because target category is being launched")
+            return
+        }
+        Log.d(tag, "HomeActivity onResume: Home truly revealed in Secondary pane")
         HomeNavigationBridge.notifyHomeRevealed()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        isLaunchingTarget = false
     }
 
     override fun onNewIntent(intent: Intent?) {
@@ -61,8 +72,14 @@ class HomeActivity : ComponentActivity() {
         }
         if (targetIntent != null) {
             intent.removeExtra(EXTRA_TARGET_INTENT)
-            Log.d(tag, "HomeActivity launching target category on top: $targetIntent")
-            startActivity(targetIntent)
+            isLaunchingTarget = true
+            try {
+                Log.d(tag, "HomeActivity launching target category on top: $targetIntent")
+                startActivity(targetIntent)
+            } catch (e: Exception) {
+                Log.e(tag, "Failed to launch target intent: $e")
+                isLaunchingTarget = false
+            }
         }
     }
 

@@ -150,6 +150,7 @@ class PrimaryActivity : BaseLoggingActivity() {
                     Log.d(tag, "[$activityName] Home revealed underneath -> updating selectedPosition to 0")
                     categoryAdapter?.selectedPosition = 0
                     categoryAdapter?.notifyDataSetChanged()
+                    listViewCategories.smoothScrollToPosition(0)
                 }
             }
         }
@@ -161,6 +162,7 @@ class PrimaryActivity : BaseLoggingActivity() {
                     Log.d(tag, "[$activityName] Category selected from Home search -> updating selectedPosition to $matchedIndex ($categoryId)")
                     categoryAdapter?.selectedPosition = matchedIndex
                     categoryAdapter?.notifyDataSetChanged()
+                    listViewCategories.smoothScrollToPosition(matchedIndex)
                 }
             }
         }

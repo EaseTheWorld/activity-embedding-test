@@ -99,7 +99,8 @@ class HomeActivity : ComponentActivity() {
             putExtra("target_item_id", item.itemId)
         }
 
-        Log.d(tag, "Launching target setting from Home search: $targetComponent, uri=$targetUri")
+        Log.d(tag, "Launching target setting from Home search: $targetComponent, uri=$targetUri, categoryId=${item.categoryId}")
+        HomeNavigationBridge.notifyCategorySelected(item.categoryId)
         startActivity(intent)
     }
 }

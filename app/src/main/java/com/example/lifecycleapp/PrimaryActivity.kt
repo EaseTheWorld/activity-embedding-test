@@ -153,11 +153,23 @@ class PrimaryActivity : BaseLoggingActivity() {
                 }
             }
         }
+
+        HomeNavigationBridge.onCategorySelected = { categoryId ->
+            runOnUiThread {
+                val matchedIndex = categories.indexOfFirst { it.id.equals(categoryId, ignoreCase = true) }
+                if (matchedIndex >= 0 && categoryAdapter?.selectedPosition != matchedIndex) {
+                    Log.d(tag, "[$activityName] Category selected from Home search -> updating selectedPosition to $matchedIndex ($categoryId)")
+                    categoryAdapter?.selectedPosition = matchedIndex
+                    categoryAdapter?.notifyDataSetChanged()
+                }
+            }
+        }
     }
 
     override fun onDestroy() {
         super.onDestroy()
         HomeNavigationBridge.onHomeRevealed = null
+        HomeNavigationBridge.onCategorySelected = null
         try {
             contentResolver.unregisterContentObserver(categoryObserver)
             Log.d(tag, "[$activityName] Unregistered categoryObserver")

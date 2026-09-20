@@ -13,6 +13,21 @@ class HomeNavigationBridgeTest {
     @After
     fun resetBridge() {
         HomeNavigationBridge.onHomeRevealed = null
+        HomeNavigationBridge.onCategorySelected = null
+    }
+
+    @Test
+    fun `notifyCategorySelected invokes registered listener with categoryId`() {
+        var selectedCategory: String? = null
+        HomeNavigationBridge.onCategorySelected = { categoryId ->
+            selectedCategory = categoryId
+        }
+
+        HomeNavigationBridge.notifyCategorySelected("seat")
+        assertEquals("seat", selectedCategory)
+
+        HomeNavigationBridge.notifyCategorySelected("light")
+        assertEquals("light", selectedCategory)
     }
 
     @Test

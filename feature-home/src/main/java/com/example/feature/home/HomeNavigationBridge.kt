@@ -9,7 +9,14 @@ object HomeNavigationBridge {
     @Volatile
     var onHomeRevealed: (() -> Unit)? = null
 
+    @Volatile
+    var onCategorySelected: ((String) -> Unit)? = null
+
     fun notifyHomeRevealed() {
         onHomeRevealed?.invoke()
+    }
+
+    fun notifyCategorySelected(categoryId: String) {
+        onCategorySelected?.invoke(categoryId)
     }
 }

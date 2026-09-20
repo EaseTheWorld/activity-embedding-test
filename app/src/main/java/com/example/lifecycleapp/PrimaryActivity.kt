@@ -20,6 +20,8 @@ import androidx.appcompat.content.res.AppCompatResources
 import androidx.core.content.res.ResourcesCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.window.embedding.SplitController
+import com.example.feature.home.HomeActivity
+import com.example.feature.home.HomeNavigationBridge
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -141,10 +143,21 @@ class PrimaryActivity : BaseLoggingActivity() {
                 Log.w(tag, "[$activityName] Failed to observe splitInfoList: $e")
             }
         }
+
+        HomeNavigationBridge.onHomeRevealed = {
+            runOnUiThread {
+                if (categoryAdapter?.selectedPosition != 0) {
+                    Log.d(tag, "[$activityName] Home revealed underneath -> updating selectedPosition to 0")
+                    categoryAdapter?.selectedPosition = 0
+                    categoryAdapter?.notifyDataSetChanged()
+                }
+            }
+        }
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        HomeNavigationBridge.onHomeRevealed = null
         try {
             contentResolver.unregisterContentObserver(categoryObserver)
             Log.d(tag, "[$activityName] Unregistered categoryObserver")
@@ -272,7 +285,7 @@ class PrimaryActivity : BaseLoggingActivity() {
                     )
                     .setFinishPrimaryWithSecondary(androidx.window.embedding.SplitRule.FinishBehavior.NEVER)
                     .setFinishSecondaryWithPrimary(androidx.window.embedding.SplitRule.FinishBehavior.ALWAYS)
-                    .setClearTop(true)
+                    .setClearTop(false)
                     .build()
                 ruleController.addRule(splitRule)
                 Log.d(tag, "[$activityName] Registered dynamic SplitPairRule for ${cat.targetPackage}/${cat.targetActivity}")
@@ -283,7 +296,19 @@ class PrimaryActivity : BaseLoggingActivity() {
     }
 
     private fun launchCategory(category: SettingCategory, deepLinkUri: Uri? = null) {
-        val intent = when {
+        if (category.id == "home") {
+            // Bring HomeActivity to top by clearing any category stacked above it
+            val homeIntent = Intent(this, HomeActivity::class.java).apply {
+                action = ACTION_SETTINGS_EMBED
+                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                data = Uri.parse("myapp://navigate/home")
+            }
+            Log.d(tag, "[$activityName] Navigating to HomeActivity (clearing any top activities in secondary pane)")
+            startActivity(homeIntent)
+            return
+        }
+
+        val targetIntent = when {
             !category.targetPackage.isNullOrEmpty() && !category.targetActivity.isNullOrEmpty() -> {
                 Intent().setComponent(ComponentName(category.targetPackage, category.targetActivity))
             }
@@ -293,19 +318,25 @@ class PrimaryActivity : BaseLoggingActivity() {
             else -> null
         }
 
-        if (intent != null) {
-            intent.action = ACTION_SETTINGS_EMBED
-            intent.putExtra(GenericSettingsActivity.EXTRA_CATEGORY_ID, category.id)
-            intent.putExtra(GenericSettingsActivity.EXTRA_AUTHORITY, category.authority)
-            intent.putExtra(GenericSettingsActivity.EXTRA_TITLE, category.title)
+        if (targetIntent != null) {
+            targetIntent.action = ACTION_SETTINGS_EMBED
+            targetIntent.putExtra(GenericSettingsActivity.EXTRA_CATEGORY_ID, category.id)
+            targetIntent.putExtra(GenericSettingsActivity.EXTRA_AUTHORITY, category.authority)
+            targetIntent.putExtra(GenericSettingsActivity.EXTRA_TITLE, category.title)
             val uriToPass = deepLinkUri ?: when (category.id) {
-                "home" -> Uri.parse("myapp://navigate/home")
                 "dashboard" -> Uri.parse("myapp://navigate/dashboard")
                 else -> Uri.parse("myapp://navigate/${category.id}")
             }
-            intent.data = uriToPass
-            Log.d(tag, "[$activityName] Launching category ${category.title} via $intent (data=$uriToPass)")
-            startActivity(intent)
+            targetIntent.data = uriToPass
+
+            Log.d(tag, "[$activityName] Launching category ${category.title} on top of HomeActivity via $targetIntent")
+            // Send to HomeActivity with CLEAR_TOP so any previous category is closed and target is launched directly on top of HomeActivity
+            val homeIntent = Intent(this, HomeActivity::class.java).apply {
+                action = ACTION_SETTINGS_EMBED
+                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                putExtra(HomeActivity.EXTRA_TARGET_INTENT, targetIntent)
+            }
+            startActivity(homeIntent)
         } else {
             Log.w(tag, "[$activityName] No target intent for category ${category.title}")
         }

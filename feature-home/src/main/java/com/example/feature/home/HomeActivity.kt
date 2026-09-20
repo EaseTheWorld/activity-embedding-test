@@ -11,6 +11,10 @@ import androidx.activity.compose.setContent
 
 class HomeActivity : ComponentActivity() {
 
+    companion object {
+        const val EXTRA_TARGET_INTENT = "extra_target_intent"
+    }
+
     private val tag = "HomeActivity"
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -31,6 +35,35 @@ class HomeActivity : ComponentActivity() {
                 }
             )
         }
+
+        handleTargetLaunch(intent)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        Log.d(tag, "HomeActivity onResume: revealed in Secondary pane")
+        HomeNavigationBridge.notifyHomeRevealed()
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleTargetLaunch(intent)
+    }
+
+    private fun handleTargetLaunch(intent: Intent?) {
+        if (intent == null) return
+        val targetIntent = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            intent.getParcelableExtra(EXTRA_TARGET_INTENT, Intent::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            intent.getParcelableExtra(EXTRA_TARGET_INTENT)
+        }
+        if (targetIntent != null) {
+            intent.removeExtra(EXTRA_TARGET_INTENT)
+            Log.d(tag, "HomeActivity launching target category on top: $targetIntent")
+            startActivity(targetIntent)
+        }
     }
 
     private fun launchTargetSetting(item: SearchableSettingItem) {
@@ -47,11 +80,9 @@ class HomeActivity : ComponentActivity() {
             data = targetUri
             putExtra("category_id", item.categoryId)
             putExtra("target_item_id", item.itemId)
-            putExtra("from_home_search", true)
         }
 
         Log.d(tag, "Launching target setting from Home search: $targetComponent, uri=$targetUri")
-        // Launch on top of HomeActivity in the Secondary TaskFragment
         startActivity(intent)
     }
 }

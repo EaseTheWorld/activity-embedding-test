@@ -50,7 +50,8 @@ open class GenericSettingsActivity : AppCompatActivity() {
 
             BackHandler {
                 if (!navController.popBackStack()) {
-                    handleRootBackPress()
+                    Log.d(tag, "At root of category Composable graph -> finishing secondary activity to reveal Home")
+                    finish()
                 }
             }
 
@@ -66,26 +67,6 @@ open class GenericSettingsActivity : AppCompatActivity() {
                     }
                 )
             }
-        }
-    }
-
-    private fun handleRootBackPress() {
-        val fromHomeSearch = intent.getBooleanExtra("from_home_search", false)
-        Log.d(tag, "handleRootBackPress: fromHomeSearch=$fromHomeSearch")
-        if (fromHomeSearch) {
-            finish()
-        } else {
-            val homeIntent = Intent("com.example.carsettings.ACTION_SETTINGS_EMBED").apply {
-                setClassName(packageName, "com.example.lifecycleapp.PrimaryActivity")
-                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-                data = Uri.parse("myapp://navigate/home")
-            }
-            try {
-                startActivity(homeIntent)
-            } catch (e: Exception) {
-                Log.w(tag, "Failed to start PrimaryActivity for Home: $e")
-            }
-            finish()
         }
     }
 

@@ -36,7 +36,7 @@ class SplitInitializer : Initializer<RuleController> {
             .setDefaultSplitAttributes(defaultSplitAttributes)
             .setFinishPrimaryWithSecondary(SplitRule.FinishBehavior.NEVER)
             .setFinishSecondaryWithPrimary(SplitRule.FinishBehavior.ALWAYS)
-            .setClearTop(true)
+            .setClearTop(false)
             .build()
 
         val ruleController = RuleController.getInstance(context)

@@ -23,6 +23,7 @@
             android:name=".LightSettingsActivity"
             android:exported="true"
             android:taskAffinity=""
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density"
             android:label="Lights">
             <intent-filter>
                 <action android:name="com.example.carsettings.light.OPEN" />

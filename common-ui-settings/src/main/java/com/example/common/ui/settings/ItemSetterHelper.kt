@@ -1,5 +1,6 @@
 package com.example.common.ui.settings
 
+import android.content.Intent
 import android.util.Log
 import com.example.core.item.ChoiceItemViewModel
 import com.example.core.item.ItemViewModelRegistry
@@ -11,15 +12,22 @@ import com.example.core.item.ValueWithState
  * Robust, universal type coercion and mutation helper for [ItemViewModelRegistry].
  *
  * Supports mutating setting items from:
- * 1. Deep Link query parameters (e.g. `myapp://navigate/{categoryId}/{itemId}?value={value}`)
- * 2. ADB simulation broadcasts
- * 3. External IPC or test tools
+ * 1. Intent Extras (e.g. `intent.putExtra("value", false)` or `adb shell am start --ez value false`)
+ * 2. Deep Link query parameters (e.g. `myapp://navigate/{categoryId}/{itemId}?value={value}`) as fallback
+ * 3. ADB simulation broadcasts
+ * 4. External IPC or test tools
  *
  * Adheres to Interface Segregation Principle (ISP):
  * Only ViewModels implementing [MutableItemViewModel] or [SerializedMutableItemViewModel] can be mutated.
  */
 object ItemSetterHelper {
     private const val TAG = "ItemSetterHelper"
+
+    /**
+     * Intent Extra key representing the mutation payload.
+     * Separates the mutation payload (POST body) from the URI destination (GET path).
+     */
+    const val EXTRA_VALUE = "value"
 
     private fun logI(tag: String, msg: String) {
         try { Log.i(tag, msg) } catch (_: Throwable) { println("[$tag] $msg") }
@@ -34,28 +42,58 @@ object ItemSetterHelper {
     }
 
     /**
-     * Attempts to mutate the setting item specified by [itemId] to [rawValue].
+     * Extracts and applies mutation payload from [Intent] (Extras or query parameter fallback).
+     *
+     * In accordance with Separation of Concerns (SoC):
+     * 1. URI represents the navigation destination (GET/READ).
+     * 2. Intent Extras represent the mutation payload (POST/WRITE).
+     *
+     * Consumes the extra upon success ([Intent.removeExtra]) to avoid repeated mutations
+     * during configuration changes or backstack navigation.
      *
      * @param registry The [ItemViewModelRegistry] owning the item's ViewModel.
      * @param itemId Unique ID of the setting item (e.g. "auto_lock", "driver_seat_heat", "seat_lumbar").
-     * @param rawValue String representation of the new value from deep link or input.
+     * @param intent The incoming Intent carrying extras or data URI.
+     * @return True if a value was found and successfully applied, false otherwise.
+     */
+    fun applyFromIntent(registry: ItemViewModelRegistry, itemId: String, intent: Intent): Boolean {
+        val extraValue: Any? = intent.extras?.get(EXTRA_VALUE)
+        val rawValue: Any = extraValue ?: intent.data?.getQueryParameter(EXTRA_VALUE) ?: return false
+
+        val success = applyValue(registry, itemId, rawValue)
+        if (success) {
+            intent.removeExtra(EXTRA_VALUE)
+        }
+        return success
+    }
+
+    /**
+     * Attempts to mutate the setting item specified by [itemId] to [rawValue].
+     * Supports strongly typed values (Boolean, Int, Float, Double, String) as well
+     * as raw strings.
+     *
+     * @param registry The [ItemViewModelRegistry] owning the item's ViewModel.
+     * @param itemId Unique ID of the setting item (e.g. "auto_lock", "driver_seat_heat", "seat_lumbar").
+     * @param rawValue Value representation from Intent Extra, deep link, or input.
      * @return True if the mutation was successfully applied, false otherwise.
      */
-    fun applyValue(registry: ItemViewModelRegistry, itemId: String, rawValue: String): Boolean {
+    fun applyValue(registry: ItemViewModelRegistry, itemId: String, rawValue: Any): Boolean {
         val vm = registry.getViewModel<Any>(itemId)
         if (vm == null) {
             logW(TAG, "Cannot apply value: no ViewModel registered for itemId '$itemId'")
             return false
         }
 
+        val rawStr = rawValue.toString()
+
         // 1. Dedicated SerializedMutableItemViewModel contract (e.g. SeatLumbarViewModel)
         if (vm is SerializedMutableItemViewModel) {
-            val handled = vm.updateFromSerialized(rawValue)
+            val handled = vm.updateFromSerialized(rawStr)
             if (handled) {
-                logI(TAG, "Applied serialized value '$rawValue' to item '$itemId'")
+                logI(TAG, "Applied serialized value '$rawStr' to item '$itemId'")
                 return true
             } else {
-                logW(TAG, "Serialized value '$rawValue' rejected by SerializedMutableItemViewModel for item '$itemId'")
+                logW(TAG, "Serialized value '$rawStr' rejected by SerializedMutableItemViewModel for item '$itemId'")
                 return false
             }
         }
@@ -72,7 +110,7 @@ object ItemSetterHelper {
         // 2. Choice Item (Multi-Option with state)
         if (vm is ChoiceItemViewModel<*>) {
             val options = vm.optionStates.value
-            val matchedOption = findMatchingOption(options, rawValue)
+            val matchedOption = findMatchingOption(options, rawStr)
             if (matchedOption != null && matchedOption.id != null) {
                 @Suppress("UNCHECKED_CAST")
                 val typedVm = vm as? MutableItemViewModel<Any>
@@ -88,13 +126,13 @@ object ItemSetterHelper {
                 @Suppress("UNCHECKED_CAST")
                 val stringVm = vm as? MutableItemViewModel<String>
                 if (stringVm != null) {
-                    stringVm.setValue(rawValue)
-                    logI(TAG, "Applied raw string choice '$rawValue' to item '$itemId'")
+                    stringVm.setValue(rawStr)
+                    logI(TAG, "Applied raw string choice '$rawStr' to item '$itemId'")
                     return true
                 }
             }
 
-            logW(TAG, "Option '$rawValue' could not be resolved for choice item '$itemId'")
+            logW(TAG, "Option '$rawStr' could not be resolved for choice item '$itemId'")
             return false
         }
 
@@ -102,14 +140,14 @@ object ItemSetterHelper {
         val current = vm.valueFlow.value
         return when (current) {
             is Boolean -> {
-                val parsed = parseBoolean(rawValue)
+                val parsed = if (rawValue is Boolean) rawValue else parseBoolean(rawStr)
                 @Suppress("UNCHECKED_CAST")
                 (mutableVm as MutableItemViewModel<Boolean>).setValue(parsed)
                 logI(TAG, "Applied boolean $parsed to item '$itemId'")
                 true
             }
             is Int -> {
-                val parsed = rawValue.toIntOrNull()
+                val parsed = if (rawValue is Number) rawValue.toInt() else rawStr.toIntOrNull()
                 if (parsed != null) {
                     @Suppress("UNCHECKED_CAST")
                     (mutableVm as MutableItemViewModel<Int>).setValue(parsed)
@@ -121,7 +159,7 @@ object ItemSetterHelper {
                 }
             }
             is Float -> {
-                val parsed = rawValue.toFloatOrNull()
+                val parsed = if (rawValue is Number) rawValue.toFloat() else rawStr.toFloatOrNull()
                 if (parsed != null) {
                     @Suppress("UNCHECKED_CAST")
                     (mutableVm as MutableItemViewModel<Float>).setValue(parsed)
@@ -133,7 +171,7 @@ object ItemSetterHelper {
                 }
             }
             is Double -> {
-                val parsed = rawValue.toDoubleOrNull()
+                val parsed = if (rawValue is Number) rawValue.toDouble() else rawStr.toDoubleOrNull()
                 if (parsed != null) {
                     @Suppress("UNCHECKED_CAST")
                     (mutableVm as MutableItemViewModel<Double>).setValue(parsed)
@@ -146,8 +184,8 @@ object ItemSetterHelper {
             }
             is String -> {
                 @Suppress("UNCHECKED_CAST")
-                (mutableVm as MutableItemViewModel<String>).setValue(rawValue)
-                logI(TAG, "Applied string '$rawValue' to item '$itemId'")
+                (mutableVm as MutableItemViewModel<String>).setValue(rawStr)
+                logI(TAG, "Applied string '$rawStr' to item '$itemId'")
                 true
             }
             else -> {
@@ -159,7 +197,7 @@ object ItemSetterHelper {
                                 it.parameterTypes[0] == String::class.java
                     }
                     if (method != null) {
-                        val res = method.invoke(vm, rawValue)
+                        val res = method.invoke(vm, rawStr)
                         if (res is Boolean) {
                             if (res) {
                                 logI(TAG, "Applied via reflection updateFromSerialized to item '$itemId'")

@@ -84,14 +84,21 @@ class LightSettingsActivity : AppCompatActivity() {
     }
 
     private fun handleDeepLinkIntent(intent: Intent?) {
-        val uri: Uri = intent?.data ?: return
-        Log.d(tag, "[$activityName] handleDeepLinkIntent: uri=$uri")
-        val segments = uri.pathSegments
+        val uri: Uri? = intent?.data
+        Log.d(tag, "[$activityName] handleDeepLinkIntent: uri=$uri, extras=${intent?.extras}")
+        val segments = uri?.pathSegments ?: emptyList()
         val itemId = segments.getOrNull(1)
-        val valueParam = uri.getQueryParameter("value")
 
-        if (itemId != null && valueParam != null) {
-            applyDeepLinkValue(itemId, valueParam)
+        val extraValue: Any? = intent?.extras?.get("value")
+        val rawValue: String? = when {
+            extraValue != null -> extraValue.toString()
+            uri != null -> uri.getQueryParameter("value")
+            else -> null
+        }
+
+        if (itemId != null && rawValue != null) {
+            applyDeepLinkValue(itemId, rawValue)
+            intent?.removeExtra("value")
         }
     }
 

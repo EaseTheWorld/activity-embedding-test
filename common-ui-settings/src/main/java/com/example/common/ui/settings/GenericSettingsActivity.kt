@@ -74,14 +74,14 @@ open class GenericSettingsActivity : AppCompatActivity() {
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
         setIntent(intent)
-        Log.d(tag, "onNewIntent received: $intent, data=${intent?.data}")
-        intent?.data?.let { uri ->
-            if (uri.scheme == SettingsNavigation.DEEP_LINK_SCHEME) {
-                val rawValue = uri.getQueryParameter("value")
+        Log.d(tag, "onNewIntent received: $intent, data=${intent?.data}, extras=${intent?.extras}")
+        intent?.let { targetIntent ->
+            val uri = targetIntent.data
+            if (uri != null && uri.scheme == SettingsNavigation.DEEP_LINK_SCHEME) {
                 val itemId = uri.pathSegments.getOrNull(1)
-                if (itemId != null && rawValue != null) {
-                    val applied = ItemSetterHelper.applyValue(getViewModelRegistry(), itemId, rawValue)
-                    Log.d(tag, "onNewIntent setter applied: itemId=$itemId, value=$rawValue, success=$applied")
+                if (itemId != null) {
+                    val applied = ItemSetterHelper.applyFromIntent(getViewModelRegistry(), itemId, targetIntent)
+                    Log.d(tag, "onNewIntent setter applied: itemId=$itemId, success=$applied")
                 }
             }
         }
@@ -92,37 +92,31 @@ open class GenericSettingsActivity : AppCompatActivity() {
     private fun handleIntentNavigation(intent: Intent, navController: NavHostController) {
         val uri: Uri? = intent.data
         if (uri != null && uri.scheme == SettingsNavigation.DEEP_LINK_SCHEME) {
-            Log.d(tag, "Navigating via deep link: $uri")
+            Log.d(tag, "Navigating via deep link: $uri, extras=${intent.extras}")
 
-            // 1. Process setter mutation if ?value= query parameter is present
-            val rawValue = uri.getQueryParameter("value")
+            // 1. Process setter mutation from Intent Extras (or query parameter fallback)
             val segments = uri.pathSegments
             val itemId = segments.getOrNull(1)
 
-            if (itemId != null && rawValue != null) {
-                val applied = ItemSetterHelper.applyValue(getViewModelRegistry(), itemId, rawValue)
-                Log.d(tag, "Deep link setter applied: itemId=$itemId, value=$rawValue, success=$applied")
+            if (itemId != null) {
+                val applied = ItemSetterHelper.applyFromIntent(getViewModelRegistry(), itemId, intent)
+                Log.d(tag, "Deep link setter applied: itemId=$itemId, success=$applied")
             }
 
-            // 2. Direct navigation with deep link URI (Jetpack Navigation natively matches ?value={value})
+            // 2. Direct navigation with clean URI (routes are pure destination identifiers)
+            val cleanUri = if (uri.query != null) uri.buildUpon().clearQuery().build() else uri
             try {
-                navController.navigate(uri)
+                navController.navigate(cleanUri)
                 return
             } catch (e: Exception) {
-                Log.w(tag, "Direct navigation with uri $uri failed, attempting cleanUri fallback: $e")
-                val cleanUri = if (uri.query != null) uri.buildUpon().clearQuery().build() else uri
-                try {
-                    navController.navigate(cleanUri)
-                    return
-                } catch (e2: Exception) {
-                    val categoryId = segments.getOrNull(0)
-                    if (!categoryId.isNullOrEmpty() && !categoryId.equals("dashboard", ignoreCase = true)) {
-                        try {
-                            navController.navigate(SettingsNavigation.categoryRoute(categoryId))
-                            return
-                        } catch (e3: Exception) {
-                            Log.e(tag, "Fallback navigation to category route failed: $e3")
-                        }
+                Log.w(tag, "Direct navigation with uri $cleanUri failed, attempting category fallback: $e")
+                val categoryId = segments.getOrNull(0)
+                if (!categoryId.isNullOrEmpty() && !categoryId.equals("dashboard", ignoreCase = true)) {
+                    try {
+                        navController.navigate(SettingsNavigation.categoryRoute(categoryId))
+                        return
+                    } catch (e3: Exception) {
+                        Log.e(tag, "Fallback navigation to category route failed: $e3")
                     }
                 }
             }

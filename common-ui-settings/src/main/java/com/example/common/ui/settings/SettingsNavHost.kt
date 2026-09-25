@@ -28,19 +28,17 @@ import com.example.core.item.ItemViewModelRegistry
 object SettingsNavigation {
     const val ROUTE_DASHBOARD = "dashboard"
     const val ROUTE_CATEGORY = "navigate/{categoryId}"
-    const val ROUTE_ITEM_DETAIL = "navigate/{categoryId}/{itemId}?value={value}"
-    const val ROUTE_SEAT_LUMBAR = "navigate/seat/seat_lumbar?value={value}"
+    const val ROUTE_ITEM_DETAIL = "navigate/{categoryId}/{itemId}"
+    const val ROUTE_SEAT_LUMBAR = "navigate/seat/seat_lumbar"
 
     const val DEEP_LINK_SCHEME = "myapp"
     const val DEEP_LINK_HOST = "navigate"
 
     fun categoryRoute(categoryId: String): String = "navigate/$categoryId"
-    fun itemDetailRoute(categoryId: String, itemId: String, value: String? = null): String =
-        if (value != null) "navigate/$categoryId/$itemId?value=$value" else "navigate/$categoryId/$itemId"
+    fun itemDetailRoute(categoryId: String, itemId: String): String = "navigate/$categoryId/$itemId"
 
     fun categoryDeepLink(categoryId: String): String = "$DEEP_LINK_SCHEME://$DEEP_LINK_HOST/$categoryId"
-    fun itemDetailDeepLink(categoryId: String, itemId: String, value: String? = null): String =
-        if (value != null) "$DEEP_LINK_SCHEME://$DEEP_LINK_HOST/$categoryId/$itemId?value=$value" else "$DEEP_LINK_SCHEME://$DEEP_LINK_HOST/$categoryId/$itemId"
+    fun itemDetailDeepLink(categoryId: String, itemId: String): String = "$DEEP_LINK_SCHEME://$DEEP_LINK_HOST/$categoryId/$itemId"
 }
 
 /**
@@ -152,29 +150,12 @@ fun SettingsNavHost(
         // ====================================================================
         composable(
             route = SettingsNavigation.ROUTE_SEAT_LUMBAR,
-            arguments = listOf(
-                navArgument("value") {
-                    type = NavType.StringType
-                    nullable = true
-                    defaultValue = null
-                }
-            ),
             deepLinks = listOf(
-                navDeepLink {
-                    uriPattern = "${SettingsNavigation.DEEP_LINK_SCHEME}://${SettingsNavigation.DEEP_LINK_HOST}/seat/seat_lumbar?value={value}"
-                },
                 navDeepLink {
                     uriPattern = "${SettingsNavigation.DEEP_LINK_SCHEME}://${SettingsNavigation.DEEP_LINK_HOST}/seat/seat_lumbar"
                 }
             )
-        ) { backStackEntry ->
-            val value = backStackEntry.arguments?.getString("value")
-            LaunchedEffect(value) {
-                if (!value.isNullOrEmpty()) {
-                    ItemSetterHelper.applyValue(viewModelRegistry, "seat_lumbar", value)
-                }
-            }
-
+        ) {
             val provider = CategoryItemRegistry.getProvider("seat")
             val item = provider?.findItem("seat_lumbar")
             val titleRes = provider?.titleKey?.let { key ->
@@ -204,17 +185,9 @@ fun SettingsNavHost(
             route = SettingsNavigation.ROUTE_ITEM_DETAIL,
             arguments = listOf(
                 navArgument("categoryId") { type = NavType.StringType },
-                navArgument("itemId") { type = NavType.StringType },
-                navArgument("value") {
-                    type = NavType.StringType
-                    nullable = true
-                    defaultValue = null
-                }
+                navArgument("itemId") { type = NavType.StringType }
             ),
             deepLinks = listOf(
-                navDeepLink {
-                    uriPattern = "${SettingsNavigation.DEEP_LINK_SCHEME}://${SettingsNavigation.DEEP_LINK_HOST}/{categoryId}/{itemId}?value={value}"
-                },
                 navDeepLink {
                     uriPattern = "${SettingsNavigation.DEEP_LINK_SCHEME}://${SettingsNavigation.DEEP_LINK_HOST}/{categoryId}/{itemId}"
                 }
@@ -222,13 +195,6 @@ fun SettingsNavHost(
         ) { backStackEntry ->
             val categoryId = backStackEntry.arguments?.getString("categoryId") ?: ""
             val itemId = backStackEntry.arguments?.getString("itemId") ?: ""
-            val value = backStackEntry.arguments?.getString("value")
-
-            LaunchedEffect(itemId, value) {
-                if (!value.isNullOrEmpty()) {
-                    ItemSetterHelper.applyValue(viewModelRegistry, itemId, value)
-                }
-            }
 
             if (categoryId.equals("light", ignoreCase = true)) {
                 onNavigateExternal(categoryId)

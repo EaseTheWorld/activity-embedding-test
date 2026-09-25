@@ -181,4 +181,30 @@ class ItemSetterHelperTest {
         val result = ItemSetterHelper.applyValue(registry, "non_existent", "true")
         assertFalse(result)
     }
+
+    @Test
+    fun `applyValue handles strongly typed objects directly from Intent Extras`() {
+        val registry = ItemViewModelRegistry()
+        val toggleVm = MockToggleViewModel(initial = false)
+        val intVm = MockIntViewModel(initial = 0)
+        val choiceVm = MockChoiceViewModel(initial = "OFF", options = listOf("OFF", "LEVEL 1", "LEVEL 2"))
+
+        registry.register("auto_lock", toggleVm)
+        registry.register("volume", intVm)
+        registry.register("driver_seat_heat", choiceVm)
+
+        // Boolean direct (e.g. from intent.getBooleanExtra or --ez value true/false)
+        assertTrue(ItemSetterHelper.applyValue(registry, "auto_lock", true))
+        assertTrue(toggleVm.valueFlow.value)
+        assertTrue(ItemSetterHelper.applyValue(registry, "auto_lock", false))
+        assertFalse(toggleVm.valueFlow.value)
+
+        // Int direct (e.g. from intent.getIntExtra or --ei value 42)
+        assertTrue(ItemSetterHelper.applyValue(registry, "volume", 42))
+        assertEquals(42, intVm.valueFlow.value)
+
+        // String choice
+        assertTrue(ItemSetterHelper.applyValue(registry, "driver_seat_heat", "LEVEL_2"))
+        assertEquals("LEVEL 2", choiceVm.valueFlow.value)
+    }
 }

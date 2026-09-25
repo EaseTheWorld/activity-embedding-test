@@ -94,15 +94,13 @@ class PrimaryActivity : BaseLoggingActivity() {
             launchCategory(selectedCategory)
         }
 
-        if (savedInstanceState == null) {
-            if (intent?.data != null || intent?.action == "com.example.lifecycleapp.open") {
-                handleIntent(intent)
-            } else {
-                categories.firstOrNull()?.let { firstCategory ->
-                    categoryAdapter?.selectedPosition = 0
-                    categoryAdapter?.notifyDataSetChanged()
-                    launchCategory(firstCategory)
-                }
+        if (intent?.data != null || intent?.action == "com.example.lifecycleapp.open") {
+            handleIntent(intent)
+        } else if (savedInstanceState == null) {
+            categories.firstOrNull()?.let { firstCategory ->
+                categoryAdapter?.selectedPosition = 0
+                categoryAdapter?.notifyDataSetChanged()
+                launchCategory(firstCategory)
             }
         }
 
@@ -131,13 +129,6 @@ class PrimaryActivity : BaseLoggingActivity() {
                         val hasSecondary = splitInfoList.any { !it.secondaryActivityStack.isEmpty }
                         val currentPos = categoryAdapter?.selectedPosition ?: 0
                         Log.d(tag, "[$activityName] splitInfoList update: hasSecondary=$hasSecondary, currentPos=$currentPos")
-                        if (!hasSecondary && currentPos != 0) {
-                            categoryAdapter?.selectedPosition = 0
-                            categoryAdapter?.notifyDataSetChanged()
-                            categories.firstOrNull()?.let { homeCat ->
-                                launchCategory(homeCat)
-                            }
-                        }
                     }
             } catch (e: Exception) {
                 Log.w(tag, "[$activityName] Failed to observe splitInfoList: $e")
@@ -206,17 +197,17 @@ class PrimaryActivity : BaseLoggingActivity() {
             val authority = resolveInfo.providerInfo?.authority ?: continue
             val packageName = resolveInfo.providerInfo?.packageName
             val categoryUri = Uri.parse("content://$authority/$PATH_CATEGORY")
-            if (observedAuthorities.add(authority)) {
-                try {
-                    contentResolver.registerContentObserver(categoryUri, true, categoryObserver)
-                    Log.d(tag, "[$activityName] Registered categoryObserver on $categoryUri")
-                } catch (e: Exception) {
-                    Log.w(tag, "[$activityName] Failed to register observer on $categoryUri: $e")
-                }
-            }
             try {
                 contentResolver.query(categoryUri, null, null, null, null)?.use { cursor ->
                     if (cursor.moveToFirst()) {
+                        if (observedAuthorities.add(authority)) {
+                            try {
+                                contentResolver.registerContentObserver(categoryUri, true, categoryObserver)
+                                Log.d(tag, "[$activityName] Registered categoryObserver on $categoryUri")
+                            } catch (e: Exception) {
+                                Log.w(tag, "[$activityName] Failed to register observer on $categoryUri: $e")
+                            }
+                        }
                         val id = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_CATEGORY_ID))
                         val title = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_CATEGORY_TITLE))
                         val subtitle = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_CATEGORY_SUBTITLE))
@@ -309,7 +300,7 @@ class PrimaryActivity : BaseLoggingActivity() {
         return sortedCategories
     }
 
-    private fun launchCategory(category: SettingCategory, deepLinkUri: Uri? = null) {
+    private fun launchCategory(category: SettingCategory, deepLinkUri: Uri? = null, extras: Bundle? = null) {
         if (category.id == "home") {
             // Bring HomeActivity to top by clearing any category stacked above it
             val homeIntent = Intent(this, HomeActivity::class.java).apply {
@@ -338,20 +329,17 @@ class PrimaryActivity : BaseLoggingActivity() {
             targetIntent.putExtra(GenericSettingsActivity.EXTRA_CATEGORY_ID, category.id)
             targetIntent.putExtra(GenericSettingsActivity.EXTRA_AUTHORITY, category.authority)
             targetIntent.putExtra(GenericSettingsActivity.EXTRA_TITLE, category.title)
+            if (extras != null) {
+                targetIntent.putExtras(extras)
+            }
             val uriToPass = deepLinkUri ?: when (category.id) {
                 "dashboard" -> Uri.parse("myapp://navigate/dashboard")
                 else -> Uri.parse("myapp://navigate/${category.id}")
             }
             targetIntent.data = uriToPass
 
-            Log.d(tag, "[$activityName] Launching category ${category.title} on top of HomeActivity via $targetIntent")
-            // Send to HomeActivity with CLEAR_TOP so any previous category is closed and target is launched directly on top of HomeActivity
-            val homeIntent = Intent(this, HomeActivity::class.java).apply {
-                action = ACTION_SETTINGS_EMBED
-                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-                putExtra(HomeActivity.EXTRA_TARGET_INTENT, targetIntent)
-            }
-            startActivity(homeIntent)
+            Log.d(tag, "[$activityName] Launching category ${category.title} via $targetIntent, extras=${targetIntent.extras}")
+            startActivity(targetIntent)
         } else {
             Log.w(tag, "[$activityName] No target intent for category ${category.title}")
         }
@@ -365,7 +353,7 @@ class PrimaryActivity : BaseLoggingActivity() {
 
         // 1. First-class DeepLink handling: myapp://navigate/...
         if (dataUri != null && dataUri.scheme == "myapp" && dataUri.host == "navigate") {
-            handleDeepLink(dataUri)
+            handleDeepLink(dataUri, intent.extras)
             return
         }
 
@@ -382,7 +370,7 @@ class PrimaryActivity : BaseLoggingActivity() {
             if (categoryKey != null) {
                 val matched = categories.find { it.id.equals(categoryKey, ignoreCase = true) }
                 if (matched != null) {
-                    launchCategory(matched)
+                    launchCategory(matched, extras = intent.extras)
                 } else {
                     Log.w(tag, "[$activityName] Deeplink category key not found: $categoryKey")
                 }
@@ -390,7 +378,7 @@ class PrimaryActivity : BaseLoggingActivity() {
         }
     }
 
-    private fun handleDeepLink(uri: Uri) {
+    private fun handleDeepLink(uri: Uri, extras: Bundle? = null) {
         val segments = uri.pathSegments
         val categoryId = when {
             segments.isEmpty() -> "home"
@@ -399,14 +387,14 @@ class PrimaryActivity : BaseLoggingActivity() {
             else -> segments[0]
         }
 
-        Log.d(tag, "[$activityName] handleDeepLink: uri=$uri, resolved categoryId=$categoryId")
+        Log.d(tag, "[$activityName] handleDeepLink: uri=$uri, resolved categoryId=$categoryId, extras=$extras")
 
         val matchedIndex = categories.indexOfFirst { it.id.equals(categoryId, ignoreCase = true) }
         if (matchedIndex >= 0) {
             categoryAdapter?.selectedPosition = matchedIndex
             categoryAdapter?.notifyDataSetChanged()
             listViewCategories.smoothScrollToPosition(matchedIndex)
-            launchCategory(categories[matchedIndex], deepLinkUri = uri)
+            launchCategory(categories[matchedIndex], deepLinkUri = uri, extras = extras)
             return
         }
 
@@ -415,6 +403,7 @@ class PrimaryActivity : BaseLoggingActivity() {
             val extIntent = Intent("com.example.carsettings.light.OPEN").apply {
                 setClassName("com.example.carsettings.light", "com.example.feature.light.LightSettingsActivity")
                 data = uri
+                if (extras != null) putExtras(extras)
             }
             try {
                 startActivity(extIntent)
@@ -426,6 +415,7 @@ class PrimaryActivity : BaseLoggingActivity() {
             val settingsIntent = Intent(this, GenericSettingsActivity::class.java).apply {
                 data = uri
                 putExtra(GenericSettingsActivity.EXTRA_CATEGORY_ID, categoryId)
+                if (extras != null) putExtras(extras)
             }
             startActivity(settingsIntent)
             Log.d(tag, "[$activityName] Launched GenericSettingsActivity fallback for $categoryId via $uri")

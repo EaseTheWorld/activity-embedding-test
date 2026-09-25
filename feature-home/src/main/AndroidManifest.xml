@@ -5,6 +5,8 @@
         <activity
             android:name=".HomeActivity"
             android:exported="true"
+            android:launchMode="singleTop"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density"
             android:theme="@style/Theme.AppCompat.DayNight.NoActionBar">
             <intent-filter>
                 <action android:name="com.example.carsettings.ACTION_SETTINGS_EMBED" />

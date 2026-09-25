@@ -49,8 +49,11 @@ class NavigationDeepLinkTest {
     @Test
     fun `itemDetailRoute builds expected intra-category relative navigation route`() {
         assertEquals("navigate/door/auto_lock", SettingsNavigation.itemDetailRoute("door", "auto_lock"))
+        assertEquals("navigate/door/auto_lock?value=true", SettingsNavigation.itemDetailRoute("door", "auto_lock", "true"))
         assertEquals("navigate/seat/seat_lumbar", SettingsNavigation.itemDetailRoute("seat", "seat_lumbar"))
+        assertEquals("navigate/seat/seat_lumbar?value=80,70", SettingsNavigation.itemDetailRoute("seat", "seat_lumbar", "80,70"))
         assertEquals("navigate/seat/driver_seat_heat", SettingsNavigation.itemDetailRoute("seat", "driver_seat_heat"))
+        assertEquals("navigate/seat/driver_seat_heat?value=LEVEL_2", SettingsNavigation.itemDetailRoute("seat", "driver_seat_heat", "LEVEL_2"))
     }
 
     @Test
@@ -58,14 +61,20 @@ class NavigationDeepLinkTest {
         assertEquals("myapp", SettingsNavigation.DEEP_LINK_SCHEME)
         assertEquals("navigate", SettingsNavigation.DEEP_LINK_HOST)
         assertEquals("dashboard", SettingsNavigation.ROUTE_DASHBOARD)
+        assertEquals("navigate/{categoryId}/{itemId}?value={value}", SettingsNavigation.ROUTE_ITEM_DETAIL)
+        assertEquals("navigate/seat/seat_lumbar?value={value}", SettingsNavigation.ROUTE_SEAT_LUMBAR)
 
         // Inter-category deep link
         val doorDeepLink = SettingsNavigation.categoryDeepLink("door")
         assertEquals("myapp://navigate/door", doorDeepLink)
 
-        // Intra-category item deep link
+        // Intra-category item deep link without value
         val itemDeepLink = SettingsNavigation.itemDetailDeepLink("seat", "seat_lumbar")
         assertEquals("myapp://navigate/seat/seat_lumbar", itemDeepLink)
+
+        // Intra-category item deep link with value
+        val itemDeepLinkWithValue = SettingsNavigation.itemDetailDeepLink("door", "auto_lock", "true")
+        assertEquals("myapp://navigate/door/auto_lock?value=true", itemDeepLinkWithValue)
     }
 
     @Test

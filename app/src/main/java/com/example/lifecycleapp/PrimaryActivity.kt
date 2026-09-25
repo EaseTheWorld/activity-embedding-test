@@ -334,6 +334,7 @@ class PrimaryActivity : BaseLoggingActivity() {
 
         if (targetIntent != null) {
             targetIntent.action = ACTION_SETTINGS_EMBED
+            targetIntent.flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
             targetIntent.putExtra(GenericSettingsActivity.EXTRA_CATEGORY_ID, category.id)
             targetIntent.putExtra(GenericSettingsActivity.EXTRA_AUTHORITY, category.authority)
             targetIntent.putExtra(GenericSettingsActivity.EXTRA_TITLE, category.title)

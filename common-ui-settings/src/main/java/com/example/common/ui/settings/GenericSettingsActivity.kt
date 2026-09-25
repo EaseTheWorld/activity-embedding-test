@@ -26,6 +26,7 @@ open class GenericSettingsActivity : AppCompatActivity() {
 
     private val tag = "GenericSettingsActivity"
     private var pendingIntent = mutableStateOf<Intent?>(null)
+    private var navTrigger = mutableStateOf(0)
 
     protected open fun getViewModelRegistry(): ItemViewModelRegistry = defaultViewModelRegistry
 
@@ -43,7 +44,7 @@ open class GenericSettingsActivity : AppCompatActivity() {
             val navController = rememberNavController()
 
             // Handle incoming deep links or intent actions
-            LaunchedEffect(pendingIntent.value) {
+            LaunchedEffect(pendingIntent.value, navTrigger.value) {
                 val targetIntent = pendingIntent.value ?: return@LaunchedEffect
                 handleIntentNavigation(targetIntent, navController)
             }
@@ -73,7 +74,19 @@ open class GenericSettingsActivity : AppCompatActivity() {
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
         setIntent(intent)
+        Log.d(tag, "onNewIntent received: $intent, data=${intent?.data}")
+        intent?.data?.let { uri ->
+            if (uri.scheme == SettingsNavigation.DEEP_LINK_SCHEME) {
+                val rawValue = uri.getQueryParameter("value")
+                val itemId = uri.pathSegments.getOrNull(1)
+                if (itemId != null && rawValue != null) {
+                    val applied = ItemSetterHelper.applyValue(getViewModelRegistry(), itemId, rawValue)
+                    Log.d(tag, "onNewIntent setter applied: itemId=$itemId, value=$rawValue, success=$applied")
+                }
+            }
+        }
         pendingIntent.value = intent
+        navTrigger.value++
     }
 
     private fun handleIntentNavigation(intent: Intent, navController: NavHostController) {
@@ -91,20 +104,25 @@ open class GenericSettingsActivity : AppCompatActivity() {
                 Log.d(tag, "Deep link setter applied: itemId=$itemId, value=$rawValue, success=$applied")
             }
 
-            // 2. Navigate to target screen (stripping query parameters to cleanly match route patterns)
-            val cleanUri = if (uri.query != null) uri.buildUpon().clearQuery().build() else uri
+            // 2. Direct navigation with deep link URI (Jetpack Navigation natively matches ?value={value})
             try {
-                navController.navigate(cleanUri)
+                navController.navigate(uri)
                 return
             } catch (e: Exception) {
-                Log.w(tag, "Failed to navigate directly to cleanUri $cleanUri, attempting fallback: $e")
-                val categoryId = segments.getOrNull(0)
-                if (!categoryId.isNullOrEmpty() && !categoryId.equals("dashboard", ignoreCase = true)) {
-                    try {
-                        navController.navigate(SettingsNavigation.categoryRoute(categoryId))
-                        return
-                    } catch (e2: Exception) {
-                        Log.e(tag, "Fallback navigation to category route failed: $e2")
+                Log.w(tag, "Direct navigation with uri $uri failed, attempting cleanUri fallback: $e")
+                val cleanUri = if (uri.query != null) uri.buildUpon().clearQuery().build() else uri
+                try {
+                    navController.navigate(cleanUri)
+                    return
+                } catch (e2: Exception) {
+                    val categoryId = segments.getOrNull(0)
+                    if (!categoryId.isNullOrEmpty() && !categoryId.equals("dashboard", ignoreCase = true)) {
+                        try {
+                            navController.navigate(SettingsNavigation.categoryRoute(categoryId))
+                            return
+                        } catch (e3: Exception) {
+                            Log.e(tag, "Fallback navigation to category route failed: $e3")
+                        }
                     }
                 }
             }

@@ -92,6 +92,14 @@ class NavigationDeepLinkTest {
         assertEquals("navigate", dashUri.host)
         val dashSegments = dashUri.path.removePrefix("/").split("/").filter { it.isNotEmpty() }
         assertEquals(listOf("dashboard"), dashSegments)
+
+        // 4. Intra-category item deep link with setter query parameter
+        val setterUri = URI.create("myapp://navigate/door/auto_lock?value=true")
+        assertEquals("myapp", setterUri.scheme)
+        assertEquals("navigate", setterUri.host)
+        val setterSegments = setterUri.path.removePrefix("/").split("/").filter { it.isNotEmpty() }
+        assertEquals(listOf("door", "auto_lock"), setterSegments)
+        assertEquals("value=true", setterUri.query)
     }
 
     // ========================================================================

@@ -1,5 +1,6 @@
 package com.example.feature.light
 
+import android.content.Intent
 import android.content.res.Configuration
 import android.net.Uri
 import android.os.Bundle
@@ -42,11 +43,7 @@ class LightSettingsActivity : AppCompatActivity() {
         val btnAuto = findViewById<Button>(R.id.btnHeadlightAuto)
 
         // Initial state sync
-        switchAmbientLight.isChecked = LightSettingsProvider.ambientLightEnabled
-        switchFrunkLight.isChecked = LightSettingsProvider.frunkLightEnabled
-        switchTrunkLight.isChecked = LightSettingsProvider.trunkLightEnabled
-        switchAutoHighBeam.isChecked = LightSettingsProvider.autoHighBeamEnabled
-        updateHeadlightUi(LightSettingsProvider.headlightsMode)
+        syncUiFromProvider()
 
         // Listeners for Headlights Mode
         btnOff.setOnClickListener { updateSetting(LightSettingsProvider.KEY_HEADLIGHTS, "OFF") }
@@ -66,6 +63,82 @@ class LightSettingsActivity : AppCompatActivity() {
         }
         switchAutoHighBeam.setOnCheckedChangeListener { _, isChecked ->
             updateSetting(LightSettingsProvider.KEY_AUTO_HIGH_BEAM, isChecked.toString())
+        }
+
+        // Handle incoming deep link or setter
+        handleDeepLinkIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleDeepLinkIntent(intent)
+    }
+
+    private fun syncUiFromProvider() {
+        switchAmbientLight.isChecked = LightSettingsProvider.ambientLightEnabled
+        switchFrunkLight.isChecked = LightSettingsProvider.frunkLightEnabled
+        switchTrunkLight.isChecked = LightSettingsProvider.trunkLightEnabled
+        switchAutoHighBeam.isChecked = LightSettingsProvider.autoHighBeamEnabled
+        updateHeadlightUi(LightSettingsProvider.headlightsMode)
+    }
+
+    private fun handleDeepLinkIntent(intent: Intent?) {
+        val uri: Uri = intent?.data ?: return
+        Log.d(tag, "[$activityName] handleDeepLinkIntent: uri=$uri")
+        val segments = uri.pathSegments
+        val itemId = segments.getOrNull(1)
+        val valueParam = uri.getQueryParameter("value")
+
+        if (itemId != null && valueParam != null) {
+            applyDeepLinkValue(itemId, valueParam)
+        }
+    }
+
+    private fun applyDeepLinkValue(itemId: String, rawValue: String) {
+        val cleanValue = rawValue.trim()
+        Log.d(tag, "[$activityName] applyDeepLinkValue: itemId=$itemId, rawValue=$cleanValue")
+        when (itemId.lowercase()) {
+            LightSettingsProvider.KEY_HEADLIGHTS -> {
+                val mode = when (cleanValue.uppercase()) {
+                    "OFF", "0" -> "OFF"
+                    "PARKING", "PARK", "1" -> "PARKING"
+                    "ON", "2" -> "ON"
+                    "AUTO", "3" -> "AUTO"
+                    else -> cleanValue.uppercase()
+                }
+                updateSetting(LightSettingsProvider.KEY_HEADLIGHTS, mode)
+                updateHeadlightUi(mode)
+            }
+            LightSettingsProvider.KEY_AMBIENT_LIGHT -> {
+                val boolVal = parseBoolean(cleanValue)
+                updateSetting(LightSettingsProvider.KEY_AMBIENT_LIGHT, boolVal.toString())
+                switchAmbientLight.isChecked = boolVal
+            }
+            LightSettingsProvider.KEY_FRUNK_LIGHT -> {
+                val boolVal = parseBoolean(cleanValue)
+                updateSetting(LightSettingsProvider.KEY_FRUNK_LIGHT, boolVal.toString())
+                switchFrunkLight.isChecked = boolVal
+            }
+            LightSettingsProvider.KEY_TRUNK_LIGHT -> {
+                val boolVal = parseBoolean(cleanValue)
+                updateSetting(LightSettingsProvider.KEY_TRUNK_LIGHT, boolVal.toString())
+                switchTrunkLight.isChecked = boolVal
+            }
+            LightSettingsProvider.KEY_AUTO_HIGH_BEAM -> {
+                val boolVal = parseBoolean(cleanValue)
+                updateSetting(LightSettingsProvider.KEY_AUTO_HIGH_BEAM, boolVal.toString())
+                switchAutoHighBeam.isChecked = boolVal
+            }
+            else -> Log.w(tag, "[$activityName] Unknown light item for deep link: $itemId")
+        }
+    }
+
+    private fun parseBoolean(raw: String): Boolean {
+        return when (raw.lowercase().trim()) {
+            "true", "1", "on", "yes", "enable", "enabled" -> true
+            "false", "0", "off", "no", "disable", "disabled" -> false
+            else -> raw.toBoolean()
         }
     }
 

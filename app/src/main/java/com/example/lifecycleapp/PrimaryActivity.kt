@@ -404,6 +404,7 @@ class PrimaryActivity : BaseLoggingActivity() {
         if (matchedIndex >= 0) {
             categoryAdapter?.selectedPosition = matchedIndex
             categoryAdapter?.notifyDataSetChanged()
+            listViewCategories.smoothScrollToPosition(matchedIndex)
             launchCategory(categories[matchedIndex], deepLinkUri = uri)
             return
         }

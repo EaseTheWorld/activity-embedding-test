@@ -2,6 +2,7 @@ package com.example.feature.seat
 
 import com.example.core.item.ItemViewModel
 import com.example.core.item.MutableItemViewModel
+import com.example.core.item.SerializedMutableItemViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -42,7 +43,7 @@ data class SeatLumbarSupport(
 class SeatLumbarViewModel(
     initialValue: SeatLumbarSupport = SeatLumbarSupport.DEFAULT,
     override val isVisibleFlow: StateFlow<Boolean> = MutableStateFlow(true)
-) : MutableItemViewModel<SeatLumbarSupport> {
+) : MutableItemViewModel<SeatLumbarSupport>, SerializedMutableItemViewModel {
 
     private val _valueFlow = MutableStateFlow(initialValue)
     override val valueFlow: StateFlow<SeatLumbarSupport> = _valueFlow.asStateFlow()
@@ -54,8 +55,9 @@ class SeatLumbarViewModel(
     /**
      * Deserializes wire payload from IPC (ContentProvider) and updates state.
      */
-    fun updateFromSerialized(raw: String) {
+    override fun updateFromSerialized(raw: String): Boolean {
         val updated = SeatLumbarSupport.fromSerialized(raw, fallback = _valueFlow.value)
         setValue(updated)
+        return true
     }
 }

@@ -80,11 +80,33 @@ open class GenericSettingsActivity : AppCompatActivity() {
         val uri: Uri? = intent.data
         if (uri != null && uri.scheme == SettingsNavigation.DEEP_LINK_SCHEME) {
             Log.d(tag, "Navigating via deep link: $uri")
+
+            // 1. Process setter mutation if ?value= query parameter is present
+            val rawValue = uri.getQueryParameter("value")
+            val segments = uri.pathSegments
+            val itemId = segments.getOrNull(1)
+
+            if (itemId != null && rawValue != null) {
+                val applied = ItemSetterHelper.applyValue(getViewModelRegistry(), itemId, rawValue)
+                Log.d(tag, "Deep link setter applied: itemId=$itemId, value=$rawValue, success=$applied")
+            }
+
+            // 2. Navigate to target screen (stripping query parameters to cleanly match route patterns)
+            val cleanUri = if (uri.query != null) uri.buildUpon().clearQuery().build() else uri
             try {
-                navController.navigate(uri)
+                navController.navigate(cleanUri)
                 return
             } catch (e: Exception) {
-                Log.w(tag, "Failed to navigate directly to uri $uri, attempting fallback: $e")
+                Log.w(tag, "Failed to navigate directly to cleanUri $cleanUri, attempting fallback: $e")
+                val categoryId = segments.getOrNull(0)
+                if (!categoryId.isNullOrEmpty() && !categoryId.equals("dashboard", ignoreCase = true)) {
+                    try {
+                        navController.navigate(SettingsNavigation.categoryRoute(categoryId))
+                        return
+                    } catch (e2: Exception) {
+                        Log.e(tag, "Fallback navigation to category route failed: $e2")
+                    }
+                }
             }
         }
 

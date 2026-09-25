@@ -4,6 +4,7 @@ import android.content.Intent
 import android.util.Log
 import com.example.common.ui.settings.AppScope
 import com.example.common.ui.settings.InMemoryHardwareStorage
+import com.example.common.ui.settings.ItemSetterHelper
 import com.example.core.item.ItemViewModelRegistry
 import com.example.core.item.MutableChoiceItemViewModel
 import com.example.core.item.MutableItemViewModel
@@ -168,24 +169,8 @@ object VehicleHardwareSimulator : com.example.common.ui.settings.VehicleSignals 
 
             // (d) Direct Value Mutation: value
             if (value != null) {
-                val choiceVm = viewModelRegistry.getMutableChoiceViewModel<String>(itemId)
-                if (choiceVm != null) {
-                    choiceVm.setValue(value)
-                    Log.i(TAG, ">> [Choice Value] Item '$itemId' setValue('$value')")
-                } else {
-                    val boolVm = viewModelRegistry.getMutableViewModel<Boolean>(itemId)
-                    if (boolVm != null) {
-                        boolVm.setValue(value.toBoolean())
-                        Log.i(TAG, ">> [Boolean Value] Item '$itemId' setValue(${value.toBoolean()})")
-                    } else {
-                        val intVm = viewModelRegistry.getMutableViewModel<Int>(itemId)
-                        if (intVm != null) {
-                            val parsedInt = value.toIntOrNull() ?: 0
-                            intVm.setValue(parsedInt)
-                            Log.i(TAG, ">> [Int Value] Item '$itemId' setValue($parsedInt)")
-                        }
-                    }
-                }
+                val applied = ItemSetterHelper.applyValue(viewModelRegistry, itemId, value)
+                Log.i(TAG, ">> [Value Mutation] Item '$itemId' applyValue('$value') result: $applied")
             }
         }
     }

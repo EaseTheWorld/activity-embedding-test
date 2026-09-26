@@ -112,6 +112,28 @@ interface ItemViewModel<T> {
  */
 interface MutableItemViewModel<T> : ItemViewModel<T> {
     fun setValue(newValue: T)
+
+    /**
+     * Mutates internal domain state from key-value parameters
+     * (e.g. from Intent Extras or IPC Bundles).
+     *
+     * Default implementation:
+     * 1. If this ViewModel implements [SerializedMutableItemViewModel], delegates to [SerializedMutableItemViewModel.updateFromSerialized].
+     * 2. Otherwise parses standard "value" key according to current [valueFlow] type and invokes [setValue].
+     *
+     * @param parameters Key-value parameters extracted from Intent Extras.
+     * @return True if parsing and mutation succeeded, false otherwise.
+     */
+    fun updateFromParameters(parameters: Map<String, String>): Boolean {
+        val rawValue = parameters["value"] ?: return false
+        if (this is SerializedMutableItemViewModel) {
+            return updateFromSerialized(rawValue)
+        }
+        val current = valueFlow.value
+        val parsed = parseTypedValue(current, rawValue) ?: return false
+        setValue(parsed)
+        return true
+    }
 }
 
 /**
@@ -130,7 +152,15 @@ interface ChoiceItemViewModel<T> : ItemViewModel<T> {
  * Mutable Choice ViewModel contract supporting user option selection.
  * Receives the selected option ID [newValue] to update domain state.
  */
-interface MutableChoiceItemViewModel<T> : ChoiceItemViewModel<T>, MutableItemViewModel<T>
+interface MutableChoiceItemViewModel<T> : ChoiceItemViewModel<T>, MutableItemViewModel<T> {
+    override fun updateFromParameters(parameters: Map<String, String>): Boolean {
+        val rawValue = parameters["value"] ?: return false
+        val options = optionStates.value.mapNotNull { it.id }
+        val matched = options.findMatchingOptionId(rawValue) ?: return false
+        setValue(matched)
+        return true
+    }
+}
 
 
 /**

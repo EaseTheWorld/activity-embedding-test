@@ -4,7 +4,6 @@ import android.content.Intent
 import android.util.Log
 import com.example.common.ui.settings.AppScope
 import com.example.common.ui.settings.InMemoryHardwareStorage
-import com.example.core.item.ParameterizedMutableItemViewModel
 import com.example.core.item.ItemViewModelRegistry
 import com.example.core.item.MutableChoiceItemViewModel
 import com.example.core.item.MutableItemViewModel
@@ -170,7 +169,7 @@ object VehicleHardwareSimulator : com.example.common.ui.settings.VehicleSignals 
             // (d) Direct Value Mutation: value
             if (value != null) {
                 val vm = viewModelRegistry.getViewModel<Any>(itemId)
-                val applied = (vm as? ParameterizedMutableItemViewModel)?.updateFromParameters(mapOf("value" to value)) ?: false
+                val applied = (vm as? MutableItemViewModel<*>)?.updateFromParameters(mapOf("value" to value)) ?: false
                 Log.i(TAG, ">> [Value Mutation] Item '$itemId' updateFromParameters(value='$value') result: $applied")
             }
         }

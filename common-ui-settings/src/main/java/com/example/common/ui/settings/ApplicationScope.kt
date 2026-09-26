@@ -4,8 +4,9 @@ import com.example.core.item.ItemViewModel
 import com.example.core.item.ItemViewModelRegistry
 import com.example.core.item.MutableChoiceItemViewModel
 import com.example.core.item.MutableItemViewModel
-import com.example.core.item.ParameterizedMutableItemViewModel
 import com.example.core.item.ValueWithState
+import com.example.core.item.findMatchingOptionId
+import com.example.core.item.parseTypedValue
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -60,20 +61,12 @@ class ReadOnlyHardwareItemViewModel<DomainT, RawV>(
 class InMemoryItemViewModel<T>(
     initialValue: T,
     override val isVisibleFlow: StateFlow<Boolean> = MutableStateFlow(true)
-) : MutableItemViewModel<T>, ParameterizedMutableItemViewModel {
+) : MutableItemViewModel<T> {
     private val _valueFlow = MutableStateFlow(initialValue)
     override val valueFlow: StateFlow<T> = _valueFlow.asStateFlow()
 
     override fun setValue(newValue: T) {
         _valueFlow.value = newValue
-    }
-
-    override fun updateFromParameters(parameters: Map<String, String>): Boolean {
-        val rawValue = parameters["value"] ?: return false
-        val current = valueFlow.value
-        val parsed = parseTypedValue(current, rawValue) ?: return false
-        setValue(parsed)
-        return true
     }
 }
 
@@ -86,7 +79,7 @@ class LocalStorageItemViewModel<T>(
     private val repository: SettingRepository<T>,
     private val scope: CoroutineScope = AppScope.scope,
     override val isVisibleFlow: StateFlow<Boolean> = MutableStateFlow(true)
-) : MutableItemViewModel<T>, ParameterizedMutableItemViewModel {
+) : MutableItemViewModel<T> {
 
     override val valueFlow: StateFlow<T> = repository.valueFlow
 
@@ -94,14 +87,6 @@ class LocalStorageItemViewModel<T>(
         scope.launch {
             repository.save(newValue)
         }
-    }
-
-    override fun updateFromParameters(parameters: Map<String, String>): Boolean {
-        val rawValue = parameters["value"] ?: return false
-        val current = valueFlow.value
-        val parsed = parseTypedValue(current, rawValue) ?: return false
-        setValue(parsed)
-        return true
     }
 
     /**
@@ -167,7 +152,7 @@ class HardwareItemViewModel<DomainT, RawV>(
     private val storage: HardwarePropertyStorage,
     private val scope: CoroutineScope = AppScope.scope,
     override val isVisibleFlow: StateFlow<Boolean> = MutableStateFlow(true)
-) : MutableItemViewModel<DomainT>, ParameterizedMutableItemViewModel {
+) : MutableItemViewModel<DomainT> {
 
     override val valueFlow: StateFlow<DomainT> = storage.observe(property)
 
@@ -178,11 +163,15 @@ class HardwareItemViewModel<DomainT, RawV>(
     }
 
     override fun updateFromParameters(parameters: Map<String, String>): Boolean {
-        val rawValue = parameters["value"] ?: parameters[property.propertyId.toString()] ?: return false
-        val current = valueFlow.value
-        val parsed = parseTypedValue(current, rawValue) ?: return false
-        setValue(parsed)
-        return true
+        val propKey = property.propertyId.toString()
+        val customValue = parameters[propKey]
+        if (customValue != null) {
+            val current = valueFlow.value
+            val parsed = parseTypedValue(current, customValue) ?: return false
+            setValue(parsed)
+            return true
+        }
+        return super.updateFromParameters(parameters)
     }
 }
 
@@ -265,7 +254,7 @@ class InMemoryChoiceItemViewModel<T>(
     private val hiddenOptionIdsFlow: StateFlow<Set<T>> = MutableStateFlow(emptySet()),
     scope: CoroutineScope = AppScope.scope,
     override val isVisibleFlow: StateFlow<Boolean> = MutableStateFlow(true)
-) : MutableChoiceItemViewModel<T>, ParameterizedMutableItemViewModel {
+) : MutableChoiceItemViewModel<T> {
     private val _selectedIdFlow = MutableStateFlow(initialSelectedId)
     override val valueFlow: StateFlow<T> = _selectedIdFlow
 
@@ -296,13 +285,6 @@ class InMemoryChoiceItemViewModel<T>(
             _selectedIdFlow.value = newValue
         }
     }
-
-    override fun updateFromParameters(parameters: Map<String, String>): Boolean {
-        val rawValue = parameters["value"] ?: return false
-        val matched = supportedOptionIds.findMatchingOptionId(rawValue) ?: return false
-        setValue(matched)
-        return true
-    }
 }
 
 /**
@@ -318,7 +300,7 @@ class ChoiceHardwareItemViewModel<DomainT, RawV>(
     private val hiddenOptionIdsFlow: StateFlow<Set<DomainT>> = MutableStateFlow(emptySet()),
     private val scope: CoroutineScope = AppScope.scope,
     override val isVisibleFlow: StateFlow<Boolean> = MutableStateFlow(true)
-) : MutableChoiceItemViewModel<DomainT>, ParameterizedMutableItemViewModel {
+) : MutableChoiceItemViewModel<DomainT> {
 
     private val rawFlow: StateFlow<DomainT> = storage.observe(property)
     override val valueFlow: StateFlow<DomainT> = rawFlow
@@ -354,77 +336,14 @@ class ChoiceHardwareItemViewModel<DomainT, RawV>(
     }
 
     override fun updateFromParameters(parameters: Map<String, String>): Boolean {
-        val rawValue = parameters["value"] ?: parameters[property.propertyId.toString()] ?: return false
-        val matched = supportedOptionIds.findMatchingOptionId(rawValue) ?: return false
-        setValue(matched)
-        return true
-    }
-}
-
-/**
- * Resolves matching option from a list of supported option IDs.
- * Supports:
- * 1. Exact string match ("LEVEL 2")
- * 2. Case-insensitive match ("level 2")
- * 3. Underscore-space normalized match ("LEVEL_2" <-> "LEVEL 2")
- * 4. Suffix match ("2" -> "LEVEL 2")
- * 5. 0-based index match ("2" -> 3rd option if not matching ID suffix)
- */
-fun <T> List<T>.findMatchingOptionId(raw: String): T? {
-    val trimmed = raw.trim()
-    if (isEmpty()) return null
-
-    // 1. Exact string match
-    firstOrNull { it.toString() == trimmed }?.let { return it }
-
-    // 2. Case-insensitive match
-    firstOrNull { it.toString().equals(trimmed, ignoreCase = true) }?.let { return it }
-
-    // 3. Underscore / space normalized match
-    val normalized = trimmed.replace('_', ' ')
-    firstOrNull {
-        it.toString().replace('_', ' ').equals(normalized, ignoreCase = true)
-    }?.let { return it }
-
-    // 4. Suffix match (e.g. "2" matches "LEVEL 2" or "LEVEL_2")
-    firstOrNull {
-        val s = it.toString()
-        s.endsWith(" $trimmed", ignoreCase = true) || s.endsWith("_$trimmed", ignoreCase = true)
-    }?.let { return it }
-
-    // 5. Index match (e.g. "0", "1", "2")
-    val idx = trimmed.toIntOrNull()
-    if (idx != null && idx in indices) {
-        return this[idx]
-    }
-
-    return null
-}
-
-/**
- * Resilient boolean parser treating common affirmative / negative strings.
- */
-fun parseLenientBoolean(raw: String): Boolean? {
-    val clean = raw.trim().lowercase()
-    return when (clean) {
-        "true", "1", "on", "yes", "enable", "enabled" -> true
-        "false", "0", "off", "no", "disable", "disabled" -> false
-        else -> clean.toBooleanStrictOrNull()
-    }
-}
-
-/**
- * Parses [rawStr] to match the type of [current].
- */
-@Suppress("UNCHECKED_CAST")
-fun <T> parseTypedValue(current: T, rawStr: String): T? {
-    return when (current) {
-        is Boolean -> parseLenientBoolean(rawStr) as? T
-        is Int -> (rawStr.toIntOrNull() ?: rawStr.toDoubleOrNull()?.toInt()) as? T
-        is Float -> rawStr.toFloatOrNull() as? T
-        is Double -> rawStr.toDoubleOrNull() as? T
-        is String -> rawStr as? T
-        else -> null
+        val propKey = property.propertyId.toString()
+        val customValue = parameters[propKey]
+        if (customValue != null) {
+            val matched = supportedOptionIds.findMatchingOptionId(customValue) ?: return false
+            setValue(matched)
+            return true
+        }
+        return super.updateFromParameters(parameters)
     }
 }
 

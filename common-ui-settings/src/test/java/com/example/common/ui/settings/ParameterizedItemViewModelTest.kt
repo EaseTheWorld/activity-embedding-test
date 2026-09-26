@@ -3,7 +3,6 @@ package com.example.common.ui.settings
 import com.example.core.item.ItemViewModelRegistry
 import com.example.core.item.MutableChoiceItemViewModel
 import com.example.core.item.MutableItemViewModel
-import com.example.core.item.ParameterizedMutableItemViewModel
 import com.example.core.item.SerializedMutableItemViewModel
 import com.example.core.item.ValueWithState
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -147,19 +146,19 @@ class ParameterizedItemViewModelTest {
     }
 
     @Test
-    fun `ReadOnly ViewModels do not implement ParameterizedMutableItemViewModel adhering to ISP`() {
+    fun `ReadOnly ViewModels do not implement MutableItemViewModel adhering to ISP`() {
         val registry = ItemViewModelRegistry()
         val readOnlyVm = ReadOnlyItemViewModel(MutableStateFlow(50).asStateFlow())
         registry.register("battery_soc", readOnlyVm)
 
         val vm = registry.getViewModel<Any>("battery_soc")
-        val isParameterized = vm is ParameterizedMutableItemViewModel
-        assertFalse("ReadOnly ViewModel must not implement ParameterizedMutableItemViewModel", isParameterized)
+        val isMutable = vm is MutableItemViewModel<*>
+        assertFalse("ReadOnly ViewModel must not implement MutableItemViewModel", isMutable)
     }
 
     @Test
     fun `Custom multi-parameter ViewModel parses multiple keys from Map directly`() {
-        class MultiParamVm : MutableItemViewModel<Pair<Int, Int>>, ParameterizedMutableItemViewModel {
+        class MultiParamVm : MutableItemViewModel<Pair<Int, Int>> {
             private val _flow = MutableStateFlow(0 to 0)
             override val valueFlow: StateFlow<Pair<Int, Int>> = _flow
             override fun setValue(newValue: Pair<Int, Int>) { _flow.value = newValue }

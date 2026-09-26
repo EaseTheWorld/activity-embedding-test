@@ -38,7 +38,9 @@ data class HighlightEvent(
 
 /**
  * CompositionLocal holding the ID of the setting item targeted by deep link navigation.
+ * @deprecated Use [LocalHighlightEvent] instead.
  */
+@Deprecated("Use LocalHighlightEvent instead", ReplaceWith("LocalHighlightEvent"))
 val LocalAnchorTarget: ProvidableCompositionLocal<String?> = compositionLocalOf { null }
 
 /**
@@ -49,7 +51,7 @@ val LocalHighlightEvent: ProvidableCompositionLocal<HighlightEvent?> = compositi
 /**
  * Modifier that marks a Composable as an anchorable setting item row.
  *
- * When the [itemId] matches [LocalAnchorTarget] or [LocalHighlightEvent]:
+ * When the [itemId] matches [LocalHighlightEvent]:
  * 1. Automatically requests the parent scroll container to bring this item into view.
  * 2. Triggers a visual highlight / pulse animation for 1 second (1000ms) to draw attention.
  */
@@ -60,11 +62,16 @@ fun Modifier.anchor(
     highlightColor: Color = Color(0x406750A4)
 ): Modifier {
     val highlightEvent = LocalHighlightEvent.current
-    val targetAnchor = LocalAnchorTarget.current
-    val isTarget = (highlightEvent?.itemId == itemId) || (targetAnchor == itemId)
-    val bringIntoViewRequester = remember { BringIntoViewRequester() }
+    val isTarget = highlightEvent?.itemId == itemId
 
     var highlighted by remember { mutableStateOf(false) }
+
+    // Optimization: Skip BringIntoViewRequester and modifier chain for non-target nodes
+    if (!isTarget && !highlighted) {
+        return this
+    }
+
+    val bringIntoViewRequester = remember { BringIntoViewRequester() }
 
     LaunchedEffect(highlightEvent?.timestamp, isTarget) {
         if (isTarget) {
@@ -107,6 +114,11 @@ fun Modifier.valueHighlight(
             isSelectedOption
 
     var active by remember { mutableStateOf(false) }
+
+    // Optimization: Skip border and background modifiers when not active/highlighted
+    if (!shouldHighlight && !active) {
+        return this
+    }
 
     LaunchedEffect(highlightEvent?.timestamp, shouldHighlight) {
         if (shouldHighlight) {

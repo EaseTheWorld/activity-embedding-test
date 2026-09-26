@@ -57,9 +57,9 @@ fun GenericSettingsScreen(
 ) {
     val scrollState = rememberScrollState()
     val highlightEvent = LocalHighlightEvent.current
-    val effectiveTargetId = highlightEvent?.itemId ?: targetItemId
+    val effectiveHighlightEvent = highlightEvent ?: targetItemId?.let { HighlightEvent(itemId = it) }
 
-    CompositionLocalProvider(LocalAnchorTarget provides effectiveTargetId) {
+    CompositionLocalProvider(LocalHighlightEvent provides effectiveHighlightEvent) {
         Surface(
             modifier = Modifier.fillMaxSize(),
             color = Color(0xFFF6F7FB)

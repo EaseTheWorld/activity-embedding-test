@@ -65,7 +65,7 @@ fun GenericSettingsScreen(
         if (!effectiveTargetId.isNullOrEmpty()) {
             val targetIndex = items.indexOfFirst { it.id == effectiveTargetId }
             if (targetIndex >= 0) {
-                listState.animateScrollToItem(targetIndex)
+                listState.scrollToItem(targetIndex)
             }
         }
     }

@@ -6,9 +6,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -35,9 +35,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.ui.Alignment
 
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.LaunchedEffect
 
 /**
  * Universal Settings Screen rendered via Jetpack Compose.
@@ -57,18 +55,9 @@ fun GenericSettingsScreen(
     onItemClick: ((Item) -> Unit)? = null,
     viewModelRegistry: ItemViewModelRegistry = LocalItemViewModelRegistry.current
 ) {
-    val listState = rememberLazyListState()
+    val scrollState = rememberScrollState()
     val highlightEvent = LocalHighlightEvent.current
     val effectiveTargetId = highlightEvent?.itemId ?: targetItemId
-
-    LaunchedEffect(effectiveTargetId, highlightEvent?.timestamp) {
-        if (!effectiveTargetId.isNullOrEmpty()) {
-            val targetIndex = items.indexOfFirst { it.id == effectiveTargetId }
-            if (targetIndex >= 0) {
-                listState.scrollToItem(targetIndex)
-            }
-        }
-    }
 
     CompositionLocalProvider(LocalAnchorTarget provides effectiveTargetId) {
         Surface(
@@ -119,13 +108,13 @@ fun GenericSettingsScreen(
                 colors = CardDefaults.cardColors(containerColor = Color.White),
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
-                LazyColumn(
-                    state = listState,
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .verticalScroll(scrollState)
                         .padding(horizontal = 20.dp, vertical = 12.dp)
                 ) {
-                    items(items, key = { it.id }) { item ->
+                    items.forEach { item ->
                         val isItemVisible by item.isVisible.collectAsState(initial = true)
                         val vm = viewModelRegistry.getViewModel<Any>(item.id)
                         val isVmVisible = (vm?.isVisibleFlow?.collectAsState())?.value ?: true
@@ -133,7 +122,8 @@ fun GenericSettingsScreen(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .anchor(item.id),
+                                    .anchor(item.id)
+                                    .padding(vertical = 48.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Box(modifier = Modifier.weight(1f)) {

@@ -23,6 +23,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
+import com.example.core.item.ParameterizedMutableItemViewModel
 import kotlinx.coroutines.delay
 
 private const val TAG = "ItemAnchor"
@@ -86,9 +87,11 @@ fun Modifier.anchor(
             if (params != null) {
                 delay(350)
                 val vm = viewModelRegistry.getViewModel<Any>(itemId)
-                if (vm != null) {
-                    val applied = ItemSetterHelper.applyParameters(vm, params)
+                if (vm is ParameterizedMutableItemViewModel) {
+                    val applied = vm.updateFromParameters(params)
                     Log.d(TAG, "Deferred parameters applied to item '$itemId': params=$params, success=$applied")
+                } else if (vm != null) {
+                    Log.w(TAG, "Cannot apply deferred parameters: ViewModel for '$itemId' does not implement ParameterizedMutableItemViewModel")
                 } else {
                     Log.w(TAG, "Cannot apply deferred parameters: no ViewModel found for '$itemId'")
                 }

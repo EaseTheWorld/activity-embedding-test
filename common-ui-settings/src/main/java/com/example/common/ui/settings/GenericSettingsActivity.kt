@@ -94,17 +94,24 @@ open class GenericSettingsActivity : AppCompatActivity() {
             val hasValueExtra = intent.hasExtra(ItemSetterHelper.EXTRA_VALUE) ||
                     uri.getQueryParameter(ItemSetterHelper.EXTRA_VALUE) != null
 
-            var valueApplied = false
-            if (itemId != null && hasValueExtra) {
-                valueApplied = ItemSetterHelper.applyFromIntent(getViewModelRegistry(), itemId, intent)
-                Log.d(tag, "Deep link setter applied: itemId=$itemId, success=$valueApplied")
-            }
-
             if (itemId != null) {
+                val intentCopy = Intent(intent)
+                var mutationExecuted = false
+                val deferredMutation: (() -> Unit)? = if (hasValueExtra) {
+                    {
+                        if (!mutationExecuted) {
+                            mutationExecuted = true
+                            val valueApplied = ItemSetterHelper.applyFromIntent(getViewModelRegistry(), itemId, intentCopy)
+                            Log.d(tag, "Deferred deep link setter applied: itemId=$itemId, success=$valueApplied")
+                        }
+                    }
+                } else null
+
                 currentHighlightEvent.value = HighlightEvent(
                     itemId = itemId,
-                    hasValueMutation = hasValueExtra && valueApplied,
-                    timestamp = System.currentTimeMillis()
+                    hasValueMutation = hasValueExtra,
+                    timestamp = System.currentTimeMillis(),
+                    pendingMutation = deferredMutation
                 )
             }
 

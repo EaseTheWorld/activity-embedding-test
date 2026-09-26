@@ -144,9 +144,7 @@ private fun ToggleItemRowContent(
         }
 
         Box(
-            modifier = Modifier
-                .valueHighlight(item.id, shape = RoundedCornerShape(18.dp))
-                .padding(2.dp)
+            modifier = Modifier.padding(2.dp)
         ) {
             Switch(
                 checked = isChecked,

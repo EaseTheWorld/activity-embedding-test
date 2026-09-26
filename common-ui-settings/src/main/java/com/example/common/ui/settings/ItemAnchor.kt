@@ -33,7 +33,8 @@ private const val TAG = "ItemAnchor"
 data class HighlightEvent(
     val itemId: String,
     val hasValueMutation: Boolean = false,
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis(),
+    val pendingMutation: (() -> Unit)? = null
 )
 
 /**
@@ -78,7 +79,13 @@ fun Modifier.anchor(
             Log.d(TAG, "Item row highlight started for '$itemId', hasValueMutation=${highlightEvent?.hasValueMutation}")
             bringIntoViewRequester.bringIntoView()
             highlighted = true
-            delay(1000)
+            if (highlightEvent?.pendingMutation != null) {
+                delay(350)
+                highlightEvent.pendingMutation.invoke()
+                delay(650)
+            } else {
+                delay(1000)
+            }
             highlighted = false
             Log.d(TAG, "Item row highlight completed for '$itemId'")
         }

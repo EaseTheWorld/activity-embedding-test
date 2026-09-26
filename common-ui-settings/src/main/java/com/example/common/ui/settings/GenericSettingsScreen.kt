@@ -58,17 +58,19 @@ fun GenericSettingsScreen(
     viewModelRegistry: ItemViewModelRegistry = LocalItemViewModelRegistry.current
 ) {
     val listState = rememberLazyListState()
+    val highlightEvent = LocalHighlightEvent.current
+    val effectiveTargetId = highlightEvent?.itemId ?: targetItemId
 
-    LaunchedEffect(targetItemId) {
-        if (!targetItemId.isNullOrEmpty()) {
-            val targetIndex = items.indexOfFirst { it.id == targetItemId }
+    LaunchedEffect(effectiveTargetId, highlightEvent?.timestamp) {
+        if (!effectiveTargetId.isNullOrEmpty()) {
+            val targetIndex = items.indexOfFirst { it.id == effectiveTargetId }
             if (targetIndex >= 0) {
                 listState.animateScrollToItem(targetIndex)
             }
         }
     }
 
-    CompositionLocalProvider(LocalAnchorTarget provides targetItemId) {
+    CompositionLocalProvider(LocalAnchorTarget provides effectiveTargetId) {
         Surface(
             modifier = Modifier.fillMaxSize(),
             color = Color(0xFFF6F7FB)

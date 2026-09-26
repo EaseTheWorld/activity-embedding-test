@@ -23,11 +23,21 @@ send_deeplink() {
     echo -e "${CYAN}------------------------------------------------------------${NC}"
     echo -e "${YELLOW}>> Test:${NC} $desc"
     echo -e "${BLUE}>> URI:${NC}   $uri"
+
+    local comp=""
+    if [[ "$uri" =~ myapp://navigate/(door|seat) ]]; then
+        comp="-n com.example.lifecycleapp/.GenericSettingsActivity"
+    elif [[ "$uri" =~ myapp://navigate/light ]]; then
+        comp="-n com.example.carsettings.light/com.example.feature.light.LightSettingsActivity"
+    else
+        comp="-n com.example.lifecycleapp/.PrimaryActivity"
+    fi
+
     if [ -n "$extra" ]; then
         echo -e "${BLUE}>> Extra:${NC} $extra"
-        adb shell am start -W -a "$ACTION" -d "$uri" $extra -p "$PACKAGE_NAME"
+        adb shell am start -W -a "$ACTION" -d "$uri" $comp $extra
     else
-        adb shell am start -W -a "$ACTION" -d "$uri" -p "$PACKAGE_NAME"
+        adb shell am start -W -a "$ACTION" -d "$uri" $comp
     fi
     echo ""
 }

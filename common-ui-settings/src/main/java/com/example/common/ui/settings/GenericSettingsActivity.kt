@@ -12,6 +12,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navOptions
 import com.example.core.item.ItemViewModelRegistry
 
 /**
@@ -27,6 +28,7 @@ open class GenericSettingsActivity : AppCompatActivity() {
     private val tag = "GenericSettingsActivity"
     private var pendingIntent = mutableStateOf<Intent?>(null)
     private var navTrigger = mutableStateOf(0)
+    private var currentHighlightEvent = mutableStateOf<HighlightEvent?>(null)
 
     protected open fun getViewModelRegistry(): ItemViewModelRegistry = defaultViewModelRegistry
 
@@ -57,7 +59,8 @@ open class GenericSettingsActivity : AppCompatActivity() {
             }
 
             CompositionLocalProvider(
-                LocalItemViewModelRegistry provides getViewModelRegistry()
+                LocalItemViewModelRegistry provides getViewModelRegistry(),
+                LocalHighlightEvent provides currentHighlightEvent.value
             ) {
                 SettingsNavHost(
                     navController = navController,
@@ -75,16 +78,6 @@ open class GenericSettingsActivity : AppCompatActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         Log.d(tag, "onNewIntent received: $intent, data=${intent?.data}, extras=${intent?.extras}")
-        intent?.let { targetIntent ->
-            val uri = targetIntent.data
-            if (uri != null && uri.scheme == SettingsNavigation.DEEP_LINK_SCHEME) {
-                val itemId = uri.pathSegments.getOrNull(1)
-                if (itemId != null) {
-                    val applied = ItemSetterHelper.applyFromIntent(getViewModelRegistry(), itemId, targetIntent)
-                    Log.d(tag, "onNewIntent setter applied: itemId=$itemId, success=$applied")
-                }
-            }
-        }
         pendingIntent.value = intent
         navTrigger.value++
     }
@@ -98,15 +91,29 @@ open class GenericSettingsActivity : AppCompatActivity() {
             val segments = uri.pathSegments
             val itemId = segments.getOrNull(1)
 
+            val hasValueExtra = intent.hasExtra(ItemSetterHelper.EXTRA_VALUE) ||
+                    uri.getQueryParameter(ItemSetterHelper.EXTRA_VALUE) != null
+
+            var valueApplied = false
+            if (itemId != null && hasValueExtra) {
+                valueApplied = ItemSetterHelper.applyFromIntent(getViewModelRegistry(), itemId, intent)
+                Log.d(tag, "Deep link setter applied: itemId=$itemId, success=$valueApplied")
+            }
+
             if (itemId != null) {
-                val applied = ItemSetterHelper.applyFromIntent(getViewModelRegistry(), itemId, intent)
-                Log.d(tag, "Deep link setter applied: itemId=$itemId, success=$applied")
+                currentHighlightEvent.value = HighlightEvent(
+                    itemId = itemId,
+                    hasValueMutation = hasValueExtra && valueApplied,
+                    timestamp = System.currentTimeMillis()
+                )
             }
 
             // 2. Direct navigation with clean URI (routes are pure destination identifiers)
             val cleanUri = if (uri.query != null) uri.buildUpon().clearQuery().build() else uri
             try {
-                navController.navigate(cleanUri)
+                navController.navigate(cleanUri, navOptions {
+                    launchSingleTop = true
+                })
                 return
             } catch (e: Exception) {
                 Log.w(tag, "Direct navigation with uri $cleanUri failed, attempting category fallback: $e")

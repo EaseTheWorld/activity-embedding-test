@@ -20,12 +20,22 @@ function Send-DeepLink {
     Write-Host "------------------------------------------------------------" -ForegroundColor Cyan
     Write-Host ">> Test:  $Description" -ForegroundColor Yellow
     Write-Host ">> URI:   $TargetUri" -ForegroundColor Blue
+    
+    $comp = ""
+    if ($TargetUri -match "myapp://navigate/(door|seat)") {
+        $comp = "-n com.example.lifecycleapp/.GenericSettingsActivity"
+    } elseif ($TargetUri -match "myapp://navigate/light") {
+        $comp = "-n com.example.carsettings.light/com.example.feature.light.LightSettingsActivity"
+    } else {
+        $comp = "-n com.example.lifecycleapp/.PrimaryActivity"
+    }
+
     if ($Extra -ne "") {
         Write-Host ">> Extra: $Extra" -ForegroundColor Blue
-        $cmd = "am start -W -a $Action -d `"$TargetUri`" $Extra -p $PackageName"
+        $cmd = "am start -W -a $Action -d `"$TargetUri`" $comp $Extra"
         adb shell $cmd
     } else {
-        adb shell am start -W -a $Action -d "$TargetUri" -p $PackageName
+        adb shell am start -W -a $Action -d "$TargetUri" $comp
     }
     Write-Host ""
 }

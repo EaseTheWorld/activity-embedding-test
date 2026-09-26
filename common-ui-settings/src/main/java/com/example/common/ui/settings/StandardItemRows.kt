@@ -1,6 +1,7 @@
 package com.example.common.ui.settings
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -142,11 +143,17 @@ private fun ToggleItemRowContent(
             }
         }
 
-        Switch(
-            checked = isChecked,
-            onCheckedChange = onCheckedChange,
-            enabled = enabled
-        )
+        Box(
+            modifier = Modifier
+                .valueHighlight(item.id, shape = RoundedCornerShape(18.dp))
+                .padding(2.dp)
+        ) {
+            Switch(
+                checked = isChecked,
+                onCheckedChange = onCheckedChange,
+                enabled = enabled
+            )
+        }
     }
 }
 
@@ -404,7 +411,11 @@ private fun ChoiceItemRowContent(
         ) {
             item.options.forEach { option ->
                 val isSelected = (option.value == selectedOption)
-                androidx.compose.foundation.layout.Box(modifier = Modifier.weight(1f)) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .valueHighlight(item.id, isSelectedOption = isSelected, shape = RoundedCornerShape(8.dp))
+                ) {
                     item.optionSlot(
                         option,
                         isSelected,
@@ -487,7 +498,11 @@ private fun ChoiceItemRowWithStates(
             optionStates.filter { it.isVisible }.forEach { state ->
                 val option = item.getOption(state.id)
                 if (option != null) {
-                    androidx.compose.foundation.layout.Box(modifier = Modifier.weight(1f)) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .valueHighlight(item.id, isSelectedOption = state.isSelected, shape = RoundedCornerShape(8.dp))
+                    ) {
                         item.optionSlot(
                             option,
                             state.isSelected,
@@ -669,13 +684,19 @@ private fun SliderItemRowContent(
                     )
                 }
             }
-            Text(
-                text = "$value$unit",
-                style = MaterialTheme.typography.titleMedium.copy(
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF6750A4)
+            Box(
+                modifier = Modifier
+                    .valueHighlight(item.id, shape = RoundedCornerShape(6.dp))
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+            ) {
+                Text(
+                    text = "$value$unit",
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF6750A4)
+                    )
                 )
-            )
+            }
         }
         Spacer(modifier = Modifier.height(4.dp))
         androidx.compose.material3.Slider(

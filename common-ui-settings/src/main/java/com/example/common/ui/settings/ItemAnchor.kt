@@ -28,6 +28,16 @@ import kotlinx.coroutines.delay
 
 private const val TAG = "ItemAnchor"
 
+/** Total duration in milliseconds for the row anchor highlight animation. */
+private const val TOTAL_HIGHLIGHT_DURATION_MS = 1000L
+
+/**
+ * Human-perception settle delay after anchoring/scrolling completes.
+ * Allows the user's eye to fixate on the target row before triggering
+ * interactive toggle/choice state transitions (mimicking a natural user tap).
+ */
+private const val USER_PERCEPTION_SETTLE_DELAY_MS = 350L
+
 /**
  * Event describing a deep link target item and whether a value mutation was executed.
  * Holds optional [pendingParams] (extracted from Intent Extras) for deferred mutation.
@@ -56,8 +66,8 @@ val LocalHighlightEvent: ProvidableCompositionLocal<HighlightEvent?> = compositi
  *
  * When the [itemId] matches [LocalHighlightEvent]:
  * 1. Automatically requests the parent scroll container to bring this item into view.
- * 2. Triggers a visual highlight / pulse animation for 1 second (1000ms) to draw attention.
- * 3. If [pendingParams] are present, applies them to the item's ViewModel after 350ms settle delay.
+ * 2. Triggers a visual highlight / pulse animation for 1 second ([TOTAL_HIGHLIGHT_DURATION_MS]ms) to draw attention.
+ * 3. If [pendingParams] are present, applies them to the item's ViewModel after [USER_PERCEPTION_SETTLE_DELAY_MS]ms settle delay.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -85,7 +95,7 @@ fun Modifier.anchor(
             highlighted = true
             val params = highlightEvent?.pendingParams
             if (params != null) {
-                delay(350)
+                delay(USER_PERCEPTION_SETTLE_DELAY_MS)
                 val vm = viewModelRegistry.getViewModel<Any>(itemId)
                 if (vm is ParameterizedMutableItemViewModel) {
                     val applied = vm.updateFromParameters(params)
@@ -95,9 +105,9 @@ fun Modifier.anchor(
                 } else {
                     Log.w(TAG, "Cannot apply deferred parameters: no ViewModel found for '$itemId'")
                 }
-                delay(650)
+                delay(TOTAL_HIGHLIGHT_DURATION_MS - USER_PERCEPTION_SETTLE_DELAY_MS)
             } else {
-                delay(1000)
+                delay(TOTAL_HIGHLIGHT_DURATION_MS)
             }
             highlighted = false
             Log.d(TAG, "Item row highlight completed for '$itemId'")

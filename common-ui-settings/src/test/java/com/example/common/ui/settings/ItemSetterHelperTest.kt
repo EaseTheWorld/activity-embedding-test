@@ -207,4 +207,26 @@ class ItemSetterHelperTest {
         assertTrue(ItemSetterHelper.applyValue(registry, "driver_seat_heat", "LEVEL_2"))
         assertEquals("LEVEL 2", choiceVm.valueFlow.value)
     }
+
+    @Test
+    fun `parseValue and applyValue work directly on ViewModel without registry`() {
+        val toggleVm = MockToggleViewModel(initial = false)
+        val choiceVm = MockChoiceViewModel(initial = "OFF", options = listOf("OFF", "LEVEL 1", "LEVEL 2"))
+
+        // parseValue directly on toggleVm
+        assertEquals(true, ItemSetterHelper.parseValue(toggleVm, "true"))
+        assertEquals(true, ItemSetterHelper.parseValue(toggleVm, "1"))
+        assertEquals(false, ItemSetterHelper.parseValue(toggleVm, "off"))
+
+        // parseValue directly on choiceVm
+        assertEquals("LEVEL 2", ItemSetterHelper.parseValue(choiceVm, "LEVEL_2"))
+        assertEquals("LEVEL 1", ItemSetterHelper.parseValue(choiceVm, "1"))
+
+        // applyValue directly on ViewModel without registry
+        assertTrue(ItemSetterHelper.applyValue(toggleVm, "true"))
+        assertTrue(toggleVm.valueFlow.value)
+
+        assertTrue(ItemSetterHelper.applyValue(choiceVm, "LEVEL_2"))
+        assertEquals("LEVEL 2", choiceVm.valueFlow.value)
+    }
 }

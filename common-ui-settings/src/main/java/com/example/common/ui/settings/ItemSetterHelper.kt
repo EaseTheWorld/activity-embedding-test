@@ -3,6 +3,7 @@ package com.example.common.ui.settings
 import android.content.Intent
 import android.util.Log
 import com.example.core.item.ChoiceItemViewModel
+import com.example.core.item.ItemViewModel
 import com.example.core.item.ItemViewModelRegistry
 import com.example.core.item.MutableItemViewModel
 import com.example.core.item.SerializedMutableItemViewModel
@@ -68,6 +69,109 @@ object ItemSetterHelper {
     }
 
     /**
+     * Parses and converts [rawValue] (from Intent Extras, URI queries, or ADB)
+     * into the strongly typed value expected by [vm].
+     *
+     * @return The strongly typed value ready for [MutableItemViewModel.setValue],
+     *         or null if parsing/matching failed.
+     */
+    fun parseValue(vm: ItemViewModel<*>, rawValue: Any): Any? {
+        val rawStr = rawValue.toString()
+
+        // 1. Choice Item (Multi-Option with state)
+        if (vm is ChoiceItemViewModel<*>) {
+            val options = vm.optionStates.value
+            val matchedOption = findMatchingOption(options, rawStr)
+            if (matchedOption != null && matchedOption.id != null) {
+                return matchedOption.id
+            }
+            if (vm.valueFlow.value is String) {
+                return rawStr
+            }
+            return null
+        }
+
+        // 2. Strongly typed primitives based on current valueFlow type
+        val current = vm.valueFlow.value
+        return when (current) {
+            is Boolean -> if (rawValue is Boolean) rawValue else parseBoolean(rawStr)
+            is Int -> if (rawValue is Number) rawValue.toInt() else rawStr.toIntOrNull()
+            is Float -> if (rawValue is Number) rawValue.toFloat() else rawStr.toFloatOrNull()
+            is Double -> if (rawValue is Number) rawValue.toDouble() else rawStr.toDoubleOrNull()
+            is String -> rawStr
+            else -> null
+        }
+    }
+
+    /**
+     * Attempts to mutate the setting item owned by [vm] to [rawValue].
+     * Directly interacts with [vm] without requiring [ItemViewModelRegistry].
+     *
+     * @param vm The [ItemViewModel] to mutate.
+     * @param rawValue Value representation from Intent Extra, deep link, or input.
+     * @return True if the mutation was successfully applied, false otherwise.
+     */
+    fun applyValue(vm: ItemViewModel<*>, rawValue: Any): Boolean {
+        val rawStr = rawValue.toString()
+
+        // 1. Dedicated SerializedMutableItemViewModel contract (e.g. SeatLumbarViewModel)
+        if (vm is SerializedMutableItemViewModel) {
+            val handled = vm.updateFromSerialized(rawStr)
+            if (handled) {
+                logI(TAG, "Applied serialized value '$rawStr' to item")
+                return true
+            } else {
+                logW(TAG, "Serialized value '$rawStr' rejected by SerializedMutableItemViewModel")
+                return false
+            }
+        }
+
+        // ISP Check: ViewModel must support mutations
+        if (vm !is MutableItemViewModel<*>) {
+            logW(TAG, "Cannot apply value: ViewModel does not implement MutableItemViewModel (read-only)")
+            return false
+        }
+
+        @Suppress("UNCHECKED_CAST")
+        val mutableVm = vm as MutableItemViewModel<Any>
+
+        val parsed = parseValue(vm, rawValue)
+        if (parsed != null) {
+            mutableVm.setValue(parsed)
+            logI(TAG, "Applied parsed value '$parsed' to item")
+            return true
+        }
+
+        // Reflection fallback for custom models with updateFromSerialized
+        try {
+            val method = vm.javaClass.methods.firstOrNull {
+                it.name == "updateFromSerialized" &&
+                        it.parameterTypes.size == 1 &&
+                        it.parameterTypes[0] == String::class.java
+            }
+            if (method != null) {
+                val res = method.invoke(vm, rawStr)
+                if (res is Boolean) {
+                    if (res) {
+                        logI(TAG, "Applied via reflection updateFromSerialized to item")
+                        return true
+                    } else {
+                        logW(TAG, "updateFromSerialized returned false for item")
+                        return false
+                    }
+                }
+                logI(TAG, "Applied via reflection updateFromSerialized to item")
+                return true
+            }
+        } catch (e: Exception) {
+            logW(TAG, "Reflection invocation failed for item: $e")
+        }
+
+        logW(TAG, "Unsupported value type '${vm.valueFlow.value?.javaClass?.simpleName}' for item")
+        return false
+    }
+
+    /**
      * Attempts to mutate the setting item specified by [itemId] to [rawValue].
      * Supports strongly typed values (Boolean, Int, Float, Double, String) as well
      * as raw strings.
@@ -83,141 +187,7 @@ object ItemSetterHelper {
             logW(TAG, "Cannot apply value: no ViewModel registered for itemId '$itemId'")
             return false
         }
-
-        val rawStr = rawValue.toString()
-
-        // 1. Dedicated SerializedMutableItemViewModel contract (e.g. SeatLumbarViewModel)
-        if (vm is SerializedMutableItemViewModel) {
-            val handled = vm.updateFromSerialized(rawStr)
-            if (handled) {
-                logI(TAG, "Applied serialized value '$rawStr' to item '$itemId'")
-                return true
-            } else {
-                logW(TAG, "Serialized value '$rawStr' rejected by SerializedMutableItemViewModel for item '$itemId'")
-                return false
-            }
-        }
-
-        // ISP Check: ViewModel must support mutations
-        if (vm !is MutableItemViewModel<*>) {
-            logW(TAG, "Cannot apply value: ViewModel for '$itemId' does not implement MutableItemViewModel (read-only)")
-            return false
-        }
-
-        @Suppress("UNCHECKED_CAST")
-        val mutableVm = vm as MutableItemViewModel<Any>
-
-        // 2. Choice Item (Multi-Option with state)
-        if (vm is ChoiceItemViewModel<*>) {
-            val options = vm.optionStates.value
-            val matchedOption = findMatchingOption(options, rawStr)
-            if (matchedOption != null && matchedOption.id != null) {
-                @Suppress("UNCHECKED_CAST")
-                val typedVm = vm as? MutableItemViewModel<Any>
-                if (typedVm != null) {
-                    typedVm.setValue(matchedOption.id!!)
-                    logI(TAG, "Applied choice option '${matchedOption.id}' to item '$itemId'")
-                    return true
-                }
-            }
-
-            // Fallback: if value type is String, try applying directly
-            if (vm.valueFlow.value is String) {
-                @Suppress("UNCHECKED_CAST")
-                val stringVm = vm as? MutableItemViewModel<String>
-                if (stringVm != null) {
-                    stringVm.setValue(rawStr)
-                    logI(TAG, "Applied raw string choice '$rawStr' to item '$itemId'")
-                    return true
-                }
-            }
-
-            logW(TAG, "Option '$rawStr' could not be resolved for choice item '$itemId'")
-            return false
-        }
-
-        // 3. Strongly typed primitives based on current valueFlow type
-        val current = vm.valueFlow.value
-        return when (current) {
-            is Boolean -> {
-                val parsed = if (rawValue is Boolean) rawValue else parseBoolean(rawStr)
-                @Suppress("UNCHECKED_CAST")
-                (mutableVm as MutableItemViewModel<Boolean>).setValue(parsed)
-                logI(TAG, "Applied boolean $parsed to item '$itemId'")
-                true
-            }
-            is Int -> {
-                val parsed = if (rawValue is Number) rawValue.toInt() else rawStr.toIntOrNull()
-                if (parsed != null) {
-                    @Suppress("UNCHECKED_CAST")
-                    (mutableVm as MutableItemViewModel<Int>).setValue(parsed)
-                    logI(TAG, "Applied int $parsed to item '$itemId'")
-                    true
-                } else {
-                    logW(TAG, "Failed to parse '$rawValue' as Int for item '$itemId'")
-                    false
-                }
-            }
-            is Float -> {
-                val parsed = if (rawValue is Number) rawValue.toFloat() else rawStr.toFloatOrNull()
-                if (parsed != null) {
-                    @Suppress("UNCHECKED_CAST")
-                    (mutableVm as MutableItemViewModel<Float>).setValue(parsed)
-                    logI(TAG, "Applied float $parsed to item '$itemId'")
-                    true
-                } else {
-                    logW(TAG, "Failed to parse '$rawValue' as Float for item '$itemId'")
-                    false
-                }
-            }
-            is Double -> {
-                val parsed = if (rawValue is Number) rawValue.toDouble() else rawStr.toDoubleOrNull()
-                if (parsed != null) {
-                    @Suppress("UNCHECKED_CAST")
-                    (mutableVm as MutableItemViewModel<Double>).setValue(parsed)
-                    logI(TAG, "Applied double $parsed to item '$itemId'")
-                    true
-                } else {
-                    logW(TAG, "Failed to parse '$rawValue' as Double for item '$itemId'")
-                    false
-                }
-            }
-            is String -> {
-                @Suppress("UNCHECKED_CAST")
-                (mutableVm as MutableItemViewModel<String>).setValue(rawStr)
-                logI(TAG, "Applied string '$rawStr' to item '$itemId'")
-                true
-            }
-            else -> {
-                // 4. Reflection fallback for custom models with updateFromSerialized
-                try {
-                    val method = vm.javaClass.methods.firstOrNull {
-                        it.name == "updateFromSerialized" &&
-                                it.parameterTypes.size == 1 &&
-                                it.parameterTypes[0] == String::class.java
-                    }
-                    if (method != null) {
-                        val res = method.invoke(vm, rawStr)
-                        if (res is Boolean) {
-                            if (res) {
-                                logI(TAG, "Applied via reflection updateFromSerialized to item '$itemId'")
-                                return true
-                            } else {
-                                logW(TAG, "updateFromSerialized returned false for item '$itemId'")
-                                return false
-                            }
-                        }
-                        logI(TAG, "Applied via reflection updateFromSerialized to item '$itemId'")
-                        return true
-                    }
-                } catch (e: Exception) {
-                    logW(TAG, "Reflection invocation failed for item '$itemId': $e")
-                }
-
-                logW(TAG, "Unsupported value type '${current.javaClass.simpleName}' for item '$itemId'")
-                false
-            }
-        }
+        return applyValue(vm, rawValue)
     }
 
     /**

@@ -14,6 +14,8 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navOptions
 import com.example.core.item.ItemViewModelRegistry
+import com.example.core.item.MutableItemViewModel
+import com.example.core.item.SerializedMutableItemViewModel
 
 /**
  * Universal Data-Driven Settings Activity powered by Jetpack Navigation 2.x and Jetpack Compose.
@@ -91,25 +93,45 @@ open class GenericSettingsActivity : AppCompatActivity() {
             val segments = uri.pathSegments
             val itemId = segments.getOrNull(1)
 
-            val hasValueExtra = intent.hasExtra(ItemSetterHelper.EXTRA_VALUE) ||
-                    uri.getQueryParameter(ItemSetterHelper.EXTRA_VALUE) != null
+            val rawValue: Any? = intent.extras?.get(ItemSetterHelper.EXTRA_VALUE)
+                ?: uri.getQueryParameter(ItemSetterHelper.EXTRA_VALUE)
 
             if (itemId != null) {
-                val intentCopy = Intent(intent)
+                val vm = getViewModelRegistry().getViewModel<Any>(itemId)
+                val parsedValue = if (vm != null && rawValue != null) {
+                    ItemSetterHelper.parseValue(vm, rawValue)
+                } else null
+
                 var mutationExecuted = false
-                val deferredMutation: (() -> Unit)? = if (hasValueExtra) {
+                val deferredMutation: (() -> Unit)? = if (vm is MutableItemViewModel<*> && parsedValue != null) {
+                    @Suppress("UNCHECKED_CAST")
+                    val mutableVm = vm as MutableItemViewModel<Any>
                     {
                         if (!mutationExecuted) {
                             mutationExecuted = true
-                            val valueApplied = ItemSetterHelper.applyFromIntent(getViewModelRegistry(), itemId, intentCopy)
-                            Log.d(tag, "Deferred deep link setter applied: itemId=$itemId, success=$valueApplied")
+                            mutableVm.setValue(parsedValue)
+                            Log.d(tag, "Deferred value applied directly to vm.setValue(): itemId=$itemId, value=$parsedValue")
                         }
                     }
+                } else if (vm is SerializedMutableItemViewModel && rawValue != null) {
+                    val rawStr = rawValue.toString()
+                    val lambda: () -> Unit = {
+                        if (!mutationExecuted) {
+                            mutationExecuted = true
+                            val handled = vm.updateFromSerialized(rawStr)
+                            Log.d(tag, "Deferred serialized value applied to vm: itemId=$itemId, handled=$handled")
+                        }
+                    }
+                    lambda
                 } else null
+
+                if (deferredMutation != null) {
+                    intent.removeExtra(ItemSetterHelper.EXTRA_VALUE)
+                }
 
                 currentHighlightEvent.value = HighlightEvent(
                     itemId = itemId,
-                    hasValueMutation = hasValueExtra,
+                    hasValueMutation = deferredMutation != null,
                     timestamp = System.currentTimeMillis(),
                     pendingMutation = deferredMutation
                 )

@@ -4,6 +4,7 @@ import com.example.core.item.ItemViewModel
 import com.example.core.item.ItemViewModelRegistry
 import com.example.core.item.MutableChoiceItemViewModel
 import com.example.core.item.MutableItemViewModel
+import com.example.core.item.ParameterizedMutableItemViewModel
 import com.example.core.item.ValueWithState
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -77,7 +78,7 @@ class LocalStorageItemViewModel<T>(
     private val repository: SettingRepository<T>,
     private val scope: CoroutineScope = AppScope.scope,
     override val isVisibleFlow: StateFlow<Boolean> = MutableStateFlow(true)
-) : MutableItemViewModel<T> {
+) : MutableItemViewModel<T>, ParameterizedMutableItemViewModel {
 
     override val valueFlow: StateFlow<T> = repository.valueFlow
 
@@ -85,6 +86,11 @@ class LocalStorageItemViewModel<T>(
         scope.launch {
             repository.save(newValue)
         }
+    }
+
+    override fun updateFromParameters(parameters: Map<String, String>): Boolean {
+        val rawValue = parameters["value"] ?: return false
+        return ItemSetterHelper.applyValue(this, rawValue)
     }
 
     /**
@@ -150,7 +156,7 @@ class HardwareItemViewModel<DomainT, RawV>(
     private val storage: HardwarePropertyStorage,
     private val scope: CoroutineScope = AppScope.scope,
     override val isVisibleFlow: StateFlow<Boolean> = MutableStateFlow(true)
-) : MutableItemViewModel<DomainT> {
+) : MutableItemViewModel<DomainT>, ParameterizedMutableItemViewModel {
 
     override val valueFlow: StateFlow<DomainT> = storage.observe(property)
 
@@ -158,6 +164,11 @@ class HardwareItemViewModel<DomainT, RawV>(
         scope.launch {
             storage.write(property, newValue)
         }
+    }
+
+    override fun updateFromParameters(parameters: Map<String, String>): Boolean {
+        val rawValue = parameters["value"] ?: parameters[property.propertyId.toString()] ?: return false
+        return ItemSetterHelper.applyValue(this, rawValue)
     }
 }
 

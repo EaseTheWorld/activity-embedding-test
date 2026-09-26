@@ -60,4 +60,17 @@ class SeatLumbarViewModel(
         setValue(updated)
         return true
     }
+
+    override fun updateFromParameters(parameters: Map<String, String>): Boolean {
+        val hStr = parameters["height"] ?: parameters["h"] ?: parameters["y"]
+        val dStr = parameters["depth"] ?: parameters["d"] ?: parameters["x"]
+        if (hStr != null && dStr != null) {
+            val h = hStr.toIntOrNull() ?: return false
+            val d = dStr.toIntOrNull() ?: return false
+            setValue(SeatLumbarSupport(heightPercent = h, depthPercent = d))
+            return true
+        }
+        val value = parameters["value"] ?: return false
+        return updateFromSerialized(value)
+    }
 }

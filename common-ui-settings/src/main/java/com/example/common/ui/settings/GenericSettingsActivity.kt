@@ -14,8 +14,6 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navOptions
 import com.example.core.item.ItemViewModelRegistry
-import com.example.core.item.MutableItemViewModel
-import com.example.core.item.SerializedMutableItemViewModel
 
 /**
  * Universal Data-Driven Settings Activity powered by Jetpack Navigation 2.x and Jetpack Compose.
@@ -89,51 +87,29 @@ open class GenericSettingsActivity : AppCompatActivity() {
         if (uri != null && uri.scheme == SettingsNavigation.DEEP_LINK_SCHEME) {
             Log.d(tag, "Navigating via deep link: $uri, extras=${intent.extras}")
 
-            // 1. Process setter mutation from Intent Extras (or query parameter fallback)
+            // 1. Process setter mutation strictly from Intent Extras (ignoring URI query)
             val segments = uri.pathSegments
             val itemId = segments.getOrNull(1)
 
-            val rawValue: Any? = intent.extras?.get(ItemSetterHelper.EXTRA_VALUE)
-                ?: uri.getQueryParameter(ItemSetterHelper.EXTRA_VALUE)
+            val extrasMap = mutableMapOf<String, String>()
+            intent.extras?.let { bundle ->
+                for (key in bundle.keySet()) {
+                    bundle.get(key)?.let { value ->
+                        extrasMap[key] = value.toString()
+                    }
+                }
+            }
 
             if (itemId != null) {
-                val vm = getViewModelRegistry().getViewModel<Any>(itemId)
-                val parsedValue = if (vm != null && rawValue != null) {
-                    ItemSetterHelper.parseValue(vm, rawValue)
-                } else null
-
-                var mutationExecuted = false
-                val deferredMutation: (() -> Unit)? = if (vm is MutableItemViewModel<*> && parsedValue != null) {
-                    @Suppress("UNCHECKED_CAST")
-                    val mutableVm = vm as MutableItemViewModel<Any>
-                    {
-                        if (!mutationExecuted) {
-                            mutationExecuted = true
-                            mutableVm.setValue(parsedValue)
-                            Log.d(tag, "Deferred value applied directly to vm.setValue(): itemId=$itemId, value=$parsedValue")
-                        }
-                    }
-                } else if (vm is SerializedMutableItemViewModel && rawValue != null) {
-                    val rawStr = rawValue.toString()
-                    val lambda: () -> Unit = {
-                        if (!mutationExecuted) {
-                            mutationExecuted = true
-                            val handled = vm.updateFromSerialized(rawStr)
-                            Log.d(tag, "Deferred serialized value applied to vm: itemId=$itemId, handled=$handled")
-                        }
-                    }
-                    lambda
-                } else null
-
-                if (deferredMutation != null) {
-                    intent.removeExtra(ItemSetterHelper.EXTRA_VALUE)
+                if (extrasMap.isNotEmpty()) {
+                    intent.replaceExtras(Bundle())
                 }
 
                 currentHighlightEvent.value = HighlightEvent(
                     itemId = itemId,
-                    hasValueMutation = deferredMutation != null,
+                    hasValueMutation = extrasMap.isNotEmpty(),
                     timestamp = System.currentTimeMillis(),
-                    pendingMutation = deferredMutation
+                    pendingParams = extrasMap.ifEmpty { null }
                 )
             }
 

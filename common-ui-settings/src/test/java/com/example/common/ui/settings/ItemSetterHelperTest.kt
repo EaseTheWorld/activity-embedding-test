@@ -229,4 +229,34 @@ class ItemSetterHelperTest {
         assertTrue(ItemSetterHelper.applyValue(choiceVm, "LEVEL_2"))
         assertEquals("LEVEL 2", choiceVm.valueFlow.value)
     }
+
+    @Test
+    fun `applyParameters routes key-value map to ViewModel or falls back to value key`() {
+        val toggleVm = MockToggleViewModel(initial = false)
+        val choiceVm = MockChoiceViewModel(initial = "OFF", options = listOf("OFF", "LEVEL 1", "LEVEL 2"))
+
+        // Standard "value" parameter map
+        assertTrue(ItemSetterHelper.applyParameters(toggleVm, mapOf("value" to "true")))
+        assertTrue(toggleVm.valueFlow.value)
+
+        assertTrue(ItemSetterHelper.applyParameters(choiceVm, mapOf("value" to "LEVEL_2")))
+        assertEquals("LEVEL 2", choiceVm.valueFlow.value)
+
+        // Custom multi-parameter VM implementing ParameterizedMutableItemViewModel
+        class MultiParamVm : MutableItemViewModel<Pair<Int, Int>>, com.example.core.item.ParameterizedMutableItemViewModel {
+            private val _flow = MutableStateFlow(0 to 0)
+            override val valueFlow: StateFlow<Pair<Int, Int>> = _flow
+            override fun setValue(newValue: Pair<Int, Int>) { _flow.value = newValue }
+            override fun updateFromParameters(parameters: Map<String, String>): Boolean {
+                val x = parameters["x"]?.toIntOrNull() ?: return false
+                val y = parameters["y"]?.toIntOrNull() ?: return false
+                setValue(x to y)
+                return true
+            }
+        }
+
+        val multiVm = MultiParamVm()
+        assertTrue(ItemSetterHelper.applyParameters(multiVm, mapOf("x" to "10", "y" to "20")))
+        assertEquals(10 to 20, multiVm.valueFlow.value)
+    }
 }

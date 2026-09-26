@@ -6,6 +6,7 @@ import com.example.core.item.ChoiceItemViewModel
 import com.example.core.item.ItemViewModel
 import com.example.core.item.ItemViewModelRegistry
 import com.example.core.item.MutableItemViewModel
+import com.example.core.item.ParameterizedMutableItemViewModel
 import com.example.core.item.SerializedMutableItemViewModel
 import com.example.core.item.ValueWithState
 
@@ -14,12 +15,12 @@ import com.example.core.item.ValueWithState
  *
  * Supports mutating setting items from:
  * 1. Intent Extras (e.g. `intent.putExtra("value", false)` or `adb shell am start --ez value false`)
- * 2. Deep Link query parameters (e.g. `myapp://navigate/{categoryId}/{itemId}?value={value}`) as fallback
+ * 2. Parameter maps from multi-extra payloads
  * 3. ADB simulation broadcasts
  * 4. External IPC or test tools
  *
  * Adheres to Interface Segregation Principle (ISP):
- * Only ViewModels implementing [MutableItemViewModel] or [SerializedMutableItemViewModel] can be mutated.
+ * Only ViewModels implementing [MutableItemViewModel] or [ParameterizedMutableItemViewModel] can be mutated.
  */
 object ItemSetterHelper {
     private const val TAG = "ItemSetterHelper"
@@ -43,7 +44,35 @@ object ItemSetterHelper {
     }
 
     /**
-     * Extracts and applies mutation payload from [Intent] (Extras or query parameter fallback).
+     * Applies key-value parameters (from Intent Extras) to [vm].
+     *
+     * 1. If [vm] implements [ParameterizedMutableItemViewModel], delegates directly to it.
+     * 2. Otherwise falls back to resolving standard "value" key via [applyValue].
+     *
+     * @param vm Target ViewModel.
+     * @param parameters Key-value map extracted from Intent Extras.
+     * @return True if mutation was accepted and applied, false otherwise.
+     */
+    fun applyParameters(vm: ItemViewModel<*>, parameters: Map<String, String>): Boolean {
+        if (vm is ParameterizedMutableItemViewModel) {
+            val handled = vm.updateFromParameters(parameters)
+            if (handled) {
+                logI(TAG, "Applied parameters via ParameterizedMutableItemViewModel: $parameters")
+                return true
+            }
+        }
+
+        val rawValue = parameters[EXTRA_VALUE]
+        if (rawValue != null) {
+            return applyValue(vm, rawValue)
+        }
+
+        logW(TAG, "Cannot apply parameters: no matching handler or 'value' key in $parameters")
+        return false
+    }
+
+    /**
+     * Extracts and applies mutation payload from [Intent] Extras.
      *
      * In accordance with Separation of Concerns (SoC):
      * 1. URI represents the navigation destination (GET/READ).
@@ -54,12 +83,12 @@ object ItemSetterHelper {
      *
      * @param registry The [ItemViewModelRegistry] owning the item's ViewModel.
      * @param itemId Unique ID of the setting item (e.g. "auto_lock", "driver_seat_heat", "seat_lumbar").
-     * @param intent The incoming Intent carrying extras or data URI.
+     * @param intent The incoming Intent carrying extras.
      * @return True if a value was found and successfully applied, false otherwise.
      */
     fun applyFromIntent(registry: ItemViewModelRegistry, itemId: String, intent: Intent): Boolean {
         val extraValue: Any? = intent.extras?.get(EXTRA_VALUE)
-        val rawValue: Any = extraValue ?: intent.data?.getQueryParameter(EXTRA_VALUE) ?: return false
+        val rawValue: Any = extraValue ?: return false
 
         val success = applyValue(registry, itemId, rawValue)
         if (success) {

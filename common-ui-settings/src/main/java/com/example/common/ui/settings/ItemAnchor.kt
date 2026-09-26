@@ -29,12 +29,13 @@ private const val TAG = "ItemAnchor"
 
 /**
  * Event describing a deep link target item and whether a value mutation was executed.
+ * Holds optional [pendingParams] (extracted from Intent Extras) for deferred mutation.
  */
 data class HighlightEvent(
     val itemId: String,
     val hasValueMutation: Boolean = false,
     val timestamp: Long = System.currentTimeMillis(),
-    val pendingMutation: (() -> Unit)? = null
+    val pendingParams: Map<String, String>? = null
 )
 
 /**
@@ -55,6 +56,7 @@ val LocalHighlightEvent: ProvidableCompositionLocal<HighlightEvent?> = compositi
  * When the [itemId] matches [LocalHighlightEvent]:
  * 1. Automatically requests the parent scroll container to bring this item into view.
  * 2. Triggers a visual highlight / pulse animation for 1 second (1000ms) to draw attention.
+ * 3. If [pendingParams] are present, applies them to the item's ViewModel after 350ms settle delay.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -63,6 +65,7 @@ fun Modifier.anchor(
     highlightColor: Color = Color(0x406750A4)
 ): Modifier {
     val highlightEvent = LocalHighlightEvent.current
+    val viewModelRegistry = LocalItemViewModelRegistry.current
     val isTarget = highlightEvent?.itemId == itemId
 
     var highlighted by remember { mutableStateOf(false) }
@@ -79,9 +82,16 @@ fun Modifier.anchor(
             Log.d(TAG, "Item row highlight started for '$itemId', hasValueMutation=${highlightEvent?.hasValueMutation}")
             bringIntoViewRequester.bringIntoView()
             highlighted = true
-            if (highlightEvent?.pendingMutation != null) {
+            val params = highlightEvent?.pendingParams
+            if (params != null) {
                 delay(350)
-                highlightEvent.pendingMutation.invoke()
+                val vm = viewModelRegistry.getViewModel<Any>(itemId)
+                if (vm != null) {
+                    val applied = ItemSetterHelper.applyParameters(vm, params)
+                    Log.d(TAG, "Deferred parameters applied to item '$itemId': params=$params, success=$applied")
+                } else {
+                    Log.w(TAG, "Cannot apply deferred parameters: no ViewModel found for '$itemId'")
+                }
                 delay(650)
             } else {
                 delay(1000)

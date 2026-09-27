@@ -209,23 +209,6 @@ class VoiceAssistantClient(
     }
 
     /**
-     * Executes the command headlessly via ContentProvider `call("update_item")`.
-     */
-    fun executeHeadless(command: VoiceCommandResult, resolver: ContentResolver? = contentResolver): Boolean {
-        val res = resolver ?: return false
-        val uri = Uri.parse("content://${command.targetItem.authority}")
-        val extras = Bundle().apply {
-            putString("extra_key", command.targetItem.itemKey)
-            command.matchedParameters.forEach { (k, v) -> putString(k, v) }
-            if (command.matchedParameters.containsKey("value")) {
-                putString("extra_value", command.matchedParameters["value"])
-            }
-        }
-        val result = res.call(uri, "update_item", command.targetItem.itemKey, extras)
-        return result?.getBoolean("success", false) == true
-    }
-
-    /**
      * Constructs a UI Deep Link Intent to navigate the user to the setting item with visual focus.
      */
     fun createDeepLinkIntent(command: VoiceCommandResult): Intent {

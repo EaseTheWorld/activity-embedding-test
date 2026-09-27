@@ -50,11 +50,6 @@ class DoorSettingsProvider : ContentProvider() {
         const val COLUMN_ITEM_KEYWORDS = "item_keywords"
         const val COLUMN_TARGET_ACTION = "target_action"
         const val COLUMN_TARGET_ACTIVITY = "target_activity"
-
-        // Call method
-        const val METHOD_UPDATE_ITEM = "update_item"
-        const val EXTRA_KEY = "extra_key"
-        const val EXTRA_VALUE = "extra_value"
     }
 
     private val uriMatcher by lazy {
@@ -170,35 +165,6 @@ class DoorSettingsProvider : ContentProvider() {
             }
             else -> null
         }
-    }
-
-    override fun call(method: String, arg: String?, extras: Bundle?): Bundle? {
-        if (method == METHOD_UPDATE_ITEM) {
-            val key = arg ?: extras?.getString(EXTRA_KEY) ?: extras?.getString("key") ?: return null
-            val targetItem = DoorItemRegistry.findItem(key)
-            if (targetItem != null) {
-                val params = mutableMapOf<String, String>()
-                extras?.keySet()?.forEach { k ->
-                    extras.getString(k)?.let { v -> params[k] = v }
-                }
-                val directValue = extras?.getString(EXTRA_VALUE) ?: extras?.getString("value")
-                if (directValue != null && !params.containsKey("value")) {
-                    params["value"] = directValue
-                }
-                val vm = DoorItemRegistry.viewModelRegistry.getViewModel<Any>(key)
-                val applied = when {
-                    vm is com.example.core.item.MutableItemViewModel<*> -> vm.updateFromParameters(params)
-                    targetItem is com.example.core.item.MutableItemViewModel<*> -> targetItem.updateFromParameters(params)
-                    else -> false
-                }
-                if (applied) {
-                    context?.contentResolver?.notifyChange(Uri.parse("content://$AUTHORITY/$PATH_ITEMS"), null)
-                    Log.d(TAG, "[$AUTHORITY] Item updated via SSOT: $key with params $params")
-                    return Bundle().apply { putBoolean("success", true) }
-                }
-            }
-        }
-        return super.call(method, arg, extras)
     }
 
     override fun getType(uri: Uri): String? = null

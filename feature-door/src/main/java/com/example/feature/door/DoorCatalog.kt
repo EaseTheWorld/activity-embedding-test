@@ -24,39 +24,45 @@ object DoorCatalog : SettingCatalog("door") {
         @StringRes nameResId: Int,
         @StringRes descriptionResId: Int,
         @DrawableRes iconResId: Int = R.drawable.ic_feature_door,
-        badgeKey: String? = null
+        badgeKey: String? = null,
+        keywords: List<String> = emptyList()
     ): UiToggleItem = item(
         UiToggleItem(
             id = id,
             nameResId = nameResId,
             descriptionResId = descriptionResId,
             iconResId = iconResId,
-            badgeKey = badgeKey
+            badgeKey = badgeKey,
+            keywords = keywords
         )
     )
 
     val autoDoorLock = createToggle(
         id = "auto_lock",
         nameResId = R.string.door_item_autolock_title,
-        descriptionResId = R.string.door_item_autolock_subtitle
+        descriptionResId = R.string.door_item_autolock_subtitle,
+        keywords = listOf("자동잠금", "오토락", "도어자동잠금", "auto lock")
     )
 
     val childLock = createToggle(
         id = "child_lock",
         nameResId = R.string.door_item_childlock_title,
-        descriptionResId = R.string.door_item_childlock_subtitle
+        descriptionResId = R.string.door_item_childlock_subtitle,
+        keywords = listOf("차일드락", "어린이보호", "아동잠금", "child lock")
     )
 
     val unlockOnPark = createToggle(
         id = "unlock_on_park",
         nameResId = R.string.door_item_unlockpark_title,
         descriptionResId = R.string.door_item_unlockpark_subtitle,
-        badgeKey = "SAFE"
+        badgeKey = "SAFE",
+        keywords = listOf("주차시잠금해제", "언락온파크", "unlock on park")
     )
 
     val autoRelock = createToggle(
         id = "auto_relock",
         nameResId = R.string.door_item_autorelock_title,
-        descriptionResId = R.string.door_item_autorelock_subtitle
+        descriptionResId = R.string.door_item_autorelock_subtitle,
+        keywords = listOf("자동재잠금", "오토리락", "auto relock")
     )
 }

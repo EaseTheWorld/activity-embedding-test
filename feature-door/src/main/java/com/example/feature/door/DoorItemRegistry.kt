@@ -21,6 +21,11 @@ object DoorItemRegistry : CategoryItemProvider {
     val childLock get() = DoorCatalog.childLock
     val unlockOnPark get() = DoorCatalog.unlockOnPark
 
+    val viewModelRegistry: com.example.core.item.ItemViewModelRegistry =
+        com.example.core.item.ItemViewModelRegistry().also {
+            DoorViewModelBinder.bindAll(it)
+        }
+
     override val items: List<Item> get() = listOf(
         autoDoorLock,
         autoRelock,

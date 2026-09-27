@@ -6,9 +6,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import com.example.core.item.HasVhalBinding
 import com.example.core.item.Item
+import com.example.core.item.ItemCapability
 import com.example.core.item.ItemType
 import com.example.core.item.ItemViewModel
 import com.example.core.item.MutableItemViewModel
+import com.example.core.item.ParameterSpec
 import com.example.core.item.VhalBinding
 import com.example.core.item.VhalPropertyBinder
 import kotlinx.coroutines.flow.Flow
@@ -96,7 +98,8 @@ open class UiItem(
     @get:DrawableRes val iconResId: Int? = null,
     @get:StringRes val descriptionResId: Int? = null,
     isVisible: Flow<Boolean> = flowOf(true),
-    children: Set<Item> = emptySet()
+    children: Set<Item> = emptySet(),
+    override val keywords: List<String> = emptyList()
 ) : Item(id = id, children = children, isVisible = isVisible) {
 
     val titleRes: Int get() = nameResId
@@ -118,17 +121,34 @@ open class UiToggleItem(
     @get:DrawableRes open val onIconRes: Int? = null,
     @get:DrawableRes open val offIconRes: Int? = null,
     isVisible: Flow<Boolean> = flowOf(true),
-    children: Set<Item> = emptySet()
+    children: Set<Item> = emptySet(),
+    keywords: List<String> = emptyList()
 ) : UiItem(
     id = id,
     nameResId = nameResId,
     iconResId = iconResId,
     descriptionResId = descriptionResId,
     isVisible = isVisible,
-    children = children
+    children = children,
+    keywords = keywords
 ) {
 
     override val type: ItemType get() = ItemType.TOGGLE
+
+    override val capability: ItemCapability get() = ItemCapability(
+        itemId = id,
+        actionType = ItemType.TOGGLE,
+        acceptedParameters = listOf(
+            ParameterSpec(
+                name = "value",
+                type = "boolean",
+                options = listOf("true", "false"),
+                isRequired = true,
+                description = "Toggle state"
+            )
+        ),
+        keywords = keywords
+    )
 
     open fun getValueVisual(value: Boolean): UiVisualData? {
         val icon = if (value) onIconRes else offIconRes
@@ -156,19 +176,36 @@ open class UiChoiceItem(
     @StringRes descriptionResId: Int? = null,
     val optionSlot: OptionSlot<String> = OptionSlots.Segmented,
     isVisible: Flow<Boolean> = flowOf(true),
-    children: Set<Item> = emptySet()
+    children: Set<Item> = emptySet(),
+    keywords: List<String> = emptyList()
 ) : UiItem(
     id = id,
     nameResId = nameResId,
     iconResId = iconResId,
     descriptionResId = descriptionResId,
     isVisible = isVisible,
-    children = children
+    children = children,
+    keywords = keywords
 ) {
 
     override val type: ItemType get() = ItemType.CHOICE
 
     val optionIds: List<String> get() = options.map { it.value }
+
+    override val capability: ItemCapability get() = ItemCapability(
+        itemId = id,
+        actionType = ItemType.CHOICE,
+        acceptedParameters = listOf(
+            ParameterSpec(
+                name = "value",
+                type = "choice",
+                options = optionIds,
+                isRequired = true,
+                description = "Selected choice option"
+            )
+        ),
+        keywords = keywords
+    )
 
     fun getOption(value: String): UiOption<String>? =
         options.firstOrNull { it.value == value }
@@ -196,16 +233,34 @@ open class UiSliderItem(
     @DrawableRes iconResId: Int? = null,
     @StringRes descriptionResId: Int? = null,
     isVisible: Flow<Boolean> = flowOf(true),
-    children: Set<Item> = emptySet()
+    children: Set<Item> = emptySet(),
+    keywords: List<String> = emptyList()
 ) : UiItem(
     id = id,
     nameResId = nameResId,
     iconResId = iconResId,
     descriptionResId = descriptionResId,
     isVisible = isVisible,
-    children = children
+    children = children,
+    keywords = keywords
 ) {
     override val type: ItemType get() = ItemType.SLIDER
+
+    override val capability: ItemCapability get() = ItemCapability(
+        itemId = id,
+        actionType = ItemType.SLIDER,
+        acceptedParameters = listOf(
+            ParameterSpec(
+                name = "value",
+                type = "int",
+                min = min,
+                max = max,
+                isRequired = true,
+                description = "Slider numeric value within $min..$max"
+            )
+        ),
+        keywords = keywords
+    )
 }
 
 /**
@@ -219,16 +274,25 @@ open class UiActionItem(
     @DrawableRes iconResId: Int? = null,
     @StringRes descriptionResId: Int? = null,
     isVisible: Flow<Boolean> = flowOf(true),
-    children: Set<Item> = emptySet()
+    children: Set<Item> = emptySet(),
+    keywords: List<String> = emptyList()
 ) : UiItem(
     id = id,
     nameResId = nameResId,
     iconResId = iconResId,
     descriptionResId = descriptionResId,
     isVisible = isVisible,
-    children = children
+    children = children,
+    keywords = keywords
 ) {
     override val type: ItemType get() = ItemType.ACTION
+
+    override val capability: ItemCapability get() = ItemCapability(
+        itemId = id,
+        actionType = ItemType.ACTION,
+        acceptedParameters = emptyList(),
+        keywords = keywords
+    )
 }
 
 // ============================================================================
@@ -247,7 +311,8 @@ open class BaseUiChoiceItem(
     @DrawableRes iconResId: Int? = null,
     optionSlot: OptionSlot<String> = OptionSlots.Segmented,
     isVisible: Flow<Boolean> = flowOf(true),
-    children: Set<Item> = emptySet()
+    children: Set<Item> = emptySet(),
+    keywords: List<String> = emptyList()
 ) : UiChoiceItem(
     id = id,
     nameResId = nameResId,
@@ -256,7 +321,8 @@ open class BaseUiChoiceItem(
     descriptionResId = descriptionResId,
     optionSlot = optionSlot,
     isVisible = isVisible,
-    children = children
+    children = children,
+    keywords = keywords
 )
 
 /**
@@ -299,7 +365,8 @@ abstract class VhalChoiceItem<V>(
     optionSlot: OptionSlot<String> = OptionSlots.Segmented,
     private val binder: VhalPropertyBinder = InMemoryVhalBinder(),
     isVisible: Flow<Boolean> = flowOf(true),
-    children: Set<Item> = emptySet()
+    children: Set<Item> = emptySet(),
+    keywords: List<String> = emptyList()
 ) : BaseUiChoiceItem(
     id = id,
     nameResId = nameResId,
@@ -308,7 +375,8 @@ abstract class VhalChoiceItem<V>(
     iconResId = iconResId,
     optionSlot = optionSlot,
     isVisible = isVisible,
-    children = children
+    children = children,
+    keywords = keywords
 ), HasVhalBinding<String, V>, MutableItemViewModel<String> {
 
     override val vhalBinding: VhalBinding<String, V> = VhalBinding(
@@ -349,7 +417,8 @@ open class BaseUiToggleItem(
     @DrawableRes onIconRes: Int? = null,
     @DrawableRes offIconRes: Int? = null,
     isVisible: Flow<Boolean> = flowOf(true),
-    children: Set<Item> = emptySet()
+    children: Set<Item> = emptySet(),
+    keywords: List<String> = emptyList()
 ) : UiToggleItem(
     id = id,
     nameResId = nameResId,
@@ -359,7 +428,8 @@ open class BaseUiToggleItem(
     onIconRes = onIconRes,
     offIconRes = offIconRes,
     isVisible = isVisible,
-    children = children
+    children = children,
+    keywords = keywords
 )
 
 /**
@@ -381,7 +451,8 @@ abstract class VhalToggleItem<V>(
     @DrawableRes offIconRes: Int? = null,
     private val binder: VhalPropertyBinder = InMemoryVhalBinder(),
     isVisible: Flow<Boolean> = flowOf(true),
-    children: Set<Item> = emptySet()
+    children: Set<Item> = emptySet(),
+    keywords: List<String> = emptyList()
 ) : BaseUiToggleItem(
     id = id,
     nameResId = nameResId,
@@ -391,7 +462,8 @@ abstract class VhalToggleItem<V>(
     onIconRes = onIconRes,
     offIconRes = offIconRes,
     isVisible = isVisible,
-    children = children
+    children = children,
+    keywords = keywords
 ), HasVhalBinding<Boolean, V>, MutableItemViewModel<Boolean> {
 
     override val vhalBinding: VhalBinding<Boolean, V> = VhalBinding(

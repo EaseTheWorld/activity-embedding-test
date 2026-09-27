@@ -44,6 +44,10 @@ class LightSettingsProvider : ContentProvider() {
         const val COLUMN_ITEM_MAX = "item_max"
         const val COLUMN_ITEM_OPTIONS = "item_options"
         const val COLUMN_ITEM_ENABLED = "item_enabled"
+        const val COLUMN_ITEM_PARAMETERS = "item_parameters"
+        const val COLUMN_ITEM_KEYWORDS = "item_keywords"
+        const val COLUMN_TARGET_ACTION = "target_action"
+        const val COLUMN_TARGET_ACTIVITY = "target_activity"
 
         // Call method
         const val METHOD_UPDATE_ITEM = "update_item"
@@ -135,14 +139,41 @@ class LightSettingsProvider : ContentProvider() {
                         COLUMN_ITEM_MIN,
                         COLUMN_ITEM_MAX,
                         COLUMN_ITEM_OPTIONS,
-                        COLUMN_ITEM_ENABLED
+                        COLUMN_ITEM_ENABLED,
+                        COLUMN_ITEM_PARAMETERS,
+                        COLUMN_ITEM_KEYWORDS,
+                        COLUMN_TARGET_ACTION,
+                        COLUMN_TARGET_ACTIVITY
                     )
                 )
-                cursor.addRow(arrayOf("1", KEY_HEADLIGHTS, "Headlights", "Automatic sensor activation", "CHOICE", headlightsMode, 0, 0, "OFF,PARKING,ON,AUTO", 1))
-                cursor.addRow(arrayOf("2", KEY_AMBIENT_LIGHT, "Ambient Lighting", "Interior footwell glow", "TOGGLE", ambientLightEnabled.toString(), 0, 0, "", 1))
-                cursor.addRow(arrayOf("3", KEY_FRUNK_LIGHT, "Front Trunk Light", "Front cargo illumination", "TOGGLE", frunkLightEnabled.toString(), 0, 0, "", 1))
-                cursor.addRow(arrayOf("4", KEY_TRUNK_LIGHT, "Rear Trunk Light", "Rear luggage illumination", "TOGGLE", trunkLightEnabled.toString(), 0, 0, "", 1))
-                cursor.addRow(arrayOf("5", KEY_AUTO_HIGH_BEAM, "Auto High Beam", "Automatic anti-glare dipping", "TOGGLE", autoHighBeamEnabled.toString(), 0, 0, "", 1))
+                val action = "com.example.carsettings.light.OPEN"
+                val activity = "com.example.feature.light.LightSettingsActivity"
+
+                cursor.addRow(arrayOf(
+                    "1", KEY_HEADLIGHTS, "Headlights", "Automatic sensor activation", "CHOICE", headlightsMode, 0, 0, "OFF,PARKING,ON,AUTO", 1,
+                    "[{\"name\":\"value\",\"type\":\"choice\",\"options\":[\"OFF\",\"PARKING\",\"ON\",\"AUTO\"],\"required\":true}]",
+                    "전조등,헤드라이트,오토라이트,headlights", action, activity
+                ))
+                cursor.addRow(arrayOf(
+                    "2", KEY_AMBIENT_LIGHT, "Ambient Lighting", "Interior footwell glow", "TOGGLE", ambientLightEnabled.toString(), 0, 0, "", 1,
+                    "[{\"name\":\"value\",\"type\":\"boolean\",\"options\":[\"true\",\"false\"],\"required\":true}]",
+                    "앰비언트,실내조명,무드등,ambient light", action, activity
+                ))
+                cursor.addRow(arrayOf(
+                    "3", KEY_FRUNK_LIGHT, "Front Trunk Light", "Front cargo illumination", "TOGGLE", frunkLightEnabled.toString(), 0, 0, "", 1,
+                    "[{\"name\":\"value\",\"type\":\"boolean\",\"options\":[\"true\",\"false\"],\"required\":true}]",
+                    "프렁크조명,앞트렁크등,frunk light", action, activity
+                ))
+                cursor.addRow(arrayOf(
+                    "4", KEY_TRUNK_LIGHT, "Rear Trunk Light", "Rear luggage illumination", "TOGGLE", trunkLightEnabled.toString(), 0, 0, "", 1,
+                    "[{\"name\":\"value\",\"type\":\"boolean\",\"options\":[\"true\",\"false\"],\"required\":true}]",
+                    "트렁크조명,트렁크등,trunk light", action, activity
+                ))
+                cursor.addRow(arrayOf(
+                    "5", KEY_AUTO_HIGH_BEAM, "Auto High Beam", "Automatic anti-glare dipping", "TOGGLE", autoHighBeamEnabled.toString(), 0, 0, "", 1,
+                    "[{\"name\":\"value\",\"type\":\"boolean\",\"options\":[\"true\",\"false\"],\"required\":true}]",
+                    "오토하이빔,상향등자동,auto high beam", action, activity
+                ))
                 cursor.setNotificationUri(context?.contentResolver, uri)
                 cursor
             }
@@ -165,8 +196,8 @@ class LightSettingsProvider : ContentProvider() {
             }
         }
         if (method == METHOD_UPDATE_ITEM) {
-            val key = extras?.getString(EXTRA_KEY) ?: return null
-            val value = extras.getString(EXTRA_VALUE) ?: return null
+            val key = arg ?: extras?.getString(EXTRA_KEY) ?: extras?.getString("key") ?: return null
+            val value = extras?.getString(EXTRA_VALUE) ?: extras?.getString("value") ?: return null
             val success = when (key) {
                 KEY_HEADLIGHTS -> { headlightsMode = value; true }
                 KEY_AMBIENT_LIGHT -> { ambientLightEnabled = value.toBoolean(); true }

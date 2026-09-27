@@ -34,6 +34,8 @@ open class Item(
 
     open val type: ItemType get() = ItemType.CUSTOM
     open val serializedValue: String get() = ""
+    open val keywords: List<String> get() = emptyList()
+    open val capability: ItemCapability? get() = null
 
     /**
      * Recursively searches for an item by id in this tree.

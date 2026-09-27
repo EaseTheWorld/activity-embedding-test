@@ -49,6 +49,10 @@ class SeatSettingsProvider : ContentProvider() {
         const val COLUMN_ITEM_ENABLED = "item_enabled"
         const val COLUMN_ITEM_TITLE_RES_ID = "item_title_res_id"
         const val COLUMN_ITEM_SUBTITLE_RES_ID = "item_subtitle_res_id"
+        const val COLUMN_ITEM_PARAMETERS = "item_parameters"
+        const val COLUMN_ITEM_KEYWORDS = "item_keywords"
+        const val COLUMN_TARGET_ACTION = "target_action"
+        const val COLUMN_TARGET_ACTIVITY = "target_activity"
 
         // Call method
         const val METHOD_UPDATE_ITEM = "update_item"
@@ -123,7 +127,11 @@ class SeatSettingsProvider : ContentProvider() {
                         COLUMN_ITEM_OPTIONS,
                         COLUMN_ITEM_ENABLED,
                         COLUMN_ITEM_TITLE_RES_ID,
-                        COLUMN_ITEM_SUBTITLE_RES_ID
+                        COLUMN_ITEM_SUBTITLE_RES_ID,
+                        COLUMN_ITEM_PARAMETERS,
+                        COLUMN_ITEM_KEYWORDS,
+                        COLUMN_TARGET_ACTION,
+                        COLUMN_TARGET_ACTIVITY
                     )
                 )
                 // Dynamically iterate over SeatItemRegistry.items (List<Item> SSOT)
@@ -138,6 +146,8 @@ class SeatSettingsProvider : ContentProvider() {
                         is SeatLumbarSupportItem -> SeatItemRegistry.seatLumbarViewModel.valueFlow.value.toSerialized()
                         else -> item.serializedValue
                     }
+                    val parametersJson = item.capability?.parametersToJson() ?: "[]"
+                    val keywordsCsv = item.keywords.joinToString(",")
 
                     cursor.addRow(
                         arrayOf(
@@ -152,7 +162,11 @@ class SeatSettingsProvider : ContentProvider() {
                             options,
                             1,
                             titleResId,
-                            subtitleResId
+                            subtitleResId,
+                            parametersJson,
+                            keywordsCsv,
+                            "com.example.carsettings.seat.OPEN",
+                            "com.example.lifecycleapp.GenericSettingsActivity"
                         )
                     )
                 }
@@ -166,24 +180,32 @@ class SeatSettingsProvider : ContentProvider() {
     override fun call(method: String, arg: String?, extras: Bundle?): Bundle? {
         if (method == METHOD_UPDATE_ITEM) {
             val key = arg ?: extras?.getString(EXTRA_KEY) ?: extras?.getString("key") ?: return null
-            val value = extras?.getString(EXTRA_VALUE) ?: extras?.getString("value") ?: return null
             val targetItem = SeatItemRegistry.findItem(key)
             if (targetItem != null) {
-                when {
-                    targetItem is MutableItemViewModel<*> -> {
-                        @Suppress("UNCHECKED_CAST")
-                        when (targetItem.type) {
-                            ItemType.TOGGLE -> (targetItem as MutableItemViewModel<Boolean>).setValue(value.toBoolean())
-                            ItemType.CHOICE -> (targetItem as MutableItemViewModel<String>).setValue(value)
-                            else -> Unit
-                        }
-                    }
-                    targetItem is SeatLumbarSupportItem -> SeatItemRegistry.seatLumbarViewModel.updateFromSerialized(value)
-                    else -> Unit
+                val params = mutableMapOf<String, String>()
+                extras?.keySet()?.forEach { k ->
+                    extras.getString(k)?.let { v -> params[k] = v }
                 }
-                context?.contentResolver?.notifyChange(Uri.parse("content://$AUTHORITY/$PATH_ITEMS"), null)
-                Log.d(TAG, "[$AUTHORITY] Item updated via SSOT: $key = $value")
-                return Bundle().apply { putBoolean("success", true) }
+                val directValue = extras?.getString(EXTRA_VALUE) ?: extras?.getString("value")
+                if (directValue != null && !params.containsKey("value")) {
+                    params["value"] = directValue
+                }
+
+                val applied = when {
+                    key == SeatItemRegistry.seatLumbar.id || targetItem is SeatLumbarSupportItem -> {
+                        SeatItemRegistry.seatLumbarViewModel.updateFromParameters(params)
+                    }
+                    targetItem is MutableItemViewModel<*> -> {
+                        targetItem.updateFromParameters(params)
+                    }
+                    else -> false
+                }
+
+                if (applied) {
+                    context?.contentResolver?.notifyChange(Uri.parse("content://$AUTHORITY/$PATH_ITEMS"), null)
+                    Log.d(TAG, "[$AUTHORITY] Item updated via SSOT: $key with params $params")
+                    return Bundle().apply { putBoolean("success", true) }
+                }
             }
         }
         return super.call(method, arg, extras)

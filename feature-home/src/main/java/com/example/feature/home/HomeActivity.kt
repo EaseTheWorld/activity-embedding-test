@@ -41,6 +41,11 @@ class HomeActivity : ComponentActivity() {
 
     private var isLaunchingTarget = false
 
+    override fun onStart() {
+        super.onStart()
+        Log.d(tag, "HomeActivity onStart()")
+    }
+
     override fun onResume() {
         super.onResume()
         if (isLaunchingTarget) {
@@ -53,7 +58,28 @@ class HomeActivity : ComponentActivity() {
 
     override fun onPause() {
         super.onPause()
+        Log.d(tag, "HomeActivity onPause()")
         isLaunchingTarget = false
+    }
+
+    override fun onStop() {
+        super.onStop()
+        Log.d(tag, "HomeActivity onStop()")
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        Log.d(tag, "HomeActivity onDestroy()")
+    }
+
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        Log.d(tag, "HomeActivity onConfigurationChanged: $newConfig")
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        Log.d(tag, "HomeActivity onSaveInstanceState()")
     }
 
     override fun onNewIntent(intent: Intent?) {

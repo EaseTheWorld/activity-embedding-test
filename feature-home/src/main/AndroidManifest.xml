@@ -2,11 +2,30 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <application>
+        <!--
+            Activity Embedding / Split Layout 대응 설정:
+            외부 앱 및 임베딩 Activity 제작자 권고 configChanges 가이드:
+            
+            1) screenLayout:
+               - 안드로이드 화면 레이아웃 등급(Screen Layout Size Bucket: xlarge, large, normal) 변경 대응.
+               - Split 폭 변화(예: 1268dp ↔ 916dp) 시 xlarge(>=960dp)와 large(640~959dp) 경계를 교차할 때
+                 시스템이 액티비티를 강제 재생성(Destroy & Recreate)하는 것을 방지.
+            
+            2) screenSize:
+               - 사용 가능한 윈도우 폭/높이(widthDp / heightDp) 변경 대응.
+               - 외부 앱 리소스에 가로 폭 한계 리소스(예: values-w600dp, values-w820dp, values-w1024dp 등)가
+                 정의되어 있는 경우, 분할 폭이 해당 임계값을 넘나들 때 액티비티가 재생성되는 것을 방지.
+            
+            3) smallestScreenSize:
+               - 화면 최단 변 크기(smallestScreenWidthDp, sw...dp) 변경 대응.
+               - Split 비율 변경으로 가로 폭이 세로 높이보다 작아지거나, 디스플레이 해상도/화면비가 다양할 때
+                 sw...dp 기반 리소스 한계값(예: values-sw600dp, values-sw720dp) 교차로 인한 재생성 방지.
+        -->
         <activity
             android:name=".HomeActivity"
             android:exported="true"
             android:launchMode="singleTop"
-            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density"
+            android:configChanges="screenSize|smallestScreenSize|screenLayout"
             android:theme="@style/Theme.AppCompat.DayNight.NoActionBar">
             <intent-filter>
                 <action android:name="com.example.carsettings.ACTION_SETTINGS_EMBED" />

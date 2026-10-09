@@ -9,6 +9,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ArrayAdapter
@@ -19,7 +20,13 @@ import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.core.content.res.ResourcesCompat
 import androidx.lifecycle.lifecycleScope
+import androidx.window.embedding.ActivityEmbeddingController
+import androidx.window.embedding.EmbeddingAnimationBackground
+import androidx.window.embedding.EmbeddingAnimationParams
+import androidx.window.embedding.SplitAttributes
 import androidx.window.embedding.SplitController
+import androidx.window.embedding.SplitInfo
+import androidx.window.embedding.setLaunchingActivityStack
 import com.example.feature.home.HomeActivity
 import com.example.feature.home.HomeNavigationBridge
 import kotlinx.coroutines.flow.collectLatest
@@ -62,9 +69,35 @@ class PrimaryActivity : BaseLoggingActivity() {
 
     private lateinit var tvDiscoveryStatus: TextView
     private lateinit var listViewCategories: ListView
+    private lateinit var layoutCollapsed: View
+    private lateinit var layoutExpanded: View
+    private lateinit var btnMore: View
+    private lateinit var btnCollapse: View
     private var categories: MutableList<SettingCategory> = mutableListOf()
     private var categoryAdapter: CategoryAdapter? = null
     private val observedAuthorities = mutableSetOf<String>()
+    private var isPrimaryActive: Boolean = false
+    private var lastSecondaryActivityStack: androidx.window.embedding.ActivityStack? = null
+
+    private fun updateLayoutVisibility() {
+        if (!::layoutCollapsed.isInitialized || !::layoutExpanded.isInitialized) return
+        if (isPrimaryActive) {
+            layoutCollapsed.visibility = View.GONE
+            layoutExpanded.visibility = View.VISIBLE
+        } else {
+            layoutCollapsed.visibility = View.VISIBLE
+            layoutExpanded.visibility = View.GONE
+        }
+    }
+
+    private fun updateActiveState(isActive: Boolean, source: String) {
+        if (isPrimaryActive != isActive) {
+            isPrimaryActive = isActive
+            Log.d(tag, "[$activityName] Active state changed to $isPrimaryActive via $source -> invalidateVisibleActivityStacks()")
+            updateLayoutVisibility()
+            ActivityEmbeddingController.getInstance(this).invalidateVisibleActivityStacks()
+        }
+    }
 
     private val categoryObserver = object : android.database.ContentObserver(android.os.Handler(android.os.Looper.getMainLooper())) {
         override fun onChange(selfChange: Boolean, uri: Uri?) {
@@ -78,6 +111,41 @@ class PrimaryActivity : BaseLoggingActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_primary)
 
+        layoutCollapsed = findViewById(R.id.layoutCollapsed)
+        layoutExpanded = findViewById(R.id.layoutExpanded)
+        btnMore = findViewById(R.id.btnMore)
+        btnCollapse = findViewById(R.id.btnCollapse)
+
+        btnMore.setOnClickListener {
+            Log.d(tag, "[$activityName] '... More' button clicked -> expanding to 35%")
+            updateActiveState(true, "MoreButtonClicked")
+        }
+
+        btnCollapse.setOnClickListener {
+            Log.d(tag, "[$activityName] 'Collapse' button clicked -> collapsing to 10%")
+            updateActiveState(false, "CollapseButtonClicked")
+        }
+
+        updateLayoutVisibility()
+
+        // WindowManager 1.4.0+ / 1.5.1 Dynamic SplitAttributesCalculator:
+        // 35% when Primary is active/focused, 10% when secondary/external app is active
+        SplitController.getInstance(this).setSplitAttributesCalculator { _ ->
+            val ratio = if (isPrimaryActive) 0.35f else 0.10f
+            Log.d(tag, "[$activityName] SplitAttributesCalculator: isPrimaryActive=$isPrimaryActive -> ratio=$ratio")
+            val animParams = EmbeddingAnimationParams.Builder()
+                .setAnimationBackground(EmbeddingAnimationBackground.DEFAULT)
+                .setChangeAnimation(EmbeddingAnimationParams.AnimationSpec.JUMP_CUT)
+                .setOpenAnimation(EmbeddingAnimationParams.AnimationSpec.JUMP_CUT)
+                .setCloseAnimation(EmbeddingAnimationParams.AnimationSpec.JUMP_CUT)
+                .build()
+            SplitAttributes.Builder()
+                .setSplitType(SplitAttributes.SplitType.ratio(ratio))
+                .setLayoutDirection(SplitAttributes.LayoutDirection.LEFT_TO_RIGHT)
+                .setAnimationParams(animParams)
+                .build()
+        }
+
         tvDiscoveryStatus = findViewById(R.id.tvDiscoveryStatus)
         listViewCategories = findViewById(R.id.listViewCategories)
 
@@ -90,6 +158,8 @@ class PrimaryActivity : BaseLoggingActivity() {
         listViewCategories.setOnItemClickListener { _, _, position, _ ->
             categoryAdapter?.selectedPosition = position
             categoryAdapter?.notifyDataSetChanged()
+            // Collapse to 10% rail upon selecting an item
+            updateActiveState(false, "ListItemSelected")
             val selectedCategory = categories[position]
             launchCategory(selectedCategory)
         }
@@ -100,12 +170,18 @@ class PrimaryActivity : BaseLoggingActivity() {
             categories.firstOrNull()?.let { firstCategory ->
                 categoryAdapter?.selectedPosition = 0
                 categoryAdapter?.notifyDataSetChanged()
+                updateActiveState(false, "InitialLaunch")
                 launchCategory(firstCategory)
             }
         }
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
+                if (isPrimaryActive) {
+                    // If expanded, back press collapses back to 10% rail
+                    updateActiveState(false, "BackPressedCollapse")
+                    return
+                }
                 val currentPos = categoryAdapter?.selectedPosition ?: 0
                 Log.d(tag, "[$activityName] Back pressed in PrimaryActivity: selectedPosition=$currentPos")
                 if (currentPos != 0) {
@@ -126,9 +202,11 @@ class PrimaryActivity : BaseLoggingActivity() {
                 SplitController.getInstance(this@PrimaryActivity)
                     .splitInfoList(this@PrimaryActivity)
                     .collectLatest { splitInfoList ->
-                        val hasSecondary = splitInfoList.any { !it.secondaryActivityStack.isEmpty }
+                        val currentSplit = splitInfoList.firstOrNull { it.primaryActivityStack.contains(this@PrimaryActivity) }
+                        lastSecondaryActivityStack = currentSplit?.secondaryActivityStack
+                        val hasSecondary = lastSecondaryActivityStack?.isEmpty == false
                         val currentPos = categoryAdapter?.selectedPosition ?: 0
-                        Log.d(tag, "[$activityName] splitInfoList update: hasSecondary=$hasSecondary, currentPos=$currentPos")
+                        Log.d(tag, "[$activityName] splitInfoList update: hasSecondary=$hasSecondary, secondaryStack=$lastSecondaryActivityStack, currentPos=$currentPos")
                     }
             } catch (e: Exception) {
                 Log.w(tag, "[$activityName] Failed to observe splitInfoList: $e")
@@ -154,9 +232,25 @@ class PrimaryActivity : BaseLoggingActivity() {
                     categoryAdapter?.selectedPosition = matchedIndex
                     categoryAdapter?.notifyDataSetChanged()
                     listViewCategories.smoothScrollToPosition(matchedIndex)
+                    updateActiveState(false, "HomeNavigationBridge")
                 }
             }
         }
+    }
+
+    override fun onTopResumedActivityChanged(isTopResumedActivity: Boolean) {
+        super.onTopResumedActivityChanged(isTopResumedActivity)
+        Log.d(tag, "[$activityName] onTopResumedActivityChanged(isTopResumedActivity = $isTopResumedActivity)")
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        Log.d(tag, "[$activityName] onWindowFocusChanged(hasFocus = $hasFocus)")
+    }
+
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        updateLayoutVisibility()
     }
 
     override fun onDestroy() {
@@ -168,6 +262,11 @@ class PrimaryActivity : BaseLoggingActivity() {
             Log.d(tag, "[$activityName] Unregistered categoryObserver")
         } catch (e: Exception) {
             Log.w(tag, "[$activityName] Error unregistering categoryObserver: $e")
+        }
+        try {
+            SplitController.getInstance(this).clearSplitAttributesCalculator()
+        } catch (e: Exception) {
+            Log.w(tag, "[$activityName] Error clearing SplitAttributesCalculator: $e")
         }
     }
 
@@ -338,8 +437,16 @@ class PrimaryActivity : BaseLoggingActivity() {
             }
             targetIntent.data = uriToPass
 
-            Log.d(tag, "[$activityName] Launching category ${category.title} via $targetIntent, extras=${targetIntent.extras}")
-            startActivity(targetIntent)
+            val optionsBundle = Bundle()
+            lastSecondaryActivityStack?.let { stack ->
+                if (!stack.isEmpty) {
+                    optionsBundle.setLaunchingActivityStack(this@PrimaryActivity, stack)
+                    Log.d(tag, "[$activityName] Applied optionsBundle.setLaunchingActivityStack targeting secondary: $stack")
+                }
+            }
+
+            Log.d(tag, "[$activityName] Launching category ${category.title} via $targetIntent, hasStackOptions=${!optionsBundle.isEmpty}")
+            startActivity(targetIntent, if (optionsBundle.isEmpty) null else optionsBundle)
         } else {
             Log.w(tag, "[$activityName] No target intent for category ${category.title}")
         }

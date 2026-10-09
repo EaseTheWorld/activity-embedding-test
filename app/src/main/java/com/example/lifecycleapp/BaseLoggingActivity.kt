@@ -33,6 +33,16 @@ abstract class BaseLoggingActivity : AppCompatActivity() {
         Log.d(tag, "[$activityName] onResume() (isActivityEmbedded = $isEmbedded, bounds = ${metrics.bounds})")
     }
 
+    override fun onTopResumedActivityChanged(isTopResumedActivity: Boolean) {
+        super.onTopResumedActivityChanged(isTopResumedActivity)
+        Log.d(tag, "[$activityName] onTopResumedActivityChanged(isTopResumedActivity = $isTopResumedActivity)")
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        Log.d(tag, "[$activityName] onWindowFocusChanged(hasFocus = $hasFocus)")
+    }
+
     override fun onPause() {
         super.onPause()
         Log.d(tag, "[$activityName] onPause()")

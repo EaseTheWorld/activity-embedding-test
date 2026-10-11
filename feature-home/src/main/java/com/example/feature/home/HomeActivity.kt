@@ -31,7 +31,6 @@ class HomeActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         homeInstance = this
-        CategoryStackManager.registerRootActivity(this)
         val isNarrowOverlayMode = AppConfig.isOverlayMode(this)
         Log.d(tag, "HomeActivity created (isNarrowOverlayMode=$isNarrowOverlayMode)")
 
@@ -136,7 +135,6 @@ class HomeActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        CategoryStackManager.unregisterRootActivity(this)
         if (homeInstance == this) {
             homeInstance = null
         }

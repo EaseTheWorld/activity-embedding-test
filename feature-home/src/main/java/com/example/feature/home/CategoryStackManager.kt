@@ -8,97 +8,68 @@ import androidx.window.embedding.ActivityEmbeddingController
 import androidx.window.embedding.ActivityStack
 import androidx.window.embedding.EmbeddingBackend
 import androidx.window.embedding.SplitInfo
-import java.util.Collections
-import java.util.WeakHashMap
 
 /**
- * Unified manager for Category `ActivityStack`s across both Wide Mode (Split) and Narrow Mode (Overlay).
+ * Helper that queries Jetpack WindowManager on demand (no manual stack storage)
+ * to finish active Category `ActivityStack`s via `ActivityEmbeddingController.finishActivityStacks()`.
  *
- * Stack Hierarchy:
- * - Protected Root Stacks (never finished on category switch):
- *   1. `HomeStack`: Contains `HomeActivity` at the bottom of the content area.
- *   2. `PrimaryStack` (Wide Mode): Contains `PrimaryActivity` on the left 35% split pane.
- *   3. `OverlayStack` (Narrow Mode): Contains `PrimaryOverlayActivity` as an Always-On-Top Pinned Overlay.
- * - `CategoryStack`:
- *   Contains the currently active category root (`GenericSettingsActivity` or external `LightSettingsActivity`)
- *   plus any sub-activities (`GenericSubActivity`, etc.) pushed on top of it.
- *
- * Calling [finishCategoryStacks] atomically finishes all active `CategoryStack`s via
- * `ActivityEmbeddingController.finishActivityStacks()`, clearing both root category activities
- * and any stacked sub-activities (including external plugin activities) while keeping
- * `HomeStack`, `PrimaryStack`, and `OverlayStack` intact.
+ * Why a helper is needed for external plugin apps in Narrow Mode:
+ * - Public API `ActivityEmbeddingController.getActivityStack(activity: Activity)` requires an
+ *   in-process `Activity` instance. It works directly for `HomeActivity`, `PrimaryActivity`,
+ *   `PrimaryOverlayActivity`, and `GenericSettingsActivity`.
+ * - However, when an external plugin app (`LightSettingsActivity` in `com.example.carsettings.light`)
+ *   is embedded via `ActivityRule(alwaysExpand = true)` in Narrow Mode, it runs in a separate process,
+ *   so the host app has no `Activity` reference to pass to `getActivityStack(activity)`.
+ * - Internally, `ExtensionEmbeddingBackend` already receives all `ActivityStack`s (including cross-process
+ *   ones) from `WindowExtensions.onActivityStackChanged`. We read that live list on demand and exclude
+ *   `getActivityStack(homeActivity)` and `getActivityStack(callerActivity)`.
  */
 object CategoryStackManager {
 
     private const val TAG = "LifecycleLog"
 
-    private val protectedRootActivities: MutableSet<Activity> =
-        Collections.newSetFromMap(WeakHashMap())
-
-    private val protectedRootClassNames = setOf(
-        "com.example.feature.home.HomeActivity",
-        "com.example.lifecycleapp.PrimaryActivity",
-        "com.example.lifecycleapp.PrimaryOverlayActivity"
-    )
-
     var wideModeCategoryLauncher: ((Intent) -> Unit)? = null
 
-    fun registerRootActivity(activity: Activity) {
-        protectedRootActivities.add(activity)
-    }
-
-    fun unregisterRootActivity(activity: Activity) {
-        protectedRootActivities.remove(activity)
-    }
-
     /**
-     * Finishes all active Category `ActivityStack`s (including any sub-activities stacked inside them)
-     * without touching `HomeStack`, `PrimaryStack`, or `OverlayStack`.
+     * Queries WindowManager for currently active `ActivityStack`s and finishes all Category stacks
+     * (excluding `HomeActivity`'s stack and the calling Menu activity's stack).
      */
-    fun finishCategoryStacks(context: Context) {
+    fun finishCategoryStacks(caller: Activity) {
         try {
-            val allStacks = collectAllActivityStacks(context)
-            val categoryStacks = allStacks.filterTo( LinkedHashSet() ) { stack ->
-                !isProtectedRootStack(stack)
+            val controller = ActivityEmbeddingController.getInstance(caller)
+
+            // Query root stacks directly from WindowManager using public getActivityStack(Activity) API
+            val homeStack: ActivityStack? = HomeActivity.homeInstance?.let { controller.getActivityStack(it) }
+            val callerStack: ActivityStack? = controller.getActivityStack(caller)
+
+            val allStacks = getLiveActivityStacksFromBackend(caller)
+            val categoryStacks = allStacks.filterTo(LinkedHashSet()) { stack ->
+                stack != homeStack &&
+                    stack != callerStack &&
+                    (HomeActivity.homeInstance == null || !stack.contains(HomeActivity.homeInstance!!)) &&
+                    !stack.contains(caller)
             }
 
             if (categoryStacks.isEmpty()) {
-                Log.d(TAG, "[CategoryStackManager] finishCategoryStacks: no active CategoryStack to finish")
+                Log.d(TAG, "[CategoryStackManager] finishCategoryStacks: no active CategoryStack found")
                 return
             }
 
-            // 1. Synchronously mark any in-process category/sub-activities as finishing
-            //    so Android ActivityStarter never delivers onNewIntent to a dying instance.
+            // Synchronously finish any in-process category activities so ActivityStarter won't reuse
+            // a dying instance via SINGLE_TOP if the same Activity class is immediately relaunched.
             for (stack in categoryStacks) {
                 for (act in getInProcessActivities(stack)) {
-                    if (!act.isFinishing && !protectedRootClassNames.contains(act.javaClass.name)) {
-                        Log.d(TAG, "[CategoryStackManager] Synchronously finishing in-process activity: ${act.javaClass.simpleName}")
+                    if (!act.isFinishing && act !== HomeActivity.homeInstance && act !== caller) {
                         act.finish()
                     }
                 }
             }
 
-            // 2. Finish the ActivityStack containers via WindowManager Extensions
-            //    (destroys the TaskFragment container and finishes any cross-process plugin activities).
             Log.d(TAG, "[CategoryStackManager] Calling finishActivityStacks on ${categoryStacks.size} stack(s): $categoryStacks")
-            ActivityEmbeddingController.getInstance(context).finishActivityStacks(categoryStacks)
+            controller.finishActivityStacks(categoryStacks)
         } catch (e: Exception) {
             Log.e(TAG, "[CategoryStackManager] Failed to finish category stacks: $e", e)
         }
-    }
-
-    private fun isProtectedRootStack(stack: ActivityStack): Boolean {
-        if (protectedRootActivities.any { rootAct ->
-                try {
-                    stack.contains(rootAct)
-                } catch (_: Exception) {
-                    false
-                }
-            }) {
-            return true
-        }
-        val inProcess = getInProcessActivities(stack)
-        return inProcess.any { act -> protectedRootClassNames.contains(act.javaClass.name) }
     }
 
     @Suppress("UNCHECKED_CAST")
@@ -108,53 +79,31 @@ object CategoryStackManager {
             method.isAccessible = true
             (method.invoke(stack) as? List<Activity>) ?: emptyList()
         } catch (_: Exception) {
-            try {
-                val field = ActivityStack::class.java.getDeclaredField("activitiesInProcess")
-                field.isAccessible = true
-                (field.get(stack) as? List<Activity>) ?: emptyList()
-            } catch (_: Exception) {
-                emptyList()
-            }
+            emptyList()
         }
     }
 
     @Suppress("UNCHECKED_CAST")
-    private fun collectAllActivityStacks(context: Context): Set<ActivityStack> {
+    private fun getLiveActivityStacksFromBackend(context: Context): Set<ActivityStack> {
         val result = LinkedHashSet<ActivityStack>()
         try {
             val backend = EmbeddingBackend.getInstance(context)
             val callbackField = backend.javaClass.getDeclaredField("embeddingCallback")
             callbackField.isAccessible = true
-            val callbackObj = callbackField.get(backend)
+            val callbackObj = callbackField.get(backend) ?: return result
 
-            if (callbackObj != null) {
-                try {
-                    val getStacksMethod = callbackObj.javaClass.getDeclaredMethod("getLastActivityStacks")
-                    getStacksMethod.isAccessible = true
-                    val stacks = getStacksMethod.invoke(callbackObj) as? List<ActivityStack>
-                    if (stacks != null) {
-                        result.addAll(stacks)
-                    }
-                } catch (e: Exception) {
-                    Log.w(TAG, "[CategoryStackManager] getLastActivityStacks reflection warning: $e")
-                }
+            val getStacksMethod = callbackObj.javaClass.getDeclaredMethod("getLastActivityStacks")
+            getStacksMethod.isAccessible = true
+            (getStacksMethod.invoke(callbackObj) as? List<ActivityStack>)?.let { result.addAll(it) }
 
-                try {
-                    val getSplitsMethod = callbackObj.javaClass.getDeclaredMethod("getLastInfo")
-                    getSplitsMethod.isAccessible = true
-                    val splits = getSplitsMethod.invoke(callbackObj) as? List<SplitInfo>
-                    if (splits != null) {
-                        for (split in splits) {
-                            result.add(split.primaryActivityStack)
-                            result.add(split.secondaryActivityStack)
-                        }
-                    }
-                } catch (e: Exception) {
-                    Log.w(TAG, "[CategoryStackManager] getLastInfo reflection warning: $e")
-                }
+            val getSplitsMethod = callbackObj.javaClass.getDeclaredMethod("getLastInfo")
+            getSplitsMethod.isAccessible = true
+            (getSplitsMethod.invoke(callbackObj) as? List<SplitInfo>)?.forEach { split ->
+                result.add(split.primaryActivityStack)
+                result.add(split.secondaryActivityStack)
             }
         } catch (e: Exception) {
-            Log.w(TAG, "[CategoryStackManager] collectAllActivityStacks reflection warning: $e")
+            Log.w(TAG, "[CategoryStackManager] getLiveActivityStacksFromBackend warning: $e")
         }
         return result
     }

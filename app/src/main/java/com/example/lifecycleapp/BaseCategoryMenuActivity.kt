@@ -93,7 +93,6 @@ abstract class BaseCategoryMenuActivity : BaseLoggingActivity() {
     }
 
     protected fun initCategoryMenuViews() {
-        com.example.feature.home.CategoryStackManager.registerRootActivity(this)
         tvDiscoveryStatus = findViewById(R.id.tvDiscoveryStatus)
         listViewCategories = findViewById(R.id.listViewCategories)
 
@@ -138,7 +137,6 @@ abstract class BaseCategoryMenuActivity : BaseLoggingActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        com.example.feature.home.CategoryStackManager.unregisterRootActivity(this)
         HomeNavigationBridge.onHomeRevealed = null
         HomeNavigationBridge.onCategorySelected = null
         try {

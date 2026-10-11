@@ -69,6 +69,7 @@ fun GenericSettingsScreen(
                 .fillMaxSize()
                 .padding(24.dp)
         ) {
+            val context = androidx.compose.ui.platform.LocalContext.current
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
@@ -83,7 +84,7 @@ fun GenericSettingsScreen(
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                 }
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = title,
                         style = MaterialTheme.typography.headlineMedium.copy(
@@ -98,6 +99,18 @@ fun GenericSettingsScreen(
                             color = Color(0xFF6B7280)
                         )
                     )
+                }
+                androidx.compose.material3.OutlinedButton(
+                    onClick = {
+                        context.startActivity(
+                            android.content.Intent(context, GenericSubActivity::class.java).apply {
+                                putExtra(GenericSubActivity.EXTRA_PARENT_TITLE, title)
+                                putExtra(GenericSubActivity.EXTRA_SUB_DEPTH, 1)
+                            }
+                        )
+                    }
+                ) {
+                    Text("Open SubActivity")
                 }
             }
             Spacer(modifier = Modifier.height(20.dp))

@@ -57,9 +57,13 @@ class SplitInitializer : Initializer<RuleController> {
         val isNarrowOverlayMode = AppConfig.isOverlayMode(context)
 
         if (isNarrowOverlayMode) {
-            // Narrow Mode: ActivityRule(alwaysExpand = true) on HomeActivity only -> creates a single Expanded TaskFragment
+            // Narrow Mode:
+            // 1. HomeActivity -> Root HomeStack (#0 Expanded TaskFragment)
+            // 2. Category Root (with ACTION_SETTINGS_EMBED) -> CategoryStack (#1 Expanded TaskFragment)
+            // 3. Sub-activities (without ACTION_SETTINGS_EMBED) -> Stack naturally inside #1 CategoryStack!
             val expandFilters = setOf(
-                ActivityFilter(ComponentName(context, com.example.feature.home.HomeActivity::class.java), null)
+                ActivityFilter(ComponentName(context, com.example.feature.home.HomeActivity::class.java), null),
+                ActivityFilter(ComponentName("*", "*"), ACTION_SETTINGS_EMBED)
             )
             val expandRule = ActivityRule.Builder(expandFilters)
                 .setAlwaysExpand(true)
@@ -101,7 +105,7 @@ class SplitInitializer : Initializer<RuleController> {
                 .setMinHeightDp(0)
                 .setMinSmallestWidthDp(0)
                 .setDefaultSplitAttributes(defaultSplitAttributes)
-                .setFinishPrimaryWithSecondary(SplitRule.FinishBehavior.ALWAYS)
+                .setFinishPrimaryWithSecondary(SplitRule.FinishBehavior.NEVER)
                 .setFinishSecondaryWithPrimary(SplitRule.FinishBehavior.ALWAYS)
                 .setClearTop(false)
                 .build()

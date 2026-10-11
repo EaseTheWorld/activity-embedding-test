@@ -31,6 +31,7 @@ class HomeActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         homeInstance = this
+        CategoryStackManager.registerRootActivity(this)
         val isNarrowOverlayMode = AppConfig.isOverlayMode(this)
         Log.d(tag, "HomeActivity created (isNarrowOverlayMode=$isNarrowOverlayMode)")
 
@@ -57,7 +58,7 @@ class HomeActivity : ComponentActivity() {
     }
 
     /**
-     * In Narrow Mode, HomeActivity is the fullscreen Task root and spawns PrimaryActivity
+     * In Narrow Mode, HomeActivity is the fullscreen Task root and spawns PrimaryOverlayActivity
      * as an Always-On-Top Pinned Overlay (`shouldAssociateWithLaunchingActivity = false`).
      */
     private fun launchPrimaryPinnedOverlay(hostIntent: Intent?) {
@@ -90,18 +91,19 @@ class HomeActivity : ComponentActivity() {
             Log.i(tag, "Launching PrimaryOverlayActivity as Always-On-Top Pinned Overlay in Narrow Mode (bounds=$bounds)")
             startActivity(overlayIntent, options)
         } catch (e: Exception) {
-            Log.e(tag, "Failed to launch PrimaryActivity pinned overlay: $e", e)
+            Log.e(tag, "Failed to launch PrimaryOverlayActivity pinned overlay: $e", e)
         }
     }
 
     /**
-     * Called by PrimaryActivity (in Narrow Overlay mode) so category intents are launched
-     * directly on top of HomeActivity inside HomeActivity's Expanded TaskFragment.
+     * Called by PrimaryOverlayActivity (in Narrow Overlay mode) so the previous CategoryStack
+     * (including any stacked sub-activities) is finished via `finishActivityStacks()` and the
+     * new category is launched in a dedicated CategoryStack on top of HomeStack.
      */
     fun launchCategoryInTask(targetIntent: Intent) {
-        val optionsBundle = getLaunchOptionsBundle()
-        Log.d(tag, "HomeActivity launching category in Home's TaskFragment (options=$optionsBundle): $targetIntent")
-        startActivity(targetIntent, optionsBundle)
+        CategoryStackManager.finishCategoryStacks(this)
+        Log.d(tag, "HomeActivity launching category into dedicated CategoryStack: $targetIntent")
+        startActivity(targetIntent)
     }
 
     private var isLaunchingTarget = false
@@ -134,6 +136,7 @@ class HomeActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        CategoryStackManager.unregisterRootActivity(this)
         if (homeInstance == this) {
             homeInstance = null
         }
@@ -169,28 +172,11 @@ class HomeActivity : ComponentActivity() {
             isLaunchingTarget = true
             try {
                 Log.d(tag, "HomeActivity launching target category on top: $targetIntent")
-                val optionsBundle = getLaunchOptionsBundle()
-                startActivity(targetIntent, optionsBundle)
+                launchCategoryInTask(targetIntent)
             } catch (e: Exception) {
                 Log.e(tag, "Failed to launch target intent: $e")
                 isLaunchingTarget = false
             }
-        }
-    }
-
-    private fun getLaunchOptionsBundle(): Bundle? {
-        return try {
-            val token = androidx.window.embedding.ActivityEmbeddingController.getInstance(this)
-                .getActivityStack(this)
-            if (token != null) {
-                Bundle().apply {
-                    setLaunchingActivityStack(this@HomeActivity, token)
-                    Log.d(tag, "Applied setLaunchingActivityStack targeting Home's stack: $token")
-                }
-            } else null
-        } catch (e: Exception) {
-            Log.w(tag, "Failed to get current ActivityStack token: $e")
-            null
         }
     }
 
@@ -212,7 +198,10 @@ class HomeActivity : ComponentActivity() {
 
         Log.d(tag, "Launching target setting from Home search: $targetComponent, uri=$targetUri, categoryId=${item.categoryId}")
         HomeNavigationBridge.notifyCategorySelected(item.categoryId)
-        val optionsBundle = getLaunchOptionsBundle()
-        startActivity(intent, optionsBundle)
+        if (AppConfig.isOverlayMode(this)) {
+            launchCategoryInTask(intent)
+        } else {
+            CategoryStackManager.wideModeCategoryLauncher?.invoke(intent) ?: startActivity(intent)
+        }
     }
 }

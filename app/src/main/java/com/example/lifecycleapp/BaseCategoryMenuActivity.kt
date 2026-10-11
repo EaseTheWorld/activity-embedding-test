@@ -93,6 +93,7 @@ abstract class BaseCategoryMenuActivity : BaseLoggingActivity() {
     }
 
     protected fun initCategoryMenuViews() {
+        com.example.feature.home.CategoryStackManager.registerRootActivity(this)
         tvDiscoveryStatus = findViewById(R.id.tvDiscoveryStatus)
         listViewCategories = findViewById(R.id.listViewCategories)
 
@@ -137,6 +138,7 @@ abstract class BaseCategoryMenuActivity : BaseLoggingActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        com.example.feature.home.CategoryStackManager.unregisterRootActivity(this)
         HomeNavigationBridge.onHomeRevealed = null
         HomeNavigationBridge.onCategorySelected = null
         try {
@@ -263,17 +265,19 @@ abstract class BaseCategoryMenuActivity : BaseLoggingActivity() {
         onBeforeCategoryLaunch()
 
         if (category.id == "home") {
-            val homeIntent = Intent(this, HomeActivity::class.java).apply {
-                action = ACTION_SETTINGS_EMBED
-                flags = if (AppConfig.isOverlayMode(this)) {
-                    Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP
-                } else {
-                    Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            Log.d(tag, "[$activityName] Navigating to HomeActivity -> finishing active CategoryStacks via finishActivityStacks()")
+            if (HomeActivity.homeInstance != null) {
+                window.decorView.post {
+                    com.example.feature.home.CategoryStackManager.finishCategoryStacks(this)
                 }
-                data = Uri.parse("myapp://navigate/home")
+            } else {
+                val homeIntent = Intent(this, HomeActivity::class.java).apply {
+                    action = ACTION_SETTINGS_EMBED
+                    flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+                    data = Uri.parse("myapp://navigate/home")
+                }
+                startContentActivity(homeIntent)
             }
-            Log.d(tag, "[$activityName] Navigating to HomeActivity")
-            startContentActivity(homeIntent)
             return
         }
 

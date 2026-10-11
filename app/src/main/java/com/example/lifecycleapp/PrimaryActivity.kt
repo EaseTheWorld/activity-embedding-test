@@ -48,12 +48,16 @@ class PrimaryActivity : BaseCategoryMenuActivity() {
         setContentView(R.layout.activity_primary)
         initCategoryMenuViews()
 
+        com.example.feature.home.CategoryStackManager.wideModeCategoryLauncher = { targetIntent ->
+            startContentActivity(targetIntent)
+        }
+
         if (savedInstanceState == null) {
             val homeIntent = Intent(this, HomeActivity::class.java).apply {
                 action = ACTION_SETTINGS_EMBED
                 flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
             }
-            Log.i(tag, "[$activityName] Wide Mode -> launching HomeActivity into SecondaryTaskFragment via SplitPairRule")
+            Log.i(tag, "[$activityName] Wide Mode -> launching HomeActivity into root SecondaryTaskFragment via SplitPairRule")
             startActivity(homeIntent)
         }
 
@@ -70,8 +74,15 @@ class PrimaryActivity : BaseCategoryMenuActivity() {
         })
     }
 
+    override fun onDestroy() {
+        super.onDestroy()
+        com.example.feature.home.CategoryStackManager.wideModeCategoryLauncher = null
+    }
+
     override fun startContentActivity(targetIntent: Intent) {
-        // Wide Mode: PrimaryActivity is the SplitPairRule Primary, so startActivity places it in SecondaryTaskFragment
+        // Wide Mode: Finish any previous CategoryStack (including sub-activities) so the right 65% pane
+        // always keeps [HomeStack (bottom), CurrentCategoryStack (top)].
+        com.example.feature.home.CategoryStackManager.finishCategoryStacks(this)
         startActivity(targetIntent)
     }
 }

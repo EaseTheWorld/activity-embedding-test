@@ -5,21 +5,31 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
+import android.app.ActivityOptions
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
+import androidx.window.embedding.EmbeddingBounds
+import androidx.window.embedding.OverlayAttributes
+import androidx.window.embedding.OverlayCreateParams
+import androidx.window.embedding.setLaunchingActivityStack
+import androidx.window.embedding.setOverlayCreateParams
+import com.example.core.item.AppConfig
 
 class HomeActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_TARGET_INTENT = "extra_target_intent"
+        const val TAG_PRIMARY_OVERLAY = "tag_primary_overlay"
+        var homeInstance: HomeActivity? = null
     }
 
     private val tag = "HomeActivity"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Log.d(tag, "HomeActivity created in Secondary pane")
+        homeInstance = this
+        Log.d(tag, "HomeActivity created (isOverlayMode=${AppConfig.isOverlayMode(this)})")
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
@@ -69,6 +79,9 @@ class HomeActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        if (homeInstance == this) {
+            homeInstance = null
+        }
         Log.d(tag, "HomeActivity onDestroy()")
     }
 
@@ -101,11 +114,28 @@ class HomeActivity : ComponentActivity() {
             isLaunchingTarget = true
             try {
                 Log.d(tag, "HomeActivity launching target category on top: $targetIntent")
-                startActivity(targetIntent)
+                val optionsBundle = getLaunchOptionsBundle()
+                startActivity(targetIntent, optionsBundle)
             } catch (e: Exception) {
                 Log.e(tag, "Failed to launch target intent: $e")
                 isLaunchingTarget = false
             }
+        }
+    }
+
+    private fun getLaunchOptionsBundle(): Bundle? {
+        return try {
+            val token = androidx.window.embedding.ActivityEmbeddingController.getInstance(this)
+                .getActivityStack(this)
+            if (token != null) {
+                Bundle().apply {
+                    setLaunchingActivityStack(this@HomeActivity, token)
+                    Log.d(tag, "Applied setLaunchingActivityStack targeting current stack: $token")
+                }
+            } else null
+        } catch (e: Exception) {
+            Log.w(tag, "Failed to get current ActivityStack token: $e")
+            null
         }
     }
 
@@ -127,6 +157,7 @@ class HomeActivity : ComponentActivity() {
 
         Log.d(tag, "Launching target setting from Home search: $targetComponent, uri=$targetUri, categoryId=${item.categoryId}")
         HomeNavigationBridge.notifyCategorySelected(item.categoryId)
-        startActivity(intent)
+        val optionsBundle = getLaunchOptionsBundle()
+        startActivity(intent, optionsBundle)
     }
 }

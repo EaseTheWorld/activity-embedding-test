@@ -52,6 +52,7 @@ class PrimaryActivity : BaseLoggingActivity() {
 
     companion object {
         const val ACTION_CATEGORY_PROVIDER = "com.example.carsettings.CATEGORY_PROVIDER"
+        const val EXTRA_IS_OVERLAY = "extra_is_overlay"
 
         // Contract column names
         const val PATH_CATEGORY = "category"
@@ -77,10 +78,18 @@ class PrimaryActivity : BaseLoggingActivity() {
     private var categoryAdapter: CategoryAdapter? = null
     private val observedAuthorities = mutableSetOf<String>()
     private var isPrimaryActive: Boolean = false
-    private var lastSecondaryActivityStack: androidx.window.embedding.ActivityStack? = null
+    private var isNarrowOverlayMode: Boolean = false
 
     private fun updateLayoutVisibility() {
         if (!::layoutCollapsed.isInitialized || !::layoutExpanded.isInitialized) return
+        if (!isNarrowOverlayMode) {
+            // In Wide mode (35% fixed split + 35% fixed overlay), always show expanded drawer without collapse button
+            layoutCollapsed.visibility = View.GONE
+            layoutExpanded.visibility = View.VISIBLE
+            btnCollapse.visibility = View.GONE
+            return
+        }
+        btnCollapse.visibility = View.VISIBLE
         if (isPrimaryActive) {
             layoutCollapsed.visibility = View.GONE
             layoutExpanded.visibility = View.VISIBLE
@@ -91,11 +100,31 @@ class PrimaryActivity : BaseLoggingActivity() {
     }
 
     private fun updateActiveState(isActive: Boolean, source: String) {
+        if (!isNarrowOverlayMode) {
+            // In Wide mode, drawer is permanently expanded at 35% matching HostAnchorActivity
+            isPrimaryActive = true
+            updateLayoutVisibility()
+            return
+        }
         if (isPrimaryActive != isActive) {
             isPrimaryActive = isActive
-            Log.d(tag, "[$activityName] Active state changed to $isPrimaryActive via $source -> invalidateVisibleActivityStacks()")
+            SplitInitializer.isOverlayDrawerExpanded = isActive
+            Log.d(tag, "[$activityName] Active state changed to $isPrimaryActive via $source (isNarrowOverlayMode=$isNarrowOverlayMode)")
             updateLayoutVisibility()
-            ActivityEmbeddingController.getInstance(this).invalidateVisibleActivityStacks()
+            updateOverlayWindowAttributes(isActive)
+        }
+    }
+
+    private fun updateOverlayWindowAttributes(isExpanded: Boolean) {
+        try {
+            val bounds = SplitInitializer.computeOverlayBounds(this, isExpanded)
+            androidx.window.embedding.OverlayController.getInstance(this).updateOverlayAttributes(
+                HostAnchorActivity.TAG_PRIMARY_OVERLAY,
+                androidx.window.embedding.OverlayAttributes(bounds)
+            )
+            Log.d(tag, "[$activityName] Updated overlay bounds: isExpanded=$isExpanded, bounds=$bounds")
+        } catch (e: Exception) {
+            Log.e(tag, "[$activityName] Failed to update overlay attributes: $e", e)
         }
     }
 
@@ -109,6 +138,26 @@ class PrimaryActivity : BaseLoggingActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        isNarrowOverlayMode = com.example.core.item.AppConfig.isOverlayMode(this)
+        isPrimaryActive = !isNarrowOverlayMode
+        SplitInitializer.isOverlayDrawerExpanded = isPrimaryActive
+
+        // Safety redirect if someone explicitly launches PrimaryActivity directly without HostAnchorActivity
+        val isOverlayExtra = intent?.getBooleanExtra(EXTRA_IS_OVERLAY, false) == true
+        if (!isOverlayExtra && HostAnchorActivity.instance == null) {
+            Log.i(tag, "[$activityName] Direct launch detected without HostAnchorActivity -> delegating to HostAnchorActivity")
+            val hostIntent = Intent(this, HostAnchorActivity::class.java).apply {
+                action = intent?.action
+                data = intent?.data
+                if (intent?.extras != null) putExtras(intent!!.extras!!)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            }
+            startActivity(hostIntent)
+            finish()
+            return
+        }
+
         setContentView(R.layout.activity_primary)
 
         layoutCollapsed = findViewById(R.id.layoutCollapsed)
@@ -122,29 +171,14 @@ class PrimaryActivity : BaseLoggingActivity() {
         }
 
         btnCollapse.setOnClickListener {
-            Log.d(tag, "[$activityName] 'Collapse' button clicked -> collapsing to 10%")
+            Log.d(tag, "[$activityName] 'Collapse' button clicked -> collapsing")
             updateActiveState(false, "CollapseButtonClicked")
         }
 
         updateLayoutVisibility()
 
-        // WindowManager 1.4.0+ / 1.5.1 Dynamic SplitAttributesCalculator:
-        // 35% when Primary is active/focused, 10% when secondary/external app is active
-        SplitController.getInstance(this).setSplitAttributesCalculator { _ ->
-            val ratio = if (isPrimaryActive) 0.35f else 0.10f
-            Log.d(tag, "[$activityName] SplitAttributesCalculator: isPrimaryActive=$isPrimaryActive -> ratio=$ratio")
-            val animParams = EmbeddingAnimationParams.Builder()
-                .setAnimationBackground(EmbeddingAnimationBackground.DEFAULT)
-                .setChangeAnimation(EmbeddingAnimationParams.AnimationSpec.JUMP_CUT)
-                .setOpenAnimation(EmbeddingAnimationParams.AnimationSpec.JUMP_CUT)
-                .setCloseAnimation(EmbeddingAnimationParams.AnimationSpec.JUMP_CUT)
-                .build()
-            SplitAttributes.Builder()
-                .setSplitType(SplitAttributes.SplitType.ratio(ratio))
-                .setLayoutDirection(SplitAttributes.LayoutDirection.LEFT_TO_RIGHT)
-                .setAnimationParams(animParams)
-                .build()
-        }
+        val extensionVersion = androidx.window.WindowSdkExtensions.getInstance().extensionVersion
+        Log.i(tag, "[$activityName] WindowSdkExtensions.extensionVersion = $extensionVersion (isNarrowOverlayMode=$isNarrowOverlayMode)")
 
         tvDiscoveryStatus = findViewById(R.id.tvDiscoveryStatus)
         listViewCategories = findViewById(R.id.listViewCategories)
@@ -158,7 +192,7 @@ class PrimaryActivity : BaseLoggingActivity() {
         listViewCategories.setOnItemClickListener { _, _, position, _ ->
             categoryAdapter?.selectedPosition = position
             categoryAdapter?.notifyDataSetChanged()
-            // Collapse to 10% rail upon selecting an item
+            // Collapse upon selecting an item in Narrow mode
             updateActiveState(false, "ListItemSelected")
             val selectedCategory = categories[position]
             launchCategory(selectedCategory)
@@ -166,24 +200,15 @@ class PrimaryActivity : BaseLoggingActivity() {
 
         if (intent?.data != null || intent?.action == "com.example.lifecycleapp.open") {
             handleIntent(intent)
-        } else if (savedInstanceState == null) {
-            categories.firstOrNull()?.let { firstCategory ->
-                categoryAdapter?.selectedPosition = 0
-                categoryAdapter?.notifyDataSetChanged()
-                updateActiveState(false, "InitialLaunch")
-                launchCategory(firstCategory)
-            }
         }
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                if (isPrimaryActive) {
-                    // If expanded, back press collapses back to 10% rail
+                if (isNarrowOverlayMode && isPrimaryActive) {
                     updateActiveState(false, "BackPressedCollapse")
                     return
                 }
                 val currentPos = categoryAdapter?.selectedPosition ?: 0
-                Log.d(tag, "[$activityName] Back pressed in PrimaryActivity: selectedPosition=$currentPos")
                 if (currentPos != 0) {
                     categoryAdapter?.selectedPosition = 0
                     categoryAdapter?.notifyDataSetChanged()
@@ -191,27 +216,10 @@ class PrimaryActivity : BaseLoggingActivity() {
                         launchCategory(homeCat)
                     }
                 } else {
-                    isEnabled = false
-                    finish()
+                    finishAffinity()
                 }
             }
         })
-
-        lifecycleScope.launch {
-            try {
-                SplitController.getInstance(this@PrimaryActivity)
-                    .splitInfoList(this@PrimaryActivity)
-                    .collectLatest { splitInfoList ->
-                        val currentSplit = splitInfoList.firstOrNull { it.primaryActivityStack.contains(this@PrimaryActivity) }
-                        lastSecondaryActivityStack = currentSplit?.secondaryActivityStack
-                        val hasSecondary = lastSecondaryActivityStack?.isEmpty == false
-                        val currentPos = categoryAdapter?.selectedPosition ?: 0
-                        Log.d(tag, "[$activityName] splitInfoList update: hasSecondary=$hasSecondary, secondaryStack=$lastSecondaryActivityStack, currentPos=$currentPos")
-                    }
-            } catch (e: Exception) {
-                Log.w(tag, "[$activityName] Failed to observe splitInfoList: $e")
-            }
-        }
 
         HomeNavigationBridge.onHomeRevealed = {
             runOnUiThread {
@@ -368,47 +376,23 @@ class PrimaryActivity : BaseLoggingActivity() {
         )
         val sortedCategories = (listOf(homeCategory, dashboardCategory) + discovered).sortedBy { it.order }
 
-        val ruleController = androidx.window.embedding.RuleController.getInstance(this)
-        val primaryComponent = ComponentName(this, PrimaryActivity::class.java)
-        for (cat in sortedCategories) {
-            if (!cat.targetPackage.isNullOrEmpty() && !cat.targetActivity.isNullOrEmpty()) {
-                val pairFilter = androidx.window.embedding.SplitPairFilter(
-                    primaryComponent,
-                    ComponentName(cat.targetPackage, cat.targetActivity),
-                    null
-                )
-                val splitRule = androidx.window.embedding.SplitPairRule.Builder(setOf(pairFilter))
-                    .setMinWidthDp(600)
-                    .setMinHeightDp(0)
-                    .setMinSmallestWidthDp(400)
-                    .setDefaultSplitAttributes(
-                        androidx.window.embedding.SplitAttributes.Builder()
-                            .setSplitType(androidx.window.embedding.SplitAttributes.SplitType.ratio(0.35f))
-                            .setLayoutDirection(androidx.window.embedding.SplitAttributes.LayoutDirection.LEFT_TO_RIGHT)
-                            .build()
-                    )
-                    .setFinishPrimaryWithSecondary(androidx.window.embedding.SplitRule.FinishBehavior.NEVER)
-                    .setFinishSecondaryWithPrimary(androidx.window.embedding.SplitRule.FinishBehavior.ALWAYS)
-                    .setClearTop(false)
-                    .build()
-                ruleController.addRule(splitRule)
-                Log.d(tag, "[$activityName] Registered dynamic SplitPairRule for ${cat.targetPackage}/${cat.targetActivity}")
-            }
-        }
-
         return sortedCategories
     }
 
     private fun launchCategory(category: SettingCategory, deepLinkUri: Uri? = null, extras: Bundle? = null) {
+        // Collapse drawer to floating button if in Narrow mode
+        updateActiveState(false, "CategoryLaunch")
+
         if (category.id == "home") {
-            // Bring HomeActivity to top by clearing any category stacked above it
             val homeIntent = Intent(this, HomeActivity::class.java).apply {
                 action = ACTION_SETTINGS_EMBED
                 flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
                 data = Uri.parse("myapp://navigate/home")
             }
-            Log.d(tag, "[$activityName] Navigating to HomeActivity (clearing any top activities in secondary pane)")
-            startActivity(homeIntent)
+            Log.d(tag, "[$activityName] Navigating to HomeActivity in SecondaryTaskFragment")
+            HostAnchorActivity.instance?.launchInSecondary(homeIntent)
+                ?: HomeActivity.homeInstance?.startActivity(homeIntent)
+                ?: startActivity(homeIntent)
             return
         }
 
@@ -437,16 +421,10 @@ class PrimaryActivity : BaseLoggingActivity() {
             }
             targetIntent.data = uriToPass
 
-            val optionsBundle = Bundle()
-            lastSecondaryActivityStack?.let { stack ->
-                if (!stack.isEmpty) {
-                    optionsBundle.setLaunchingActivityStack(this@PrimaryActivity, stack)
-                    Log.d(tag, "[$activityName] Applied optionsBundle.setLaunchingActivityStack targeting secondary: $stack")
-                }
-            }
-
-            Log.d(tag, "[$activityName] Launching category ${category.title} via $targetIntent, hasStackOptions=${!optionsBundle.isEmpty}")
-            startActivity(targetIntent, if (optionsBundle.isEmpty) null else optionsBundle)
+            Log.d(tag, "[$activityName] Launching category ${category.title} into SecondaryTaskFragment via HostAnchorActivity")
+            HostAnchorActivity.instance?.launchInSecondary(targetIntent)
+                ?: HomeActivity.homeInstance?.startActivity(targetIntent)
+                ?: startActivity(targetIntent)
         } else {
             Log.w(tag, "[$activityName] No target intent for category ${category.title}")
         }

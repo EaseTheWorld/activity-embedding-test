@@ -2,4 +2,7 @@
     <string name="app_name">Vehicle Lights</string>
     <string name="category_light_title">Vehicle Lights</string>
     <string name="category_light_subtitle">Exterior &amp; interior illumination via Resource ID</string>
+    <string-array name="known_activity_embedding_certs">
+        <item>7352a6785fb50c46fde42a7c45a8c7b3d045e0f254a3c61732354acece8df723</item>
+    </string-array>
 </resources>

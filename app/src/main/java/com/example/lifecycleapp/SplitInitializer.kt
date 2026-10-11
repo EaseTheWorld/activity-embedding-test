@@ -57,9 +57,9 @@ class SplitInitializer : Initializer<RuleController> {
         val isNarrowOverlayMode = AppConfig.isOverlayMode(context)
 
         if (isNarrowOverlayMode) {
-            // Narrow Mode: ActivityRule(alwaysExpand = true) + Pinned Overlay (no SplitPairRule, no Dummy Primary)
+            // Narrow Mode: ActivityRule(alwaysExpand = true) on HomeActivity only -> creates a single Expanded TaskFragment
             val expandFilters = setOf(
-                ActivityFilter(ComponentName("*", "*"), ACTION_SETTINGS_EMBED)
+                ActivityFilter(ComponentName(context, com.example.feature.home.HomeActivity::class.java), null)
             )
             val expandRule = ActivityRule.Builder(expandFilters)
                 .setAlwaysExpand(true)

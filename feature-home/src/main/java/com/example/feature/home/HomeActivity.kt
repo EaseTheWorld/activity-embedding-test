@@ -97,11 +97,12 @@ class HomeActivity : ComponentActivity() {
 
     /**
      * Called by PrimaryActivity (in Narrow Overlay mode) so category intents are launched
-     * directly on top of HomeActivity in the main fullscreen Task.
+     * directly on top of HomeActivity inside HomeActivity's Expanded TaskFragment.
      */
     fun launchCategoryInTask(targetIntent: Intent) {
-        Log.d(tag, "HomeActivity launching category in fullscreen Task: $targetIntent")
-        startActivity(targetIntent)
+        val optionsBundle = getLaunchOptionsBundle()
+        Log.d(tag, "HomeActivity launching category in Home's TaskFragment (options=$optionsBundle): $targetIntent")
+        startActivity(targetIntent, optionsBundle)
     }
 
     private var isLaunchingTarget = false
@@ -179,14 +180,13 @@ class HomeActivity : ComponentActivity() {
     }
 
     private fun getLaunchOptionsBundle(): Bundle? {
-        if (AppConfig.isOverlayMode(this)) return null
         return try {
             val token = androidx.window.embedding.ActivityEmbeddingController.getInstance(this)
                 .getActivityStack(this)
             if (token != null) {
                 Bundle().apply {
                     setLaunchingActivityStack(this@HomeActivity, token)
-                    Log.d(tag, "Applied setLaunchingActivityStack targeting current stack: $token")
+                    Log.d(tag, "Applied setLaunchingActivityStack targeting Home's stack: $token")
                 }
             } else null
         } catch (e: Exception) {

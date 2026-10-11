@@ -25,7 +25,7 @@ object AppConfig {
      * - false (Wide Mode):   Pure SplitPairRule; PrimaryActivity (left 35%) + SecondaryTaskFragment (right 65%),
      *                        with no Overlay container.
      */
-    var IS_OVERLAY_MODE: Boolean = false
+    var IS_OVERLAY_MODE: Boolean = true
 
     fun isOverlayMode(@Suppress("UNUSED_PARAMETER") context: Any? = null): Boolean {
         return IS_OVERLAY_MODE

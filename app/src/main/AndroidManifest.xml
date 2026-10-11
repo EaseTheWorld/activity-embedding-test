@@ -40,7 +40,7 @@
         <activity
             android:name=".PrimaryActivity"
             android:exported="true"
-            android:theme="@style/Theme.LifecycleApp.Translucent"
+            android:theme="@style/Theme.LifecycleApp"
             android:launchMode="singleTop"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density"
             android:label="@string/title_primary">
@@ -61,6 +61,14 @@
                     android:host="navigate" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".PrimaryOverlayActivity"
+            android:exported="false"
+            android:theme="@style/Theme.LifecycleApp.Translucent"
+            android:launchMode="singleTop"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density"
+            android:label="@string/title_primary" />
 
         <activity
             android:name=".Secondary1Activity"

@@ -1,12 +1,12 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Base application theme. -->
-    <style name="Theme.LifecycleApp" parent="Theme.Material3.DayNight">
-        <!-- Primary brand color. -->
+    <!-- Base application theme (Opaque, used by Wide Split PrimaryActivity & content activities). -->
+    <style name="Theme.LifecycleApp" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="colorPrimary">@color/primary</item>
         <item name="colorSecondary">@color/accent</item>
         <item name="android:statusBarColor">@color/primary_dark</item>
     </style>
 
+    <!-- Translucent theme exclusively for Narrow Mode PrimaryOverlayActivity. -->
     <style name="Theme.LifecycleApp.Translucent" parent="Theme.LifecycleApp">
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>

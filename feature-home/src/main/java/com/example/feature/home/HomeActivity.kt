@@ -81,14 +81,13 @@ class HomeActivity : ComponentActivity() {
             )
 
             val overlayIntent = Intent().apply {
-                component = ComponentName(packageName, "com.example.lifecycleapp.PrimaryActivity")
-                putExtra("extra_is_overlay", true)
+                component = ComponentName(packageName, "com.example.lifecycleapp.PrimaryOverlayActivity")
                 hostIntent?.getStringExtra(EXTRA_INITIAL_DEEPLINK_ACTION)?.let { action = it }
                 hostIntent?.getStringExtra(EXTRA_INITIAL_DEEPLINK_URI)?.let { data = Uri.parse(it) }
                 hostIntent?.getBundleExtra(EXTRA_INITIAL_DEEPLINK_EXTRAS)?.let { putExtras(it) }
             }
 
-            Log.i(tag, "Launching PrimaryActivity as Always-On-Top Pinned Overlay in Narrow Mode (bounds=$bounds)")
+            Log.i(tag, "Launching PrimaryOverlayActivity as Always-On-Top Pinned Overlay in Narrow Mode (bounds=$bounds)")
             startActivity(overlayIntent, options)
         } catch (e: Exception) {
             Log.e(tag, "Failed to launch PrimaryActivity pinned overlay: $e", e)

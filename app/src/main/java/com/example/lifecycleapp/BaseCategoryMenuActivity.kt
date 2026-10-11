@@ -17,6 +17,7 @@ import android.widget.ListView
 import android.widget.TextView
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.core.content.res.ResourcesCompat
+import com.example.core.item.AppConfig
 import com.example.feature.home.HomeActivity
 import com.example.feature.home.HomeNavigationBridge
 
@@ -264,7 +265,11 @@ abstract class BaseCategoryMenuActivity : BaseLoggingActivity() {
         if (category.id == "home") {
             val homeIntent = Intent(this, HomeActivity::class.java).apply {
                 action = ACTION_SETTINGS_EMBED
-                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                flags = if (AppConfig.isOverlayMode(this)) {
+                    Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                } else {
+                    Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                }
                 data = Uri.parse("myapp://navigate/home")
             }
             Log.d(tag, "[$activityName] Navigating to HomeActivity")

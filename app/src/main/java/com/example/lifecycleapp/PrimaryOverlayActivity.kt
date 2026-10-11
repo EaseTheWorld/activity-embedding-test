@@ -107,7 +107,10 @@ class PrimaryOverlayActivity : BaseCategoryMenuActivity() {
     }
 
     override fun startContentActivity(targetIntent: Intent) {
-        // Narrow Mode: Launch into HomeActivity's single ExpandedTaskFragment underneath this Pinned Overlay
-        HomeActivity.homeInstance?.launchCategoryInTask(targetIntent) ?: startActivity(targetIntent)
+        // Narrow Mode: Post to next frame so the overlay collapse (updateOverlayAttributes)
+        // commits cleanly without BLASTSyncEngine contention with the new activity launch.
+        window.decorView.post {
+            HomeActivity.homeInstance?.launchCategoryInTask(targetIntent) ?: startActivity(targetIntent)
+        }
     }
 }

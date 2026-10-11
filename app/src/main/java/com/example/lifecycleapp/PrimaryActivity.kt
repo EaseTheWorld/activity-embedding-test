@@ -9,7 +9,6 @@ import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
-import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ArrayAdapter
@@ -19,18 +18,12 @@ import android.widget.TextView
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.core.content.res.ResourcesCompat
-import androidx.lifecycle.lifecycleScope
-import androidx.window.embedding.ActivityEmbeddingController
-import androidx.window.embedding.EmbeddingAnimationBackground
-import androidx.window.embedding.EmbeddingAnimationParams
-import androidx.window.embedding.SplitAttributes
+import androidx.window.embedding.OverlayAttributes
+import androidx.window.embedding.OverlayController
 import androidx.window.embedding.SplitController
-import androidx.window.embedding.SplitInfo
-import androidx.window.embedding.setLaunchingActivityStack
+import com.example.core.item.AppConfig
 import com.example.feature.home.HomeActivity
 import com.example.feature.home.HomeNavigationBridge
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.launch
 
 data class SettingCategory(
     val id: String,
@@ -83,12 +76,13 @@ class PrimaryActivity : BaseLoggingActivity() {
     private fun updateLayoutVisibility() {
         if (!::layoutCollapsed.isInitialized || !::layoutExpanded.isInitialized) return
         if (!isNarrowOverlayMode) {
-            // In Wide mode (35% fixed split + 35% fixed overlay), always show expanded drawer without collapse button
+            // Wide Mode (Pure Split): always show expanded left pane without collapse button
             layoutCollapsed.visibility = View.GONE
             layoutExpanded.visibility = View.VISIBLE
             btnCollapse.visibility = View.GONE
             return
         }
+        // Narrow Mode (Pinned Overlay): toggle between 80dp button and 35% drawer
         btnCollapse.visibility = View.VISIBLE
         if (isPrimaryActive) {
             layoutCollapsed.visibility = View.GONE
@@ -101,7 +95,6 @@ class PrimaryActivity : BaseLoggingActivity() {
 
     private fun updateActiveState(isActive: Boolean, source: String) {
         if (!isNarrowOverlayMode) {
-            // In Wide mode, drawer is permanently expanded at 35% matching HostAnchorActivity
             isPrimaryActive = true
             updateLayoutVisibility()
             return
@@ -109,7 +102,7 @@ class PrimaryActivity : BaseLoggingActivity() {
         if (isPrimaryActive != isActive) {
             isPrimaryActive = isActive
             SplitInitializer.isOverlayDrawerExpanded = isActive
-            Log.d(tag, "[$activityName] Active state changed to $isPrimaryActive via $source (isNarrowOverlayMode=$isNarrowOverlayMode)")
+            Log.d(tag, "[$activityName] Active state changed to $isPrimaryActive via $source")
             updateLayoutVisibility()
             updateOverlayWindowAttributes(isActive)
         }
@@ -118,9 +111,9 @@ class PrimaryActivity : BaseLoggingActivity() {
     private fun updateOverlayWindowAttributes(isExpanded: Boolean) {
         try {
             val bounds = SplitInitializer.computeOverlayBounds(this, isExpanded)
-            androidx.window.embedding.OverlayController.getInstance(this).updateOverlayAttributes(
-                HostAnchorActivity.TAG_PRIMARY_OVERLAY,
-                androidx.window.embedding.OverlayAttributes(bounds)
+            OverlayController.getInstance(this).updateOverlayAttributes(
+                AppConfig.TAG_PRIMARY_OVERLAY,
+                OverlayAttributes(bounds)
             )
             Log.d(tag, "[$activityName] Updated overlay bounds: isExpanded=$isExpanded, bounds=$bounds")
         } catch (e: Exception) {
@@ -139,24 +132,35 @@ class PrimaryActivity : BaseLoggingActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        isNarrowOverlayMode = com.example.core.item.AppConfig.isOverlayMode(this)
-        isPrimaryActive = !isNarrowOverlayMode
-        SplitInitializer.isOverlayDrawerExpanded = isPrimaryActive
-
-        // Safety redirect if someone explicitly launches PrimaryActivity directly without HostAnchorActivity
+        isNarrowOverlayMode = AppConfig.isOverlayMode(this)
         val isOverlayExtra = intent?.getBooleanExtra(EXTRA_IS_OVERLAY, false) == true
-        if (!isOverlayExtra && HostAnchorActivity.instance == null) {
-            Log.i(tag, "[$activityName] Direct launch detected without HostAnchorActivity -> delegating to HostAnchorActivity")
-            val hostIntent = Intent(this, HostAnchorActivity::class.java).apply {
-                action = intent?.action
-                data = intent?.data
-                if (intent?.extras != null) putExtras(intent!!.extras!!)
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+
+        // Explicit Mode Branching at Entry:
+        // 1. Narrow Mode: If launched as initial entry (not yet in Pinned Overlay), bootstrap HomeActivity
+        //    as the fullscreen Task root so HomeActivity spawns PrimaryActivity as a Pinned Overlay.
+        if (isNarrowOverlayMode && !isOverlayExtra) {
+            Log.i(tag, "[$activityName] Narrow Mode entry -> bootstrapping HomeActivity as Task root")
+            val homeIntent = Intent(this, HomeActivity::class.java).apply {
+                action = ACTION_SETTINGS_EMBED
+                if (intent?.data != null) {
+                    putExtra(HomeActivity.EXTRA_INITIAL_DEEPLINK_URI, intent.data.toString())
+                }
+                if (intent?.action != null && intent.action != Intent.ACTION_MAIN) {
+                    putExtra(HomeActivity.EXTRA_INITIAL_DEEPLINK_ACTION, intent.action)
+                }
+                if (intent?.extras != null) {
+                    putExtra(HomeActivity.EXTRA_INITIAL_DEEPLINK_EXTRAS, intent.extras)
+                }
             }
-            startActivity(hostIntent)
+            startActivity(homeIntent)
+            @Suppress("DEPRECATION")
+            overridePendingTransition(0, 0)
             finish()
             return
         }
+
+        isPrimaryActive = !isNarrowOverlayMode
+        SplitInitializer.isOverlayDrawerExpanded = isPrimaryActive
 
         setContentView(R.layout.activity_primary)
 
@@ -192,14 +196,25 @@ class PrimaryActivity : BaseLoggingActivity() {
         listViewCategories.setOnItemClickListener { _, _, position, _ ->
             categoryAdapter?.selectedPosition = position
             categoryAdapter?.notifyDataSetChanged()
-            // Collapse upon selecting an item in Narrow mode
             updateActiveState(false, "ListItemSelected")
             val selectedCategory = categories[position]
             launchCategory(selectedCategory)
         }
 
+        // 2. Wide Mode: PrimaryActivity is the Primary of SplitPairRule -> launch HomeActivity into SecondaryTaskFragment
+        if (!isNarrowOverlayMode && savedInstanceState == null) {
+            val homeIntent = Intent(this, HomeActivity::class.java).apply {
+                action = ACTION_SETTINGS_EMBED
+                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+            }
+            Log.i(tag, "[$activityName] Wide Mode -> launching HomeActivity into SecondaryTaskFragment via SplitPairRule")
+            startActivity(homeIntent)
+        }
+
         if (intent?.data != null || intent?.action == "com.example.lifecycleapp.open") {
-            handleIntent(intent)
+            window.decorView.post {
+                handleIntent(intent)
+            }
         }
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
@@ -224,7 +239,7 @@ class PrimaryActivity : BaseLoggingActivity() {
         HomeNavigationBridge.onHomeRevealed = {
             runOnUiThread {
                 if (categoryAdapter?.selectedPosition != 0) {
-                    Log.d(tag, "[$activityName] Home revealed underneath -> updating selectedPosition to 0")
+                    Log.d(tag, "[$activityName] Home revealed -> updating selectedPosition to 0")
                     categoryAdapter?.selectedPosition = 0
                     categoryAdapter?.notifyDataSetChanged()
                     listViewCategories.smoothScrollToPosition(0)
@@ -379,8 +394,17 @@ class PrimaryActivity : BaseLoggingActivity() {
         return sortedCategories
     }
 
+    private fun startContentActivity(targetIntent: Intent) {
+        if (isNarrowOverlayMode) {
+            // Narrow Mode: Launch in the underlying fullscreen Task via HomeActivity
+            HomeActivity.homeInstance?.launchCategoryInTask(targetIntent) ?: startActivity(targetIntent)
+        } else {
+            // Wide Mode: PrimaryActivity is the SplitPairRule Primary, so startActivity places it in SecondaryTaskFragment
+            startActivity(targetIntent)
+        }
+    }
+
     private fun launchCategory(category: SettingCategory, deepLinkUri: Uri? = null, extras: Bundle? = null) {
-        // Collapse drawer to floating button if in Narrow mode
         updateActiveState(false, "CategoryLaunch")
 
         if (category.id == "home") {
@@ -389,10 +413,8 @@ class PrimaryActivity : BaseLoggingActivity() {
                 flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
                 data = Uri.parse("myapp://navigate/home")
             }
-            Log.d(tag, "[$activityName] Navigating to HomeActivity in SecondaryTaskFragment")
-            HostAnchorActivity.instance?.launchInSecondary(homeIntent)
-                ?: HomeActivity.homeInstance?.startActivity(homeIntent)
-                ?: startActivity(homeIntent)
+            Log.d(tag, "[$activityName] Navigating to HomeActivity (isNarrowOverlayMode=$isNarrowOverlayMode)")
+            startContentActivity(homeIntent)
             return
         }
 
@@ -421,10 +443,8 @@ class PrimaryActivity : BaseLoggingActivity() {
             }
             targetIntent.data = uriToPass
 
-            Log.d(tag, "[$activityName] Launching category ${category.title} into SecondaryTaskFragment via HostAnchorActivity")
-            HostAnchorActivity.instance?.launchInSecondary(targetIntent)
-                ?: HomeActivity.homeInstance?.startActivity(targetIntent)
-                ?: startActivity(targetIntent)
+            Log.d(tag, "[$activityName] Launching category ${category.title} (isNarrowOverlayMode=$isNarrowOverlayMode)")
+            startContentActivity(targetIntent)
         } else {
             Log.w(tag, "[$activityName] No target intent for category ${category.title}")
         }
@@ -436,13 +456,11 @@ class PrimaryActivity : BaseLoggingActivity() {
         val dataUri = intent.data
         Log.d(tag, "[$activityName] handleIntent: action=$action, data=$dataUri, extras=${intent.extras}")
 
-        // 1. First-class DeepLink handling: myapp://navigate/...
         if (dataUri != null && dataUri.scheme == "myapp" && dataUri.host == "navigate") {
             handleDeepLink(dataUri, intent.extras)
             return
         }
 
-        // 2. Legacy action: com.example.lifecycleapp.open
         if (action == "com.example.lifecycleapp.open") {
             intent.action = null
             val categoryKey = intent.getStringExtra("category") ?: when (intent.extras?.get("id")) {
@@ -483,26 +501,26 @@ class PrimaryActivity : BaseLoggingActivity() {
             return
         }
 
-        // Fallback if category was not discovered yet via ContentProvider
         if (categoryId.equals("light", ignoreCase = true)) {
-            val extIntent = Intent("com.example.carsettings.light.OPEN").apply {
+            val extIntent = Intent(ACTION_SETTINGS_EMBED).apply {
                 setClassName("com.example.carsettings.light", "com.example.feature.light.LightSettingsActivity")
                 data = uri
                 if (extras != null) putExtras(extras)
             }
             try {
-                startActivity(extIntent)
+                startContentActivity(extIntent)
                 Log.d(tag, "[$activityName] Launched external light category fallback via $uri")
             } catch (e: Exception) {
                 Log.e(tag, "[$activityName] Failed to launch external light activity: $e")
             }
         } else {
             val settingsIntent = Intent(this, GenericSettingsActivity::class.java).apply {
+                action = ACTION_SETTINGS_EMBED
                 data = uri
                 putExtra(GenericSettingsActivity.EXTRA_CATEGORY_ID, categoryId)
                 if (extras != null) putExtras(extras)
             }
-            startActivity(settingsIntent)
+            startContentActivity(settingsIntent)
             Log.d(tag, "[$activityName] Launched GenericSettingsActivity fallback for $categoryId via $uri")
         }
     }
@@ -541,7 +559,6 @@ private class CategoryAdapter(
             null
         }
 
-        // 1. Resolve Localized String via Pattern A (fallback to Cursor string if missing)
         val resolvedTitle = if (featureResources != null && category.titleResId != 0) {
             try {
                 featureResources.getString(category.titleResId)
@@ -562,7 +579,6 @@ private class CategoryAdapter(
             category.subtitle
         }
 
-        // 2. Resolve Drawable Icon via Pattern A
         val resolvedIcon = if (category.iconResId != 0 && featurePackage.isNotEmpty()) {
             try {
                 val foreignContext = context.createPackageContext(featurePackage, Context.CONTEXT_RESTRICTED)

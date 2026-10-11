@@ -2,9 +2,9 @@ package com.example.core.item
 
 object AppConfig {
     /**
-     * Single source of truth for Primary Drawer width ratio.
-     * In Wide (Split-like) mode, both DummyPrimary Split ratio and PrimaryActivity Overlay width
-     * use this exact constant so their boundaries always match 1:1 without drift.
+     * Primary pane width ratio (35%) used for:
+     * - Wide Mode: SplitAttributes.SplitType.ratio(0.35f) in SplitPairRule
+     * - Narrow Mode: Expanded Overlay drawer width EmbeddingBounds.Dimension.ratio(0.35f)
      */
     const val PRIMARY_DRAWER_RATIO: Float = 0.35f
 
@@ -14,12 +14,16 @@ object AppConfig {
     const val COLLAPSED_BUTTON_SIZE_DP: Int = 80
 
     /**
-     * Hardcoded toggle for testing Narrow (0% EXPAND + collapsible overlay) vs Wide (35% fixed split + fixed overlay)
-     * on the same emulator.
-     * - When true (Narrow / sw < 800dp): Secondary uses SplitType.SPLIT_TYPE_EXPAND (100% full screen at x=0),
-     *   and Primary overlay toggles between 80dp floating button and 35% drawer.
-     * - When false (Wide / sw >= 800dp): DummyPrimary takes 35% (Secondary starts at x=35%),
-     *   and Primary overlay permanently covers the left 35% area.
+     * Tag for the Always-On-Top Primary Overlay container in Narrow mode.
+     */
+    const val TAG_PRIMARY_OVERLAY: String = "tag_primary_overlay"
+
+    /**
+     * Explicit mode toggle for testing Narrow (Pinned Overlay) vs Wide (Pure Split) on the same emulator.
+     * - true  (Narrow Mode): No SplitPairRule; HomeActivity + categories stack in the fullscreen Task,
+     *                        and PrimaryActivity runs as an Always-On-Top Pinned Overlay (80dp button <-> 35% drawer).
+     * - false (Wide Mode):   Pure SplitPairRule; PrimaryActivity (left 35%) + SecondaryTaskFragment (right 65%),
+     *                        with no Overlay container.
      */
     var IS_OVERLAY_MODE: Boolean = false
 
@@ -27,4 +31,3 @@ object AppConfig {
         return IS_OVERLAY_MODE
     }
 }
-

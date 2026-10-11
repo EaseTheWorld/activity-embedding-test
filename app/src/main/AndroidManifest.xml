@@ -38,12 +38,12 @@
         </provider>
 
         <activity
-            android:name=".HostAnchorActivity"
+            android:name=".PrimaryActivity"
             android:exported="true"
             android:theme="@style/Theme.LifecycleApp.Translucent"
-            android:launchMode="singleTask"
+            android:launchMode="singleTop"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density"
-            android:label="@string/app_name">
+            android:label="@string/title_primary">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -61,14 +61,6 @@
                     android:host="navigate" />
             </intent-filter>
         </activity>
-
-        <activity
-            android:name=".PrimaryActivity"
-            android:exported="true"
-            android:theme="@style/Theme.LifecycleApp.Translucent"
-            android:launchMode="singleTop"
-            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density"
-            android:label="@string/title_primary" />
 
         <activity
             android:name=".Secondary1Activity"

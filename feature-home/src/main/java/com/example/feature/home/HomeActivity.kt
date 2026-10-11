@@ -1,11 +1,11 @@
 package com.example.feature.home
 
+import android.app.ActivityOptions
 import android.content.ComponentName
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
-import android.app.ActivityOptions
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
@@ -20,7 +20,9 @@ class HomeActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_TARGET_INTENT = "extra_target_intent"
-        const val TAG_PRIMARY_OVERLAY = "tag_primary_overlay"
+        const val EXTRA_INITIAL_DEEPLINK_URI = "extra_initial_deeplink_uri"
+        const val EXTRA_INITIAL_DEEPLINK_ACTION = "extra_initial_deeplink_action"
+        const val EXTRA_INITIAL_DEEPLINK_EXTRAS = "extra_initial_deeplink_extras"
         var homeInstance: HomeActivity? = null
     }
 
@@ -29,7 +31,8 @@ class HomeActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         homeInstance = this
-        Log.d(tag, "HomeActivity created (isOverlayMode=${AppConfig.isOverlayMode(this)})")
+        val isNarrowOverlayMode = AppConfig.isOverlayMode(this)
+        Log.d(tag, "HomeActivity created (isNarrowOverlayMode=$isNarrowOverlayMode)")
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
@@ -46,7 +49,59 @@ class HomeActivity : ComponentActivity() {
             )
         }
 
+        if (isNarrowOverlayMode && savedInstanceState == null) {
+            launchPrimaryPinnedOverlay(intent)
+        }
+
         handleTargetLaunch(intent)
+    }
+
+    /**
+     * In Narrow Mode, HomeActivity is the fullscreen Task root and spawns PrimaryActivity
+     * as an Always-On-Top Pinned Overlay (`shouldAssociateWithLaunchingActivity = false`).
+     */
+    private fun launchPrimaryPinnedOverlay(hostIntent: Intent?) {
+        try {
+            val dpPx = (AppConfig.COLLAPSED_BUTTON_SIZE_DP * resources.displayMetrics.density).toInt()
+            val bounds = EmbeddingBounds(
+                EmbeddingBounds.Alignment.ALIGN_LEFT,
+                EmbeddingBounds.Dimension.pixel(dpPx),
+                EmbeddingBounds.Dimension.pixel(dpPx)
+            )
+            val overlayParams = OverlayCreateParams.Builder()
+                .setTag(AppConfig.TAG_PRIMARY_OVERLAY)
+                .setOverlayAttributes(OverlayAttributes(bounds))
+                .build()
+
+            val options = ActivityOptions.makeBasic().toBundle()
+            options.setOverlayCreateParams(this, overlayParams)
+            options.putBoolean(
+                "androidx.window.extensions.embedding.shouldAssociateWithLaunchingActivity",
+                false
+            )
+
+            val overlayIntent = Intent().apply {
+                component = ComponentName(packageName, "com.example.lifecycleapp.PrimaryActivity")
+                putExtra("extra_is_overlay", true)
+                hostIntent?.getStringExtra(EXTRA_INITIAL_DEEPLINK_ACTION)?.let { action = it }
+                hostIntent?.getStringExtra(EXTRA_INITIAL_DEEPLINK_URI)?.let { data = Uri.parse(it) }
+                hostIntent?.getBundleExtra(EXTRA_INITIAL_DEEPLINK_EXTRAS)?.let { putExtras(it) }
+            }
+
+            Log.i(tag, "Launching PrimaryActivity as Always-On-Top Pinned Overlay in Narrow Mode (bounds=$bounds)")
+            startActivity(overlayIntent, options)
+        } catch (e: Exception) {
+            Log.e(tag, "Failed to launch PrimaryActivity pinned overlay: $e", e)
+        }
+    }
+
+    /**
+     * Called by PrimaryActivity (in Narrow Overlay mode) so category intents are launched
+     * directly on top of HomeActivity in the main fullscreen Task.
+     */
+    fun launchCategoryInTask(targetIntent: Intent) {
+        Log.d(tag, "HomeActivity launching category in fullscreen Task: $targetIntent")
+        startActivity(targetIntent)
     }
 
     private var isLaunchingTarget = false
@@ -62,7 +117,7 @@ class HomeActivity : ComponentActivity() {
             Log.d(tag, "HomeActivity onResume: skipped bridge notification because target category is being launched")
             return
         }
-        Log.d(tag, "HomeActivity onResume: Home truly revealed in Secondary pane")
+        Log.d(tag, "HomeActivity onResume: Home truly revealed")
         HomeNavigationBridge.notifyHomeRevealed()
     }
 
@@ -124,6 +179,7 @@ class HomeActivity : ComponentActivity() {
     }
 
     private fun getLaunchOptionsBundle(): Bundle? {
+        if (AppConfig.isOverlayMode(this)) return null
         return try {
             val token = androidx.window.embedding.ActivityEmbeddingController.getInstance(this)
                 .getActivityStack(this)

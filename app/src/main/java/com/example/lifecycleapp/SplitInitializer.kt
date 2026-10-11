@@ -57,9 +57,12 @@ class SplitInitializer : Initializer<RuleController> {
         val isNarrowOverlayMode = AppConfig.isOverlayMode(context)
 
         if (isNarrowOverlayMode) {
-            // Narrow Mode: ActivityRule(alwaysExpand = true) on HomeActivity only -> creates a single Expanded TaskFragment
+            // Narrow Mode:
+            // - HomeActivity -> ExpandedTaskFragment #0
+            // - CategoryHostActivity -> ExpandedTaskFragment #1 (hosts Generic/Light + sub-activities)
             val expandFilters = setOf(
-                ActivityFilter(ComponentName(context, com.example.feature.home.HomeActivity::class.java), null)
+                ActivityFilter(ComponentName(context, com.example.feature.home.HomeActivity::class.java), null),
+                ActivityFilter(ComponentName(context, com.example.feature.home.CategoryHostActivity::class.java), null)
             )
             val expandRule = ActivityRule.Builder(expandFilters)
                 .setAlwaysExpand(true)
@@ -75,13 +78,14 @@ class SplitInitializer : Initializer<RuleController> {
             } catch (e: Exception) {
                 Log.w("LifecycleLog", "[SplitInitializer] OverlayAttributesCalculator registration skipped: $e")
             }
-            Log.d("LifecycleLog", "[SplitInitializer] Initialized Narrow Mode (ActivityRule alwaysExpand + Pinned Overlay, no SplitPairRule)")
+            Log.d("LifecycleLog", "[SplitInitializer] Initialized Narrow Mode (ActivityRule alwaysExpand on HomeActivity & CategoryHostActivity + Pinned Overlay)")
         } else {
-            // Wide Mode: Pure SplitPairRule (PrimaryActivity [35%] <-> Secondary [65%]) without Overlay
+            // Wide Mode:
+            // 1. PrimaryActivity <-> HomeActivity (root SecondaryTaskFragment #1, finishes together with PrimaryActivity)
+            // 2. PrimaryActivity <-> CategoryHostActivity (category SecondaryTaskFragment #2, finishing it reveals HomeActivity)
             val primaryComponent = ComponentName(context, PrimaryActivity::class.java)
-            val filters = setOf(
-                SplitPairFilter(primaryComponent, ComponentName("*", "*"), ACTION_SETTINGS_EMBED)
-            )
+            val homeComponent = ComponentName(context, com.example.feature.home.HomeActivity::class.java)
+            val categoryHostComponent = ComponentName(context, com.example.feature.home.CategoryHostActivity::class.java)
 
             val animParams = EmbeddingAnimationParams.Builder()
                 .setAnimationBackground(EmbeddingAnimationBackground.DEFAULT)
@@ -96,7 +100,9 @@ class SplitInitializer : Initializer<RuleController> {
                 .setAnimationParams(animParams)
                 .build()
 
-            val splitPairRule = SplitPairRule.Builder(filters)
+            val homeSplitRule = SplitPairRule.Builder(
+                setOf(SplitPairFilter(primaryComponent, homeComponent, null))
+            )
                 .setMinWidthDp(0)
                 .setMinHeightDp(0)
                 .setMinSmallestWidthDp(0)
@@ -106,8 +112,20 @@ class SplitInitializer : Initializer<RuleController> {
                 .setClearTop(false)
                 .build()
 
-            ruleController.setRules(setOf(splitPairRule))
-            Log.d("LifecycleLog", "[SplitInitializer] Initialized Wide Mode (Pure SplitPairRule, ratio=${AppConfig.PRIMARY_DRAWER_RATIO})")
+            val categorySplitRule = SplitPairRule.Builder(
+                setOf(SplitPairFilter(primaryComponent, categoryHostComponent, null))
+            )
+                .setMinWidthDp(0)
+                .setMinHeightDp(0)
+                .setMinSmallestWidthDp(0)
+                .setDefaultSplitAttributes(defaultSplitAttributes)
+                .setFinishPrimaryWithSecondary(SplitRule.FinishBehavior.NEVER)
+                .setFinishSecondaryWithPrimary(SplitRule.FinishBehavior.ALWAYS)
+                .setClearTop(false)
+                .build()
+
+            ruleController.setRules(setOf(homeSplitRule, categorySplitRule))
+            Log.d("LifecycleLog", "[SplitInitializer] Initialized Wide Mode (SplitPairRules for HomeActivity and CategoryHostActivity, ratio=${AppConfig.PRIMARY_DRAWER_RATIO})")
         }
 
         return ruleController

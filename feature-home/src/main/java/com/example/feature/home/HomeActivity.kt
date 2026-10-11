@@ -96,9 +96,9 @@ class HomeActivity : ComponentActivity() {
     }
 
     /**
-     * Launches a category activity directly into HomeActivity's TaskFragment on top of HomeActivity,
-     * finishing any previously active category activity (`REQUEST_CODE_CATEGORY`) first so categories
-     * never stack on top of each other.
+     * Launches a category activity inside its own dedicated [CategoryHostActivity] `ActivityStack` (`TaskFragment`),
+     * finishing any previously active category `ActivityStack` (including any sub-activities) first via
+     * [CategoryHostActivity.finishActiveCategoryStacks].
      */
     private var isLaunchingTarget = false
     private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
@@ -106,39 +106,33 @@ class HomeActivity : ComponentActivity() {
         isLaunchingTarget = false
     }
 
-    @Suppress("DEPRECATION")
     fun launchCategoryInTask(targetIntent: Intent) {
         isLaunchingTarget = true
         mainHandler.removeCallbacks(clearLaunchingFlagRunnable)
         mainHandler.postDelayed(clearLaunchingFlagRunnable, 400L)
         try {
-            finishActivity(REQUEST_CODE_CATEGORY)
+            CategoryHostActivity.finishActiveCategoryStacks()
+            val hostIntent = CategoryHostActivity.createLaunchIntent(this, targetIntent)
+            Log.d(tag, "HomeActivity launching CategoryHostActivity for target: $targetIntent")
+            startActivity(hostIntent)
+            @Suppress("DEPRECATION")
+            overridePendingTransition(0, 0)
         } catch (e: Exception) {
-            Log.w(tag, "finishActivity(REQUEST_CODE_CATEGORY) warning: $e")
-        }
-        try {
-            val optionsBundle = getLaunchOptionsBundle()
-            Log.d(tag, "HomeActivity launching category in Home's TaskFragment (options=$optionsBundle): $targetIntent")
-            startActivityForResult(targetIntent, REQUEST_CODE_CATEGORY, optionsBundle)
-        } catch (e: Exception) {
-            Log.e(tag, "Failed to launch category in task: $e", e)
+            Log.e(tag, "Failed to launch category via CategoryHostActivity: $e", e)
             isLaunchingTarget = false
             mainHandler.removeCallbacks(clearLaunchingFlagRunnable)
         }
     }
 
     /**
-     * Finishes the currently active category activity (internal or external) to reveal HomeActivity underneath.
+     * Finishes the currently active category ActivityStack (internal or external, including sub-activities)
+     * to reveal HomeActivity underneath.
      */
     fun returnToHome() {
         isLaunchingTarget = false
         mainHandler.removeCallbacks(clearLaunchingFlagRunnable)
-        try {
-            Log.d(tag, "HomeActivity returnToHome -> finishActivity(REQUEST_CODE_CATEGORY)")
-            finishActivity(REQUEST_CODE_CATEGORY)
-        } catch (e: Exception) {
-            Log.w(tag, "returnToHome finishActivity warning: $e")
-        }
+        Log.d(tag, "HomeActivity returnToHome -> CategoryHostActivity.finishActiveCategoryStacks()")
+        CategoryHostActivity.finishActiveCategoryStacks()
     }
 
     override fun onStart() {

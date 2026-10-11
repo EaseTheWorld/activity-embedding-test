@@ -75,9 +75,11 @@ class PrimaryOverlayActivity : BaseCategoryMenuActivity() {
     private fun updateOverlayViews() {
         if (!::layoutCollapsed.isInitialized || !::layoutExpanded.isInitialized) return
         if (isDrawerExpanded) {
+            window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE)
             layoutCollapsed.visibility = View.GONE
             layoutExpanded.visibility = View.VISIBLE
         } else {
+            window.addFlags(android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE)
             layoutCollapsed.visibility = View.VISIBLE
             layoutExpanded.visibility = View.GONE
         }

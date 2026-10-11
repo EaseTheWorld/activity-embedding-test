@@ -71,8 +71,12 @@ class PrimaryActivity : BaseCategoryMenuActivity() {
     }
 
     override fun startContentActivity(targetIntent: Intent) {
-        // Wide Mode: Launch into HomeActivity's SecondaryTaskFragment on top of HomeActivity,
-        // replacing any previous category via finishActivity(REQUEST_CODE_CATEGORY).
-        HomeActivity.homeInstance?.launchCategoryInTask(targetIntent) ?: startActivity(targetIntent)
+        // Wide Mode: Finish any active category ActivityStack and launch CategoryHostActivity from PrimaryActivity
+        // so SplitPairRule(PrimaryActivity <-> CategoryHostActivity) creates a dedicated SecondaryTaskFragment.
+        com.example.feature.home.CategoryHostActivity.finishActiveCategoryStacks()
+        val hostIntent = com.example.feature.home.CategoryHostActivity.createLaunchIntent(this, targetIntent)
+        startActivity(hostIntent)
+        @Suppress("DEPRECATION")
+        overridePendingTransition(0, 0)
     }
 }

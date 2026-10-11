@@ -100,7 +100,19 @@ fun GenericSettingsScreen(
                     )
                 }
             }
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(12.dp))
+            val context = androidx.compose.ui.platform.LocalContext.current
+            androidx.compose.material3.Button(
+                onClick = {
+                    val subIntent = android.content.Intent(context, GenericSubActivity::class.java).apply {
+                        putExtra(GenericSubActivity.EXTRA_PARENT_TITLE, title)
+                    }
+                    context.startActivity(subIntent)
+                }
+            ) {
+                Text("Open Sub-Setting Page (GenericSubActivity)")
+            }
+            Spacer(modifier = Modifier.height(12.dp))
 
             Card(
                 modifier = Modifier.fillMaxWidth(),

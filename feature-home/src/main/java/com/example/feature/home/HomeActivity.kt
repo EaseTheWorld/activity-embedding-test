@@ -23,6 +23,7 @@ class HomeActivity : ComponentActivity() {
         const val EXTRA_INITIAL_DEEPLINK_URI = "extra_initial_deeplink_uri"
         const val EXTRA_INITIAL_DEEPLINK_ACTION = "extra_initial_deeplink_action"
         const val EXTRA_INITIAL_DEEPLINK_EXTRAS = "extra_initial_deeplink_extras"
+        const val REQUEST_CODE_CATEGORY = 1001
         var homeInstance: HomeActivity? = null
     }
 
@@ -95,17 +96,50 @@ class HomeActivity : ComponentActivity() {
     }
 
     /**
-     * Called by PrimaryOverlayActivity (in Narrow Overlay mode) so the previous CategoryStack
-     * (including any stacked sub-activities) is finished via `finishActivityStacks()` and the
-     * new category is launched in a dedicated CategoryStack on top of HomeStack.
+     * Launches a category activity directly into HomeActivity's TaskFragment on top of HomeActivity,
+     * finishing any previously active category activity (`REQUEST_CODE_CATEGORY`) first so categories
+     * never stack on top of each other.
      */
-    fun launchCategoryInTask(targetIntent: Intent) {
-        CategoryStackManager.finishCategoryStacks(this)
-        Log.d(tag, "HomeActivity launching category into dedicated CategoryStack: $targetIntent")
-        startActivity(targetIntent)
+    private var isLaunchingTarget = false
+    private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val clearLaunchingFlagRunnable = Runnable {
+        isLaunchingTarget = false
     }
 
-    private var isLaunchingTarget = false
+    @Suppress("DEPRECATION")
+    fun launchCategoryInTask(targetIntent: Intent) {
+        isLaunchingTarget = true
+        mainHandler.removeCallbacks(clearLaunchingFlagRunnable)
+        mainHandler.postDelayed(clearLaunchingFlagRunnable, 400L)
+        try {
+            finishActivity(REQUEST_CODE_CATEGORY)
+        } catch (e: Exception) {
+            Log.w(tag, "finishActivity(REQUEST_CODE_CATEGORY) warning: $e")
+        }
+        try {
+            val optionsBundle = getLaunchOptionsBundle()
+            Log.d(tag, "HomeActivity launching category in Home's TaskFragment (options=$optionsBundle): $targetIntent")
+            startActivityForResult(targetIntent, REQUEST_CODE_CATEGORY, optionsBundle)
+        } catch (e: Exception) {
+            Log.e(tag, "Failed to launch category in task: $e", e)
+            isLaunchingTarget = false
+            mainHandler.removeCallbacks(clearLaunchingFlagRunnable)
+        }
+    }
+
+    /**
+     * Finishes the currently active category activity (internal or external) to reveal HomeActivity underneath.
+     */
+    fun returnToHome() {
+        isLaunchingTarget = false
+        mainHandler.removeCallbacks(clearLaunchingFlagRunnable)
+        try {
+            Log.d(tag, "HomeActivity returnToHome -> finishActivity(REQUEST_CODE_CATEGORY)")
+            finishActivity(REQUEST_CODE_CATEGORY)
+        } catch (e: Exception) {
+            Log.w(tag, "returnToHome finishActivity warning: $e")
+        }
+    }
 
     override fun onStart() {
         super.onStart()
@@ -126,6 +160,7 @@ class HomeActivity : ComponentActivity() {
         super.onPause()
         Log.d(tag, "HomeActivity onPause()")
         isLaunchingTarget = false
+        mainHandler.removeCallbacks(clearLaunchingFlagRunnable)
     }
 
     override fun onStop() {
@@ -178,6 +213,22 @@ class HomeActivity : ComponentActivity() {
         }
     }
 
+    private fun getLaunchOptionsBundle(): Bundle? {
+        return try {
+            val token = androidx.window.embedding.ActivityEmbeddingController.getInstance(this)
+                .getActivityStack(this)
+            if (token != null) {
+                Bundle().apply {
+                    setLaunchingActivityStack(this@HomeActivity, token)
+                    Log.d(tag, "Applied setLaunchingActivityStack targeting Home's stack: $token")
+                }
+            } else null
+        } catch (e: Exception) {
+            Log.w(tag, "Failed to get current ActivityStack token: $e")
+            null
+        }
+    }
+
     private fun launchTargetSetting(item: SearchableSettingItem) {
         val targetComponent = if (item.categoryId.equals("light", ignoreCase = true)) {
             ComponentName("com.example.carsettings.light", "com.example.feature.light.LightSettingsActivity")
@@ -196,10 +247,6 @@ class HomeActivity : ComponentActivity() {
 
         Log.d(tag, "Launching target setting from Home search: $targetComponent, uri=$targetUri, categoryId=${item.categoryId}")
         HomeNavigationBridge.notifyCategorySelected(item.categoryId)
-        if (AppConfig.isOverlayMode(this)) {
-            launchCategoryInTask(intent)
-        } else {
-            CategoryStackManager.wideModeCategoryLauncher?.invoke(intent) ?: startActivity(intent)
-        }
+        launchCategoryInTask(intent)
     }
 }

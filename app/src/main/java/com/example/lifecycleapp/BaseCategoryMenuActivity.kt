@@ -263,10 +263,11 @@ abstract class BaseCategoryMenuActivity : BaseLoggingActivity() {
         onBeforeCategoryLaunch()
 
         if (category.id == "home") {
-            Log.d(tag, "[$activityName] Navigating to HomeActivity -> finishing active CategoryStacks via finishActivityStacks()")
-            if (HomeActivity.homeInstance != null) {
+            Log.d(tag, "[$activityName] Navigating to HomeActivity -> finishing active category via HomeActivity.returnToHome()")
+            val home = HomeActivity.homeInstance
+            if (home != null) {
                 window.decorView.post {
-                    com.example.feature.home.CategoryStackManager.finishCategoryStacks(this)
+                    home.returnToHome()
                 }
             } else {
                 val homeIntent = Intent(this, HomeActivity::class.java).apply {
@@ -291,7 +292,6 @@ abstract class BaseCategoryMenuActivity : BaseLoggingActivity() {
 
         if (targetIntent != null) {
             targetIntent.action = ACTION_SETTINGS_EMBED
-            targetIntent.flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
             targetIntent.putExtra(GenericSettingsActivity.EXTRA_CATEGORY_ID, category.id)
             targetIntent.putExtra(GenericSettingsActivity.EXTRA_AUTHORITY, category.authority)
             targetIntent.putExtra(GenericSettingsActivity.EXTRA_TITLE, category.title)

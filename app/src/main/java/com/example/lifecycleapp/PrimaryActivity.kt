@@ -48,10 +48,6 @@ class PrimaryActivity : BaseCategoryMenuActivity() {
         setContentView(R.layout.activity_primary)
         initCategoryMenuViews()
 
-        com.example.feature.home.CategoryStackManager.wideModeCategoryLauncher = { targetIntent ->
-            startContentActivity(targetIntent)
-        }
-
         if (savedInstanceState == null) {
             val homeIntent = Intent(this, HomeActivity::class.java).apply {
                 action = ACTION_SETTINGS_EMBED
@@ -74,15 +70,9 @@ class PrimaryActivity : BaseCategoryMenuActivity() {
         })
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
-        com.example.feature.home.CategoryStackManager.wideModeCategoryLauncher = null
-    }
-
     override fun startContentActivity(targetIntent: Intent) {
-        // Wide Mode: Finish any previous CategoryStack (including sub-activities) so the right 65% pane
-        // always keeps [HomeStack (bottom), CurrentCategoryStack (top)].
-        com.example.feature.home.CategoryStackManager.finishCategoryStacks(this)
-        startActivity(targetIntent)
+        // Wide Mode: Launch into HomeActivity's SecondaryTaskFragment on top of HomeActivity,
+        // replacing any previous category via finishActivity(REQUEST_CODE_CATEGORY).
+        HomeActivity.homeInstance?.launchCategoryInTask(targetIntent) ?: startActivity(targetIntent)
     }
 }

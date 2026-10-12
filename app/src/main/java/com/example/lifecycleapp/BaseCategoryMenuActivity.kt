@@ -71,13 +71,6 @@ abstract class BaseCategoryMenuActivity : BaseLoggingActivity() {
     private val observedAuthorities = mutableSetOf<String>()
 
     /**
-     * Subclasses implement how a content activity Intent is launched:
-     * - [PrimaryActivity] (Wide): `startActivity(targetIntent)` -> routed by `SplitPairRule` into `SecondaryTaskFragment`
-     * - [PrimaryOverlayActivity] (Narrow): `HomeActivity.homeInstance?.launchCategoryInTask(targetIntent)` -> routed into `HomeActivity`'s `ExpandedTaskFragment`
-     */
-    protected abstract fun startContentActivity(targetIntent: Intent)
-
-    /**
      * Optional hook invoked right before launching a category (e.g., [PrimaryOverlayActivity] collapses the drawer).
      */
     protected open fun onBeforeCategoryLaunch() {}
@@ -263,19 +256,9 @@ abstract class BaseCategoryMenuActivity : BaseLoggingActivity() {
         onBeforeCategoryLaunch()
 
         if (category.id == "home") {
-            Log.d(tag, "[$activityName] Navigating to HomeActivity -> finishing active category via HomeActivity.returnToHome()")
-            val home = HomeActivity.homeInstance
-            if (home != null) {
-                window.decorView.post {
-                    home.returnToHome()
-                }
-            } else {
-                val homeIntent = Intent(this, HomeActivity::class.java).apply {
-                    action = ACTION_SETTINGS_EMBED
-                    flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
-                    data = Uri.parse("myapp://navigate/home")
-                }
-                startContentActivity(homeIntent)
+            Log.d(tag, "[$activityName] Navigating to HomeActivity -> CategoryHostActivity.dismissCurrent()")
+            window.decorView.post {
+                com.example.feature.home.CategoryHostActivity.dismissCurrent()
             }
             return
         }
@@ -304,8 +287,10 @@ abstract class BaseCategoryMenuActivity : BaseLoggingActivity() {
             }
             targetIntent.data = uriToPass
 
-            Log.d(tag, "[$activityName] Launching category ${category.title}")
-            startContentActivity(targetIntent)
+            Log.d(tag, "[$activityName] Launching category ${category.title} via CategoryHostActivity.launch()")
+            window.decorView.post {
+                com.example.feature.home.CategoryHostActivity.launch(this, targetIntent)
+            }
         } else {
             Log.w(tag, "[$activityName] No target intent for category ${category.title}")
         }
@@ -363,27 +348,22 @@ abstract class BaseCategoryMenuActivity : BaseLoggingActivity() {
             return
         }
 
-        if (categoryId.equals("light", ignoreCase = true)) {
-            val extIntent = Intent(ACTION_SETTINGS_EMBED).apply {
+        val fallbackIntent = if (categoryId.equals("light", ignoreCase = true)) {
+            Intent(ACTION_SETTINGS_EMBED).apply {
                 setClassName("com.example.carsettings.light", "com.example.feature.light.LightSettingsActivity")
                 data = uri
                 if (extras != null) putExtras(extras)
             }
-            try {
-                startContentActivity(extIntent)
-                Log.d(tag, "[$activityName] Launched external light category fallback via $uri")
-            } catch (e: Exception) {
-                Log.e(tag, "[$activityName] Failed to launch external light activity: $e")
-            }
         } else {
-            val settingsIntent = Intent(this, GenericSettingsActivity::class.java).apply {
+            Intent(this, GenericSettingsActivity::class.java).apply {
                 action = ACTION_SETTINGS_EMBED
                 data = uri
                 putExtra(GenericSettingsActivity.EXTRA_CATEGORY_ID, categoryId)
                 if (extras != null) putExtras(extras)
             }
-            startContentActivity(settingsIntent)
-            Log.d(tag, "[$activityName] Launched GenericSettingsActivity fallback for $categoryId via $uri")
+        }
+        window.decorView.post {
+            com.example.feature.home.CategoryHostActivity.launch(this, fallbackIntent)
         }
     }
 }

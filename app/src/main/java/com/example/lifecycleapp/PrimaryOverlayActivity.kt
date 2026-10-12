@@ -75,11 +75,9 @@ class PrimaryOverlayActivity : BaseCategoryMenuActivity() {
     private fun updateOverlayViews() {
         if (!::layoutCollapsed.isInitialized || !::layoutExpanded.isInitialized) return
         if (isDrawerExpanded) {
-            window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE)
             layoutCollapsed.visibility = View.GONE
             layoutExpanded.visibility = View.VISIBLE
         } else {
-            window.addFlags(android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE)
             layoutCollapsed.visibility = View.VISIBLE
             layoutExpanded.visibility = View.GONE
         }
@@ -106,13 +104,5 @@ class PrimaryOverlayActivity : BaseCategoryMenuActivity() {
 
     override fun onBeforeCategoryLaunch() {
         setDrawerExpanded(false, "CategoryLaunch")
-    }
-
-    override fun startContentActivity(targetIntent: Intent) {
-        // Narrow Mode: Post to next frame so the overlay collapse (updateOverlayAttributes)
-        // commits cleanly without BLASTSyncEngine contention with the new activity launch.
-        window.decorView.post {
-            HomeActivity.homeInstance?.launchCategoryInTask(targetIntent) ?: startActivity(targetIntent)
-        }
     }
 }

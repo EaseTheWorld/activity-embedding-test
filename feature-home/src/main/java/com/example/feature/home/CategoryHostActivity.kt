@@ -27,19 +27,58 @@ import java.lang.ref.WeakReference
 class CategoryHostActivity : ComponentActivity() {
 
     companion object {
-        const val EXTRA_TARGET_CATEGORY_INTENT = "extra_target_category_intent"
+        private const val EXTRA_TARGET_CATEGORY_INTENT = "extra_target_category_intent"
         private const val TAG = "LifecycleLog"
 
+        private var taskRootRef: WeakReference<android.app.Activity>? = null
         private var activeHostRef: WeakReference<CategoryHostActivity>? = null
+        private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
+        private val clearLaunchingRunnable = Runnable { isLaunchingCategory = false }
 
-        fun createLaunchIntent(context: Context, targetIntent: Intent): Intent {
-            return Intent(context, CategoryHostActivity::class.java).apply {
+        @Volatile
+        var isLaunchingCategory: Boolean = false
+            private set
+
+        /**
+         * Registers the Task root activity ([HomeActivity]) so that in Narrow Overlay Mode,
+         * [CategoryHostActivity] is launched from the Task root (`ExpandedTaskFragment #0`)
+         * rather than inside `PrimaryOverlayActivity`'s `OverlayTaskFragment`.
+         */
+        fun registerTaskRoot(activity: android.app.Activity) {
+            taskRootRef = WeakReference(activity)
+        }
+
+        /**
+         * Launches [targetIntent] inside a fresh Category `ActivityStack` (`TaskFragment`),
+         * automatically finishing any previously active Category `ActivityStack` first.
+         */
+        @Suppress("DEPRECATION")
+        fun launch(context: Context, targetIntent: Intent) {
+            isLaunchingCategory = true
+            mainHandler.removeCallbacks(clearLaunchingRunnable)
+            mainHandler.postDelayed(clearLaunchingRunnable, 400L)
+
+            dismissCurrent()
+            val launcher = if (com.example.core.item.AppConfig.isOverlayMode(context)) {
+                taskRootRef?.get() ?: context
+            } else {
+                context
+            }
+            val hostIntent = Intent(launcher, CategoryHostActivity::class.java).apply {
                 action = "com.example.carsettings.ACTION_CATEGORY_HOST"
                 putExtra(EXTRA_TARGET_CATEGORY_INTENT, targetIntent)
             }
+            launcher.startActivity(hostIntent)
+            if (launcher is android.app.Activity) {
+                launcher.overridePendingTransition(0, 0)
+            }
         }
 
-        fun finishActiveCategoryStack() {
+        /**
+         * Finishes the currently active Category `ActivityStack` (including any internal or external
+         * sub-activities), revealing `HomeActivity` underneath without touching `PrimaryOverlayActivity`.
+         */
+        fun dismissCurrent() {
             val host = activeHostRef?.get() ?: return
             activeHostRef = null
             if (!host.isFinishing && !host.isDestroyed) {
@@ -67,6 +106,11 @@ class CategoryHostActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         overridePendingTransition(0, 0)
+        // Safety guard: if another CategoryHostActivity is still active, finish its stack before registering this one
+        val previous = activeHostRef?.get()
+        if (previous != null && previous !== this) {
+            dismissCurrent()
+        }
         activeHostRef = WeakReference(this)
         Log.d(TAG, "[CategoryHostActivity] onCreate(savedInstanceState=$savedInstanceState, hash=${System.identityHashCode(this)})")
 
@@ -81,7 +125,11 @@ class CategoryHostActivity : ComponentActivity() {
             }
 
             if (targetIntent != null) {
-                launchChildCategory(targetIntent)
+                window.decorView.post {
+                    if (!isFinishing && !isDestroyed) {
+                        launchChildCategory(targetIntent)
+                    }
+                }
             } else {
                 Log.w(TAG, "[CategoryHostActivity] No target category intent found, finishing")
                 finish()

@@ -12,7 +12,6 @@ import androidx.activity.compose.setContent
 import androidx.window.embedding.EmbeddingBounds
 import androidx.window.embedding.OverlayAttributes
 import androidx.window.embedding.OverlayCreateParams
-import androidx.window.embedding.setLaunchingActivityStack
 import androidx.window.embedding.setOverlayCreateParams
 import com.example.core.item.AppConfig
 
@@ -23,20 +22,13 @@ class HomeActivity : ComponentActivity() {
         const val EXTRA_INITIAL_DEEPLINK_URI = "extra_initial_deeplink_uri"
         const val EXTRA_INITIAL_DEEPLINK_ACTION = "extra_initial_deeplink_action"
         const val EXTRA_INITIAL_DEEPLINK_EXTRAS = "extra_initial_deeplink_extras"
-        const val REQUEST_CODE_CATEGORY = 1001
-        private var homeInstanceRef: java.lang.ref.WeakReference<HomeActivity>? = null
-        var homeInstance: HomeActivity?
-            get() = homeInstanceRef?.get()
-            set(value) {
-                homeInstanceRef = value?.let { java.lang.ref.WeakReference(it) }
-            }
     }
 
     private val tag = "HomeActivity"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        homeInstance = this
+        CategoryHostActivity.registerTaskRoot(this)
         val isNarrowOverlayMode = AppConfig.isOverlayMode(this)
         Log.d(tag, "HomeActivity created (isNarrowOverlayMode=$isNarrowOverlayMode)")
 
@@ -100,46 +92,6 @@ class HomeActivity : ComponentActivity() {
         }
     }
 
-    /**
-     * Launches a category activity inside its own dedicated [CategoryHostActivity] `ActivityStack` (`TaskFragment`),
-     * finishing any previously active category `ActivityStack` (including any sub-activities) first via
-     * [CategoryHostActivity.finishActiveCategoryStack].
-     */
-    private var isLaunchingTarget = false
-    private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
-    private val clearLaunchingFlagRunnable = Runnable {
-        isLaunchingTarget = false
-    }
-
-    fun launchCategoryInTask(targetIntent: Intent) {
-        isLaunchingTarget = true
-        mainHandler.removeCallbacks(clearLaunchingFlagRunnable)
-        mainHandler.postDelayed(clearLaunchingFlagRunnable, 400L)
-        try {
-            CategoryHostActivity.finishActiveCategoryStack()
-            val hostIntent = CategoryHostActivity.createLaunchIntent(this, targetIntent)
-            Log.d(tag, "HomeActivity launching CategoryHostActivity for target: $targetIntent")
-            startActivity(hostIntent)
-            @Suppress("DEPRECATION")
-            overridePendingTransition(0, 0)
-        } catch (e: Exception) {
-            Log.e(tag, "Failed to launch category via CategoryHostActivity: $e", e)
-            isLaunchingTarget = false
-            mainHandler.removeCallbacks(clearLaunchingFlagRunnable)
-        }
-    }
-
-    /**
-     * Finishes the currently active category ActivityStack (internal or external, including sub-activities)
-     * to reveal HomeActivity underneath.
-     */
-    fun returnToHome() {
-        isLaunchingTarget = false
-        mainHandler.removeCallbacks(clearLaunchingFlagRunnable)
-        Log.d(tag, "HomeActivity returnToHome -> CategoryHostActivity.finishActiveCategoryStack()")
-        CategoryHostActivity.finishActiveCategoryStack()
-    }
-
     override fun onStart() {
         super.onStart()
         Log.d(tag, "HomeActivity onStart()")
@@ -147,7 +99,7 @@ class HomeActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        if (isLaunchingTarget) {
+        if (CategoryHostActivity.isLaunchingCategory) {
             Log.d(tag, "HomeActivity onResume: skipped bridge notification because target category is being launched")
             return
         }
@@ -158,8 +110,6 @@ class HomeActivity : ComponentActivity() {
     override fun onPause() {
         super.onPause()
         Log.d(tag, "HomeActivity onPause()")
-        isLaunchingTarget = false
-        mainHandler.removeCallbacks(clearLaunchingFlagRunnable)
     }
 
     override fun onStop() {
@@ -169,9 +119,6 @@ class HomeActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        if (homeInstance == this) {
-            homeInstance = null
-        }
         Log.d(tag, "HomeActivity onDestroy()")
     }
 
@@ -201,30 +148,12 @@ class HomeActivity : ComponentActivity() {
         }
         if (targetIntent != null) {
             intent.removeExtra(EXTRA_TARGET_INTENT)
-            isLaunchingTarget = true
             try {
-                Log.d(tag, "HomeActivity launching target category on top: $targetIntent")
-                launchCategoryInTask(targetIntent)
+                Log.d(tag, "HomeActivity launching target category via CategoryHostActivity: $targetIntent")
+                CategoryHostActivity.launch(this, targetIntent)
             } catch (e: Exception) {
                 Log.e(tag, "Failed to launch target intent: $e")
-                isLaunchingTarget = false
             }
-        }
-    }
-
-    private fun getLaunchOptionsBundle(): Bundle? {
-        return try {
-            val token = androidx.window.embedding.ActivityEmbeddingController.getInstance(this)
-                .getActivityStack(this)
-            if (token != null) {
-                Bundle().apply {
-                    setLaunchingActivityStack(this@HomeActivity, token)
-                    Log.d(tag, "Applied setLaunchingActivityStack targeting Home's stack: $token")
-                }
-            } else null
-        } catch (e: Exception) {
-            Log.w(tag, "Failed to get current ActivityStack token: $e")
-            null
         }
     }
 
@@ -246,6 +175,6 @@ class HomeActivity : ComponentActivity() {
 
         Log.d(tag, "Launching target setting from Home search: $targetComponent, uri=$targetUri, categoryId=${item.categoryId}")
         HomeNavigationBridge.notifyCategorySelected(item.categoryId)
-        launchCategoryInTask(intent)
+        CategoryHostActivity.launch(this, intent)
     }
 }

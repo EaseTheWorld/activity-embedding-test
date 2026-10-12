@@ -98,7 +98,7 @@ class HomeActivity : ComponentActivity() {
     /**
      * Launches a category activity inside its own dedicated [CategoryHostActivity] `ActivityStack` (`TaskFragment`),
      * finishing any previously active category `ActivityStack` (including any sub-activities) first via
-     * [CategoryHostActivity.finishActiveCategoryStacks].
+     * [CategoryHostActivity.finishActiveCategoryStack].
      */
     private var isLaunchingTarget = false
     private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
@@ -111,7 +111,7 @@ class HomeActivity : ComponentActivity() {
         mainHandler.removeCallbacks(clearLaunchingFlagRunnable)
         mainHandler.postDelayed(clearLaunchingFlagRunnable, 400L)
         try {
-            CategoryHostActivity.finishActiveCategoryStacks()
+            CategoryHostActivity.finishActiveCategoryStack()
             val hostIntent = CategoryHostActivity.createLaunchIntent(this, targetIntent)
             Log.d(tag, "HomeActivity launching CategoryHostActivity for target: $targetIntent")
             startActivity(hostIntent)
@@ -131,8 +131,8 @@ class HomeActivity : ComponentActivity() {
     fun returnToHome() {
         isLaunchingTarget = false
         mainHandler.removeCallbacks(clearLaunchingFlagRunnable)
-        Log.d(tag, "HomeActivity returnToHome -> CategoryHostActivity.finishActiveCategoryStacks()")
-        CategoryHostActivity.finishActiveCategoryStacks()
+        Log.d(tag, "HomeActivity returnToHome -> CategoryHostActivity.finishActiveCategoryStack()")
+        CategoryHostActivity.finishActiveCategoryStack()
     }
 
     override fun onStart() {

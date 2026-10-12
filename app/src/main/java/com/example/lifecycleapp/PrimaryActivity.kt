@@ -73,7 +73,7 @@ class PrimaryActivity : BaseCategoryMenuActivity() {
     override fun startContentActivity(targetIntent: Intent) {
         // Wide Mode: Finish any active category ActivityStack and launch CategoryHostActivity from PrimaryActivity
         // so SplitPairRule(PrimaryActivity <-> CategoryHostActivity) creates a dedicated SecondaryTaskFragment.
-        com.example.feature.home.CategoryHostActivity.finishActiveCategoryStacks()
+        com.example.feature.home.CategoryHostActivity.finishActiveCategoryStack()
         val hostIntent = com.example.feature.home.CategoryHostActivity.createLaunchIntent(this, targetIntent)
         startActivity(hostIntent)
         @Suppress("DEPRECATION")

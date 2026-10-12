@@ -8,18 +8,16 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.window.embedding.ActivityEmbeddingController
 import androidx.window.embedding.setLaunchingActivityStack
-import java.util.Collections
-import java.util.WeakHashMap
 
 /**
  * Lightweight in-process root Activity (`Hist #0`) for a Category `ActivityStack` (`TaskFragment`).
  *
  * Why this exists:
- * - `ActivityEmbeddingController.getActivityStack(activity)` requires an in-process [ android.app.Activity ] reference.
+ * - `ActivityEmbeddingController.getActivityStack(activity)` requires an in-process [android.app.Activity] reference.
  * - By placing [CategoryHostActivity] at the root (`Hist #0`) of each Category `TaskFragment` (via `ActivityRule(alwaysExpand = true)`
  *   in Narrow Mode or `SplitPairRule` in Wide Mode), both internal (`GenericSettingsActivity`, `GenericSubActivity`) and
  *   external (`LightSettingsActivity`, external sub-activities) categories run on top of [CategoryHostActivity] in the same `ActivityStack`.
- * - When switching categories or returning to Home, [finishActiveCategoryStacks] queries `getActivityStack(host)` via the
+ * - When switching categories or returning to Home, [finishActiveCategoryStack] queries `getActivityStack(host)` via the
  *   official public API and calls `finishActivityStacks(setOf(stack))`, atomically finishing the entire category stack
  *   (including any sub-activities) without touching `HomeActivity` or `PrimaryOverlayActivity`.
  * - When the user presses Back until the last category activity above [CategoryHostActivity] finishes, [CategoryHostActivity]
@@ -31,8 +29,7 @@ class CategoryHostActivity : ComponentActivity() {
         const val EXTRA_TARGET_CATEGORY_INTENT = "extra_target_category_intent"
         private const val TAG = "LifecycleLog"
 
-        private val activeHosts: MutableSet<CategoryHostActivity> =
-            Collections.synchronizedSet(Collections.newSetFromMap(WeakHashMap()))
+        var activeHost: CategoryHostActivity? = null
 
         fun createLaunchIntent(context: Context, targetIntent: Intent): Intent {
             return Intent(context, CategoryHostActivity::class.java).apply {
@@ -41,25 +38,23 @@ class CategoryHostActivity : ComponentActivity() {
             }
         }
 
-        fun finishActiveCategoryStacks() {
-            val hosts = synchronized(activeHosts) { activeHosts.toList() }
-            activeHosts.clear()
-            for (host in hosts) {
-                if (!host.isFinishing && !host.isDestroyed) {
-                    try {
-                        val controller = ActivityEmbeddingController.getInstance(host)
-                        val stack = controller.getActivityStack(host)
-                        if (stack != null) {
-                            Log.d(TAG, "[CategoryHostActivity] Finishing category ActivityStack via public API: $stack")
-                            controller.finishActivityStacks(setOf(stack))
-                        } else {
-                            Log.d(TAG, "[CategoryHostActivity] ActivityStack is null, finishing host directly")
-                            host.finish()
-                        }
-                    } catch (e: Exception) {
-                        Log.w(TAG, "[CategoryHostActivity] Failed to finish ActivityStack: $e")
+        fun finishActiveCategoryStack() {
+            val host = activeHost ?: return
+            activeHost = null
+            if (!host.isFinishing && !host.isDestroyed) {
+                try {
+                    val controller = ActivityEmbeddingController.getInstance(host)
+                    val stack = controller.getActivityStack(host)
+                    if (stack != null) {
+                        Log.d(TAG, "[CategoryHostActivity] Finishing category ActivityStack via public API: $stack")
+                        controller.finishActivityStacks(setOf(stack))
+                    } else {
+                        Log.d(TAG, "[CategoryHostActivity] ActivityStack is null, finishing host directly")
                         host.finish()
                     }
+                } catch (e: Exception) {
+                    Log.w(TAG, "[CategoryHostActivity] Failed to finish ActivityStack: $e")
+                    host.finish()
                 }
             }
         }
@@ -67,10 +62,11 @@ class CategoryHostActivity : ComponentActivity() {
 
     private var hasPausedForChild = false
 
+    @Suppress("DEPRECATION")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         overridePendingTransition(0, 0)
-        activeHosts.add(this)
+        activeHost = this
         Log.d(TAG, "[CategoryHostActivity] onCreate(savedInstanceState=$savedInstanceState, hash=${System.identityHashCode(this)})")
 
         if (savedInstanceState != null) {
@@ -92,6 +88,7 @@ class CategoryHostActivity : ComponentActivity() {
         }
     }
 
+    @Suppress("DEPRECATION")
     private fun launchChildCategory(targetIntent: Intent) {
         try {
             val options = try {
@@ -113,12 +110,15 @@ class CategoryHostActivity : ComponentActivity() {
         }
     }
 
+    @Suppress("DEPRECATION")
     override fun onResume() {
         super.onResume()
         Log.d(TAG, "[CategoryHostActivity] onResume(hasPausedForChild=$hasPausedForChild)")
         if (hasPausedForChild && !isFinishing) {
             Log.d(TAG, "[CategoryHostActivity] All child category activities finished -> finishing CategoryHostActivity to reveal Home")
-            activeHosts.remove(this)
+            if (activeHost === this) {
+                activeHost = null
+            }
             finish()
             overridePendingTransition(0, 0)
         }
@@ -137,7 +137,9 @@ class CategoryHostActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        activeHosts.remove(this)
+        if (activeHost === this) {
+            activeHost = null
+        }
         Log.d(TAG, "[CategoryHostActivity] onDestroy(hash=${System.identityHashCode(this)})")
     }
 }

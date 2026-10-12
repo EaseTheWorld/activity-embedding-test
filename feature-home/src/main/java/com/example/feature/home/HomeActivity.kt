@@ -24,7 +24,12 @@ class HomeActivity : ComponentActivity() {
         const val EXTRA_INITIAL_DEEPLINK_ACTION = "extra_initial_deeplink_action"
         const val EXTRA_INITIAL_DEEPLINK_EXTRAS = "extra_initial_deeplink_extras"
         const val REQUEST_CODE_CATEGORY = 1001
-        var homeInstance: HomeActivity? = null
+        private var homeInstanceRef: java.lang.ref.WeakReference<HomeActivity>? = null
+        var homeInstance: HomeActivity?
+            get() = homeInstanceRef?.get()
+            set(value) {
+                homeInstanceRef = value?.let { java.lang.ref.WeakReference(it) }
+            }
     }
 
     private val tag = "HomeActivity"

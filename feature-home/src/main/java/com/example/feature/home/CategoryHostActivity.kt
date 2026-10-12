@@ -8,6 +8,7 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.window.embedding.ActivityEmbeddingController
 import androidx.window.embedding.setLaunchingActivityStack
+import java.lang.ref.WeakReference
 
 /**
  * Lightweight in-process root Activity (`Hist #0`) for a Category `ActivityStack` (`TaskFragment`).
@@ -29,7 +30,7 @@ class CategoryHostActivity : ComponentActivity() {
         const val EXTRA_TARGET_CATEGORY_INTENT = "extra_target_category_intent"
         private const val TAG = "LifecycleLog"
 
-        var activeHost: CategoryHostActivity? = null
+        private var activeHostRef: WeakReference<CategoryHostActivity>? = null
 
         fun createLaunchIntent(context: Context, targetIntent: Intent): Intent {
             return Intent(context, CategoryHostActivity::class.java).apply {
@@ -39,8 +40,8 @@ class CategoryHostActivity : ComponentActivity() {
         }
 
         fun finishActiveCategoryStack() {
-            val host = activeHost ?: return
-            activeHost = null
+            val host = activeHostRef?.get() ?: return
+            activeHostRef = null
             if (!host.isFinishing && !host.isDestroyed) {
                 try {
                     val controller = ActivityEmbeddingController.getInstance(host)
@@ -66,7 +67,7 @@ class CategoryHostActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         overridePendingTransition(0, 0)
-        activeHost = this
+        activeHostRef = WeakReference(this)
         Log.d(TAG, "[CategoryHostActivity] onCreate(savedInstanceState=$savedInstanceState, hash=${System.identityHashCode(this)})")
 
         if (savedInstanceState != null) {
@@ -116,8 +117,8 @@ class CategoryHostActivity : ComponentActivity() {
         Log.d(TAG, "[CategoryHostActivity] onResume(hasPausedForChild=$hasPausedForChild)")
         if (hasPausedForChild && !isFinishing) {
             Log.d(TAG, "[CategoryHostActivity] All child category activities finished -> finishing CategoryHostActivity to reveal Home")
-            if (activeHost === this) {
-                activeHost = null
+            if (activeHostRef?.get() === this) {
+                activeHostRef = null
             }
             finish()
             overridePendingTransition(0, 0)
@@ -137,8 +138,8 @@ class CategoryHostActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        if (activeHost === this) {
-            activeHost = null
+        if (activeHostRef?.get() === this) {
+            activeHostRef = null
         }
         Log.d(TAG, "[CategoryHostActivity] onDestroy(hash=${System.identityHashCode(this)})")
     }

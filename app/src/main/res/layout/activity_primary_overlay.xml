@@ -7,11 +7,12 @@
     android:background="@android:color/transparent"
     tools:context=".PrimaryOverlayActivity">
 
-    <!-- 1. Collapsed Floating Overlay View: 80dp circular button at center-left -->
+    <!-- 1. Collapsed Floating Overlay View: Fixed 80dp circular button vertically centered at left edge -->
     <FrameLayout
         android:id="@+id/layoutCollapsed"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_width="80dp"
+        android:layout_height="80dp"
+        android:layout_gravity="center_vertical|start"
         android:padding="8dp"
         android:visibility="visible">
 

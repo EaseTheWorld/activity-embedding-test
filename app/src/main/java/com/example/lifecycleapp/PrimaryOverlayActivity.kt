@@ -72,23 +72,89 @@ class PrimaryOverlayActivity : BaseCategoryMenuActivity() {
         })
     }
 
-    private fun updateOverlayViews() {
+    private fun updateOverlayViews(animate: Boolean = false) {
         if (!::layoutCollapsed.isInitialized || !::layoutExpanded.isInitialized) return
+
+        if (!animate) {
+            layoutCollapsed.animate().cancel()
+            layoutExpanded.animate().cancel()
+            if (isDrawerExpanded) {
+                layoutCollapsed.visibility = View.GONE
+                layoutCollapsed.alpha = 0f
+                layoutExpanded.visibility = View.VISIBLE
+                layoutExpanded.alpha = 1f
+                layoutExpanded.translationX = 0f
+            } else {
+                layoutCollapsed.visibility = View.VISIBLE
+                layoutCollapsed.alpha = 1f
+                layoutCollapsed.scaleX = 1f
+                layoutCollapsed.scaleY = 1f
+                layoutExpanded.visibility = View.GONE
+                layoutExpanded.alpha = 0f
+            }
+            return
+        }
+
+        val duration = 250L
         if (isDrawerExpanded) {
-            layoutCollapsed.visibility = View.GONE
+            // Collapsed -> Expanded
+            // 1. Fade out & scale down the collapsed button
+            layoutCollapsed.animate()
+                .alpha(0f)
+                .scaleX(0.7f)
+                .scaleY(0.7f)
+                .setDuration(150L)
+                .withEndAction {
+                    layoutCollapsed.visibility = View.GONE
+                }
+                .start()
+
+            // 2. Slide in from left & fade in the drawer
             layoutExpanded.visibility = View.VISIBLE
+            layoutExpanded.alpha = 0f
+            layoutExpanded.translationX = -layoutExpanded.width.toFloat().coerceAtLeast(300f)
+            layoutExpanded.animate()
+                .translationX(0f)
+                .alpha(1f)
+                .setDuration(duration)
+                .setInterpolator(android.view.animation.DecelerateInterpolator())
+                .start()
         } else {
+            // Expanded -> Collapsed
+            // 1. Slide out to left & fade out the drawer
+            val targetTranslationX = -layoutExpanded.width.toFloat().coerceAtLeast(300f)
+            layoutExpanded.animate()
+                .translationX(targetTranslationX)
+                .alpha(0f)
+                .setDuration(duration)
+                .setInterpolator(android.view.animation.AccelerateInterpolator())
+                .withEndAction {
+                    layoutExpanded.visibility = View.GONE
+                }
+                .start()
+
+            // 2. Fade in & scale up the collapsed button
             layoutCollapsed.visibility = View.VISIBLE
-            layoutExpanded.visibility = View.GONE
+            layoutCollapsed.alpha = 0f
+            layoutCollapsed.scaleX = 0.6f
+            layoutCollapsed.scaleY = 0.6f
+            layoutCollapsed.animate()
+                .alpha(1f)
+                .scaleX(1f)
+                .scaleY(1f)
+                .setStartDelay(100L)
+                .setDuration(duration)
+                .setInterpolator(android.view.animation.OvershootInterpolator(1.2f))
+                .start()
         }
     }
 
-    private fun setDrawerExpanded(expanded: Boolean, source: String) {
+    private fun setDrawerExpanded(expanded: Boolean, source: String, animate: Boolean = true) {
         if (isDrawerExpanded != expanded) {
             isDrawerExpanded = expanded
             SplitInitializer.isOverlayDrawerExpanded = expanded
             Log.d(tag, "[$activityName] Overlay drawer state changed to isDrawerExpanded=$isDrawerExpanded via $source")
-            updateOverlayViews()
+            updateOverlayViews(animate = animate)
             try {
                 val bounds = SplitInitializer.computeOverlayBounds(this, expanded)
                 OverlayController.getInstance(this).updateOverlayAttributes(
@@ -103,6 +169,6 @@ class PrimaryOverlayActivity : BaseCategoryMenuActivity() {
     }
 
     override fun onBeforeCategoryLaunch() {
-        setDrawerExpanded(false, "CategoryLaunch")
+        setDrawerExpanded(false, "CategoryLaunch", animate = true)
     }
 }

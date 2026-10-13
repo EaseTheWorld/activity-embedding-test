@@ -8,21 +8,17 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.window.embedding.ActivityEmbeddingController
 import androidx.window.embedding.setLaunchingActivityStack
-import java.lang.ref.WeakReference
 
 /**
  * Lightweight in-process root Activity (`Hist #0`) for a Category `ActivityStack` (`TaskFragment`).
  *
- * Why this exists:
- * - `ActivityEmbeddingController.getActivityStack(activity)` requires an in-process [android.app.Activity] reference.
- * - By placing [CategoryHostActivity] at the root (`Hist #0`) of each Category `TaskFragment` (via `ActivityRule(alwaysExpand = true)`
- *   in Narrow Mode or `SplitPairRule` in Wide Mode), both internal (`GenericSettingsActivity`, `GenericSubActivity`) and
- *   external (`LightSettingsActivity`, external sub-activities) categories run on top of [CategoryHostActivity] in the same `ActivityStack`.
- * - When switching categories or returning to Home, [finishActiveCategoryStack] queries `getActivityStack(host)` via the
- *   official public API and calls `finishActivityStacks(setOf(stack))`, atomically finishing the entire category stack
- *   (including any sub-activities) without touching `HomeActivity` or `PrimaryOverlayActivity`.
- * - When the user presses Back until the last category activity above [CategoryHostActivity] finishes, [CategoryHostActivity]
- *   is resumed (`hasPausedForChild == true`) and immediately finishes itself to reveal `HomeActivity`.
+ * Lifecycle & Stack Management:
+ * - No static `Activity` or `WeakReference` is stored in `companion object`.
+ * - Each instance registers its own [dismissListener] with [HomeNavigationBridge] in [onCreate]
+ *   and unregisters it in [onDestroy].
+ * - When `Primary` or `Home` notifies [HomeNavigationBridge.notifyDismissCategoryStacks], the active
+ *   [CategoryHostActivity] instance receives the callback and finishes its own `ActivityStack`
+ *   (including any internal or external sub-activities) via `finishActivityStacks(setOf(stack))`.
  */
 class CategoryHostActivity : ComponentActivity() {
 
@@ -30,88 +26,29 @@ class CategoryHostActivity : ComponentActivity() {
         private const val EXTRA_TARGET_CATEGORY_INTENT = "extra_target_category_intent"
         private const val TAG = "LifecycleLog"
 
-        private var taskRootRef: WeakReference<android.app.Activity>? = null
-        private var activeHostRef: WeakReference<CategoryHostActivity>? = null
-        private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
-        private val clearLaunchingRunnable = Runnable { isLaunchingCategory = false }
-
-        @Volatile
-        var isLaunchingCategory: Boolean = false
-            private set
-
-        /**
-         * Registers the Task root activity ([HomeActivity]) so that in Narrow Overlay Mode,
-         * [CategoryHostActivity] is launched from the Task root (`ExpandedTaskFragment #0`)
-         * rather than inside `PrimaryOverlayActivity`'s `OverlayTaskFragment`.
-         */
-        fun registerTaskRoot(activity: android.app.Activity) {
-            taskRootRef = WeakReference(activity)
-        }
-
-        /**
-         * Launches [targetIntent] inside a fresh Category `ActivityStack` (`TaskFragment`),
-         * automatically finishing any previously active Category `ActivityStack` first.
-         */
-        @Suppress("DEPRECATION")
-        fun launch(context: Context, targetIntent: Intent) {
-            isLaunchingCategory = true
-            mainHandler.removeCallbacks(clearLaunchingRunnable)
-            mainHandler.postDelayed(clearLaunchingRunnable, 400L)
-
-            dismissCurrent()
-            val launcher = if (com.example.core.item.AppConfig.isOverlayMode(context)) {
-                taskRootRef?.get() ?: context
-            } else {
-                context
-            }
-            val hostIntent = Intent(launcher, CategoryHostActivity::class.java).apply {
+        fun createIntent(context: Context, targetIntent: Intent): Intent {
+            return Intent(context, CategoryHostActivity::class.java).apply {
                 action = "com.example.carsettings.ACTION_CATEGORY_HOST"
                 putExtra(EXTRA_TARGET_CATEGORY_INTENT, targetIntent)
-            }
-            launcher.startActivity(hostIntent)
-            if (launcher is android.app.Activity) {
-                launcher.overridePendingTransition(0, 0)
-            }
-        }
-
-        /**
-         * Finishes the currently active Category `ActivityStack` (including any internal or external
-         * sub-activities), revealing `HomeActivity` underneath without touching `PrimaryOverlayActivity`.
-         */
-        fun dismissCurrent() {
-            val host = activeHostRef?.get() ?: return
-            activeHostRef = null
-            if (!host.isFinishing && !host.isDestroyed) {
-                try {
-                    val controller = ActivityEmbeddingController.getInstance(host)
-                    val stack = controller.getActivityStack(host)
-                    if (stack != null) {
-                        Log.d(TAG, "[CategoryHostActivity] Finishing category ActivityStack via public API: $stack")
-                        controller.finishActivityStacks(setOf(stack))
-                    } else {
-                        Log.d(TAG, "[CategoryHostActivity] ActivityStack is null, finishing host directly")
-                        host.finish()
-                    }
-                } catch (e: Exception) {
-                    Log.w(TAG, "[CategoryHostActivity] Failed to finish ActivityStack: $e")
-                    host.finish()
-                }
             }
         }
     }
 
     private var hasPausedForChild = false
 
+    private val dismissListener: () -> Unit = {
+        finishOwnActivityStack()
+    }
+
     @Suppress("DEPRECATION")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         overridePendingTransition(0, 0)
-        // Safety guard: if another CategoryHostActivity is still active, finish its stack before registering this one
-        val previous = activeHostRef?.get()
-        if (previous != null && previous !== this) {
-            dismissCurrent()
-        }
-        activeHostRef = WeakReference(this)
+
+        // Ensure any previous CategoryHostActivity stack is dismissed before registering this instance
+        HomeNavigationBridge.notifyDismissCategoryStacks()
+        HomeNavigationBridge.registerCategoryHostDismissListener(dismissListener)
+
         Log.d(TAG, "[CategoryHostActivity] onCreate(savedInstanceState=$savedInstanceState, hash=${System.identityHashCode(this)})")
 
         if (savedInstanceState != null) {
@@ -132,6 +69,26 @@ class CategoryHostActivity : ComponentActivity() {
                 }
             } else {
                 Log.w(TAG, "[CategoryHostActivity] No target category intent found, finishing")
+                finish()
+            }
+        }
+    }
+
+    private fun finishOwnActivityStack() {
+        HomeNavigationBridge.unregisterCategoryHostDismissListener(dismissListener)
+        if (!isFinishing && !isDestroyed) {
+            try {
+                val controller = ActivityEmbeddingController.getInstance(this)
+                val stack = controller.getActivityStack(this)
+                if (stack != null) {
+                    Log.d(TAG, "[CategoryHostActivity] Finishing own category ActivityStack via public API: $stack")
+                    controller.finishActivityStacks(setOf(stack))
+                } else {
+                    Log.d(TAG, "[CategoryHostActivity] ActivityStack is null, finishing host directly")
+                    finish()
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "[CategoryHostActivity] Failed to finish ActivityStack: $e")
                 finish()
             }
         }
@@ -165,9 +122,7 @@ class CategoryHostActivity : ComponentActivity() {
         Log.d(TAG, "[CategoryHostActivity] onResume(hasPausedForChild=$hasPausedForChild)")
         if (hasPausedForChild && !isFinishing) {
             Log.d(TAG, "[CategoryHostActivity] All child category activities finished -> finishing CategoryHostActivity to reveal Home")
-            if (activeHostRef?.get() === this) {
-                activeHostRef = null
-            }
+            HomeNavigationBridge.unregisterCategoryHostDismissListener(dismissListener)
             finish()
             overridePendingTransition(0, 0)
         }
@@ -186,9 +141,7 @@ class CategoryHostActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        if (activeHostRef?.get() === this) {
-            activeHostRef = null
-        }
+        HomeNavigationBridge.unregisterCategoryHostDismissListener(dismissListener)
         Log.d(TAG, "[CategoryHostActivity] onDestroy(hash=${System.identityHashCode(this)})")
     }
 }

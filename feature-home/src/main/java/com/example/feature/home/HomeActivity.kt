@@ -26,9 +26,16 @@ class HomeActivity : ComponentActivity() {
 
     private val tag = "HomeActivity"
 
+    @Suppress("DEPRECATION")
+    private val taskRootLaunchListener: (Intent) -> Unit = { targetIntent ->
+        val hostIntent = CategoryHostActivity.createIntent(this, targetIntent)
+        startActivity(hostIntent)
+        overridePendingTransition(0, 0)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        CategoryHostActivity.registerTaskRoot(this)
+        HomeNavigationBridge.registerTaskRootLaunchListener(taskRootLaunchListener)
         val isNarrowOverlayMode = AppConfig.isOverlayMode(this)
         Log.d(tag, "HomeActivity created (isNarrowOverlayMode=$isNarrowOverlayMode)")
 
@@ -99,7 +106,7 @@ class HomeActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        if (CategoryHostActivity.isLaunchingCategory) {
+        if (HomeNavigationBridge.isLaunchingCategory) {
             Log.d(tag, "HomeActivity onResume: skipped bridge notification because target category is being launched")
             return
         }
@@ -119,6 +126,7 @@ class HomeActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        HomeNavigationBridge.unregisterTaskRootLaunchListener(taskRootLaunchListener)
         Log.d(tag, "HomeActivity onDestroy()")
     }
 
@@ -149,8 +157,8 @@ class HomeActivity : ComponentActivity() {
         if (targetIntent != null) {
             intent.removeExtra(EXTRA_TARGET_INTENT)
             try {
-                Log.d(tag, "HomeActivity launching target category via CategoryHostActivity: $targetIntent")
-                CategoryHostActivity.launch(this, targetIntent)
+                Log.d(tag, "HomeActivity launching target category via HomeNavigationBridge: $targetIntent")
+                HomeNavigationBridge.launchCategory(this, targetIntent)
             } catch (e: Exception) {
                 Log.e(tag, "Failed to launch target intent: $e")
             }
@@ -175,6 +183,6 @@ class HomeActivity : ComponentActivity() {
 
         Log.d(tag, "Launching target setting from Home search: $targetComponent, uri=$targetUri, categoryId=${item.categoryId}")
         HomeNavigationBridge.notifyCategorySelected(item.categoryId)
-        CategoryHostActivity.launch(this, intent)
+        HomeNavigationBridge.launchCategory(this, intent)
     }
 }

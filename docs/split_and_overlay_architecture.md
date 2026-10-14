@@ -77,12 +77,18 @@ flowchart TD
 
 ### 3) [PrimaryOverlayActivity.kt](file:///C:/Users/user/.gemini/antigravity/worktrees/kind-curie/say_hello/app/src/main/java/com/example/lifecycleapp/PrimaryOverlayActivity.kt) (Narrow Mode)
 - **역할**: Narrow Mode에서 항상 화면 최상단에 떠 있는 플로팅 메뉴 오버레이.
+- **윈도우 바운즈 동적 리사이징의 목적 (터치 이벤트 보장)**:
+  - 안드로이드의 `Activity` 윈도우는 배경이 100% 투명하더라도, **자신의 Window Bounds 사각형 영역 전체로 들어오는 모든 터치 입력을 기본적으로 가로챕니다(Consume).**
+  - 만약 접힌 상태에서도 윈도우 크기를 35%로 유지하면, 비어있는 투명 영역 아래에 있는 `HomeActivity`나 콘텐츠 화면의 터치가 모두 먹통이 되는 **'터치 블랙홀' 현상**이 발생합니다.
+  - 따라서 접혔을 때는 `OverlayController.updateOverlayAttributes()`를 통해 **윈도우 자체의 물리적 크기를 정확히 `80dp × 80dp` 사각형으로 축소**하여, 버튼 바깥의 모든 화면 영역 터치를 아래 레이어로 100% 온전히 통과시킵니다.
+  - 서랍이 열릴 때만 윈도우 크기를 `가로 35% × 세로 100%`로 확장하여 카테고리 목록의 스크롤 및 터치를 수신합니다.
+- **80dp 고정 뷰 크기 설계 (형상 왜곡 방지)**:
+  - 서랍을 열 때 윈도우 바운즈가 `80dp × 80dp`에서 `35% × 100%`로 즉시 확장되는데, 만약 버튼 뷰(`layoutCollapsed`)가 `match_parent`이면 애니메이션 도중 윈도우 크기에 맞춰 늘어나면서 **원형 버튼이 거대한 타원형 기둥으로 일시 확대되는 왜곡 현상**이 발생합니다.
+  - 이를 방지하기 위해 XML 레이아웃에서 `layoutCollapsed`의 크기를 **`80dp × 80dp` 고정 크기**(`layout_gravity="center_vertical|start"`)로 잠금 처리하여, 윈도우가 확장되어도 버튼이 제자리에서 본래 크기를 유지한 채 매끄럽게 축소(`scale 1.0 -> 0.7`) 및 fade-out 되도록 설계했습니다.
 - **애니메이션 및 뷰 전환**:
-  - **80dp 고정 원형 버튼 (☰ MENU)**: 화면 좌측 중앙에 위치(`layout_gravity="center_vertical|start"`). 윈도우 바운즈가 35%로 확장될 때도 버튼 크기(80dp)를 유지하며 `scale (1.0 -> 0.7)` 축소 & `fade-out`.
+  - **80dp 고정 원형 버튼 (☰ MENU)**: 화면 좌측 중앙에 위치. 윈도우 확장 시 `scale (1.0 -> 0.7)` 축소 & `fade-out`.
   - **35% 좌측 슬라이딩 서랍 (Drawer)**: 화면 왼쪽 바깥에서 `slide-in-left` & `fade-in`으로 부드럽게 등장.
   - **접기 / 카테고리 선택 / Back 키**: 35% 서랍이 왼쪽으로 `slide-out` & `fade-out` 되며, 원형 버튼이 `scale (0.6 -> 1.0)`로 탄성(`OvershootInterpolator`) 팝업 복귀.
-- **윈도우 바운즈 동적 갱신**:
-  - `OverlayController.getInstance(this).updateOverlayAttributes()`를 통해 접힘(80dp × 80dp) ↔ 펼침(가로 35% × 세로 100%) 상태를 전환.
 
 ### 4) [SplitInitializer.kt](file:///C:/Users/user/.gemini/antigravity/worktrees/kind-curie/say_hello/app/src/main/java/com/example/lifecycleapp/SplitInitializer.kt)
 - **앱 시작 시 모드별 규칙 구성**:

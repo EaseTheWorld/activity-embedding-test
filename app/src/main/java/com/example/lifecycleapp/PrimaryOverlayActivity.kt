@@ -61,15 +61,35 @@ class PrimaryOverlayActivity : BaseCategoryMenuActivity() {
             }
         }
 
-        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+        backCallback = object : OnBackPressedCallback(isDrawerExpanded) {
             override fun handleOnBackPressed() {
                 if (isDrawerExpanded) {
                     setDrawerExpanded(false, "BackPressedCollapse")
-                    return
                 }
-                navigateBackToHomeOrFinish()
             }
-        })
+        }
+        onBackPressedDispatcher.addCallback(this, backCallback)
+    }
+
+    private lateinit var backCallback: OnBackPressedCallback
+
+    private fun updateOverlayWindowFocus(expanded: Boolean) {
+        if (::backCallback.isInitialized) {
+            backCallback.isEnabled = expanded
+        }
+    }
+
+    private fun applyOverlayBounds(expanded: Boolean) {
+        try {
+            val bounds = SplitInitializer.computeOverlayBounds(this, expanded)
+            OverlayController.getInstance(this).updateOverlayAttributes(
+                AppConfig.TAG_PRIMARY_OVERLAY,
+                OverlayAttributes(bounds)
+            )
+            Log.d(tag, "[$activityName] Updated overlay bounds: isExpanded=$expanded, bounds=$bounds")
+        } catch (e: Exception) {
+            Log.e(tag, "[$activityName] Failed to update overlay attributes: $e", e)
+        }
     }
 
     private fun updateOverlayViews(animate: Boolean = false) {
@@ -92,12 +112,15 @@ class PrimaryOverlayActivity : BaseCategoryMenuActivity() {
                 layoutExpanded.visibility = View.GONE
                 layoutExpanded.alpha = 0f
             }
+            applyOverlayBounds(isDrawerExpanded)
             return
         }
 
         val duration = 250L
         if (isDrawerExpanded) {
-            // Collapsed -> Expanded
+            // Collapsed -> Expanded: Expand window bounds first, then animate drawer in
+            applyOverlayBounds(true)
+
             // 1. Fade out & scale down the collapsed button
             layoutCollapsed.animate()
                 .alpha(0f)
@@ -120,7 +143,7 @@ class PrimaryOverlayActivity : BaseCategoryMenuActivity() {
                 .setInterpolator(android.view.animation.DecelerateInterpolator())
                 .start()
         } else {
-            // Expanded -> Collapsed
+            // Expanded -> Collapsed: Animate drawer out first, then shrink window bounds
             // 1. Slide out to left & fade out the drawer
             val targetTranslationX = -layoutExpanded.width.toFloat().coerceAtLeast(300f)
             layoutExpanded.animate()
@@ -130,6 +153,7 @@ class PrimaryOverlayActivity : BaseCategoryMenuActivity() {
                 .setInterpolator(android.view.animation.AccelerateInterpolator())
                 .withEndAction {
                     layoutExpanded.visibility = View.GONE
+                    applyOverlayBounds(false)
                 }
                 .start()
 
@@ -154,17 +178,8 @@ class PrimaryOverlayActivity : BaseCategoryMenuActivity() {
             isDrawerExpanded = expanded
             SplitInitializer.isOverlayDrawerExpanded = expanded
             Log.d(tag, "[$activityName] Overlay drawer state changed to isDrawerExpanded=$isDrawerExpanded via $source")
+            updateOverlayWindowFocus(expanded)
             updateOverlayViews(animate = animate)
-            try {
-                val bounds = SplitInitializer.computeOverlayBounds(this, expanded)
-                OverlayController.getInstance(this).updateOverlayAttributes(
-                    AppConfig.TAG_PRIMARY_OVERLAY,
-                    OverlayAttributes(bounds)
-                )
-                Log.d(tag, "[$activityName] Updated overlay bounds: isExpanded=$expanded, bounds=$bounds")
-            } catch (e: Exception) {
-                Log.e(tag, "[$activityName] Failed to update overlay attributes: $e", e)
-            }
         }
     }
 

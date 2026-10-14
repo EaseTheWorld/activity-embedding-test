@@ -12,7 +12,9 @@
 2. **원자적 스택 정리 (Atomic ActivityStack Cleanup)**:
    - 카테고리 전환 시 이전 카테고리의 모든 하위 뎁스(Depth >= 2, 내부/외부 액티비티)를 `finishActivityStacks()`를 통해 OS 레벨에서 완벽히 일괄 정리.
 3. **수명주기 안전성 (Pub/Sub Event Bridge)**:
-   - 정적(`companion object`) 액티비티 인스턴스나 `WeakReference` 저장 방식을 완전히 배제하고, `onCreate` 구독 및 `onDestroy` 해제 기반의 이벤트 브릿지([HomeNavigationBridge](file:///C:/Users/user/.gemini/antigravity/worktrees/kind-curie/say_hello/feature-home/src/main/java/com/example/feature/home/HomeNavigationBridge.kt))를 통해 메모리 누수 및 수명주기 교차 문제를 원천 차단.
+   - 정적(`companion object`) 액티비티 인스턴스나 `WeakReference` 저장 방식을 완전히 배제하고, `onCreate` 구독 및 `onDestroy` 해제 기반의 이벤트 브릿지([HomeNavigationBridge](../feature-home/src/main/java/com/example/feature/home/HomeNavigationBridge.kt))를 통해 메모리 누수 및 수명주기 교차 문제를 원천 차단.
+4. **플랫폼 요구사항 (WindowManager Extension Version >= 8)**:
+   - Jetpack WindowManager의 Pinned Overlay API(`setOverlayCreateParams`, `OverlayController.updateOverlayAttributes`)는 **WindowManager Window Extension Version 8 이상**을 필수로 요구합니다. (Extension Version 8 미만의 디바이스/에뮬레이터는 지원 대상에서 제외)
 
 ---
 
@@ -40,7 +42,7 @@ flowchart TD
     end
 
     subgraph BridgeLayer ["Event Bridge"]
-        HNB["HomeNavigationBridge<br/>(Lifecycle-bound Pub/Sub)"]
+        HNB["HomeNavigationBridge<br/>(Lifecycle-bound Multi-Listener Pub/Sub)"]
     end
 
     subgraph ContentLayer ["Content Layer (우측 / 전체화면 Task)"]
@@ -59,23 +61,27 @@ flowchart TD
     Sub1 --> Sub2
 ```
 
-### 1) [HomeNavigationBridge.kt](file:///C:/Users/user/.gemini/antigravity/worktrees/kind-curie/say_hello/feature-home/src/main/java/com/example/feature/home/HomeNavigationBridge.kt)
+### 1) [HomeNavigationBridge.kt](../feature-home/src/main/java/com/example/feature/home/HomeNavigationBridge.kt)
 - **역할**: `Primary` 메뉴, `HomeActivity`, `CategoryHostActivity` 간의 비동기 이벤트 중계.
-- **수명주기 리스너 구독**:
+- **다중 리스너 구독 (Multi-Listener Pub/Sub)**:
+  - `registerCategorySelectedListener()` / `unregisterCategorySelectedListener()`: `CopyOnWriteArraySet` 기반으로 다중 인스턴스의 리스너를 스레드 안전하게 관리.
+  - `registerHomeRevealedListener()` / `unregisterHomeRevealedListener()`: Home 화면 복귀 알림을 다중 구독자에게 브로드캐스트.
+  - **생명주기 독립성 보장**: 단일 함수 레퍼런스 방식과 달리, Narrow 모드 기동 시 부트스트랩용 `PrimaryActivity`가 `onDestroy()`되면서 자신의 리스너를 해제하더라도, 나중에 뜬 `PrimaryOverlayActivity`의 구독 리스너가 영향받지 않고 온전히 유지됩니다. 이를 통해 Home 화면 검색 결과 클릭 시 오버레이 메뉴의 하이라이트 동기화가 정상 작동합니다.
+- **스택 제어 리스너**:
   - `registerCategoryHostDismissListener()`: `CategoryHostActivity.onCreate()` 시 등록, `onDestroy()` 시 해제.
   - `registerTaskRootLaunchListener()`: `HomeActivity.onCreate()` 시 등록, `onDestroy()` 시 해제.
 - **주요 함수**:
   - `launchCategory(caller, targetIntent)`: 활성 카테고리 스택 정리 후 새로운 카테고리 스택 기동.
   - `notifyDismissCategoryStacks()`: 현재 등록된 모든 `CategoryHostActivity` 인스턴스에 스택 종료 명령 전달.
 
-### 2) [CategoryHostActivity.kt](file:///C:/Users/user/.gemini/antigravity/worktrees/kind-curie/say_hello/feature-home/src/main/java/com/example/feature/home/CategoryHostActivity.kt)
+### 2) [CategoryHostActivity.kt](../feature-home/src/main/java/com/example/feature/home/CategoryHostActivity.kt)
 - **역할**: 카테고리 TaskFragment의 루트(`Hist #0`) 역할을 담당하는 초경량 투명 액티비티.
 - **동작 원리**:
   1. `onCreate` 시 dismiss 리스너를 등록하고, 전달받은 `targetIntent`를 `setLaunchingActivityStack` 옵션과 함께 실행하여 자신의 스택 내부로 격리 실행.
   2. dismiss 통지를 받으면 `ActivityEmbeddingController.getInstance(this).getActivityStack(this)`를 조회하여 `finishActivityStacks(setOf(stack))`를 호출. 해당 스택의 모든 하위 액티비티(Depth >= 2)가 원자적으로 즉시 종료됨.
   3. 모든 하위 액티비티가 사용자의 Back 키 입력으로 종료되어 다시 `CategoryHostActivity`로 돌아오면(`onResume`), 스스로 `finish()`하여 아래에 깔린 `HomeActivity`를 자연스럽게 노출.
 
-### 3) [PrimaryOverlayActivity.kt](file:///C:/Users/user/.gemini/antigravity/worktrees/kind-curie/say_hello/app/src/main/java/com/example/lifecycleapp/PrimaryOverlayActivity.kt) (Narrow Mode)
+### 3) [PrimaryOverlayActivity.kt](../app/src/main/java/com/example/lifecycleapp/PrimaryOverlayActivity.kt) (Narrow Mode)
 - **역할**: Narrow Mode에서 항상 화면 최상단에 떠 있는 플로팅 메뉴 오버레이.
 - **윈도우 바운즈 동적 리사이징의 목적 (터치 이벤트 보장)**:
   - 안드로이드의 `Activity` 윈도우는 배경이 100% 투명하더라도, **자신의 Window Bounds 사각형 영역 전체로 들어오는 모든 터치 입력을 기본적으로 가로챕니다(Consume).**
@@ -85,14 +91,18 @@ flowchart TD
 - **80dp 고정 뷰 크기 설계 (형상 왜곡 방지)**:
   - 서랍을 열 때 윈도우 바운즈가 `80dp × 80dp`에서 `35% × 100%`로 즉시 확장되는데, 만약 버튼 뷰(`layoutCollapsed`)가 `match_parent`이면 애니메이션 도중 윈도우 크기에 맞춰 늘어나면서 **원형 버튼이 거대한 타원형 기둥으로 일시 확대되는 왜곡 현상**이 발생합니다.
   - 이를 방지하기 위해 XML 레이아웃에서 `layoutCollapsed`의 크기를 **`80dp × 80dp` 고정 크기**(`layout_gravity="center_vertical|start"`)로 잠금 처리하여, 윈도우가 확장되어도 버튼이 제자리에서 본래 크기를 유지한 채 매끄럽게 축소(`scale 1.0 -> 0.7`) 및 fade-out 되도록 설계했습니다.
-- **애니메이션 및 뷰 전환**:
-  - **80dp 고정 원형 버튼 (☰ MENU)**: 화면 좌측 중앙에 위치. 윈도우 확장 시 `scale (1.0 -> 0.7)` 축소 & `fade-out`.
-  - **35% 좌측 슬라이딩 서랍 (Drawer)**: 화면 왼쪽 바깥에서 `slide-in-left` & `fade-in`으로 부드럽게 등장.
-  - **접기 / 카테고리 선택 / Back 키**: 35% 서랍이 왼쪽으로 `slide-out` & `fade-out` 되며, 원형 버튼이 `scale (0.6 -> 1.0)`로 탄성(`OvershootInterpolator`) 팝업 복귀.
+- **애니메이션 및 윈도우 리사이징 순서 동기화**:
+  - **열림 전환 (Collapsed → Expanded)**: 윈도우 바운즈를 먼저 35% 너비로 즉시 확장(`applyOverlayBounds(true)`)한 뒤, 서랍 뷰를 `slide-in-left` 및 `fade-in` 합니다.
+  - **닫힘 전환 (Expanded → Collapsed)**: 서랍 뷰가 완전히 화면 왼쪽 밖으로 슬라이드아웃(`withEndAction`)된 이후에 뷰를 `GONE` 처리하고 윈도우 바운즈를 `80dp × 80dp`로 축소(`applyOverlayBounds(false)`)합니다. 애니메이션 시작 시점에 윈도우를 미리 축소할 경우 서랍 뷰가 80dp 경계에서 중간에 잘리는(Clipping) 문제를 원천 방지합니다.
+- **Back 키 처리 및 윈도우 포커스 분기**:
+  - `FLAG_NOT_FOCUSABLE`을 적용할 경우 WindowManager의 입력 디스패치 타임아웃(ANR)이 발생하므로, 표준 윈도우 플래그를 유지합니다.
+  - 대신 서랍 확장 여부에 따라 `OnBackPressedCallback.isEnabled = isDrawerExpanded`를 동적으로 바인딩합니다.
+    - 서랍 확장 시 (`isEnabled = true`): 오버레이 액티비티가 Back 입력을 처리하여 서랍만 닫음.
+    - 서랍 축소 시 (`isEnabled = false`): Back 입력이 아래에 깔린 콘텐츠 액티비티(`GenericSettingsActivity` 또는 `HomeActivity`)로 직접 전달되어 정상적인 뒤로가기 탐색 보장.
 
-### 4) [SplitInitializer.kt](file:///C:/Users/user/.gemini/antigravity/worktrees/kind-curie/say_hello/app/src/main/java/com/example/lifecycleapp/SplitInitializer.kt)
+### 4) [SplitInitializer.kt](../app/src/main/java/com/example/lifecycleapp/SplitInitializer.kt)
 - **앱 시작 시 모드별 규칙 구성**:
-  - **Narrow**: `ActivityRule(HomeActivity, CategoryHostActivity, alwaysExpand = true)` 등록.
+  - **Narrow**: `ActivityRule(HomeActivity, CategoryHostActivity, alwaysExpand = true)` 등록 및 `setOverlayCreateParams`를 통한 Pinned Overlay 선언 (Window Extension Version >= 8 전제).
   - **Wide**: `SplitPairRule(PrimaryActivity <-> HomeActivity, ratio = 0.35)` 및 `SplitPairRule(PrimaryActivity <-> CategoryHostActivity, ratio = 0.35)` 등록.
 
 ---
@@ -119,7 +129,7 @@ flowchart TD
 
 ## 5. 결론 및 장점
 
-- **누수 없는 안전한 수명주기**: WeakReference, 정적 필드 없이 안전한 이벤트 기반 아키텍처 구축.
+- **누수 없는 안전한 수명주기**: WeakReference, 정적 필드 없이 안전한 다중 구독 기반 이벤트 브릿지 구축.
 - **완벽한 스택 청소**: WindowManager의 `finishActivityStacks` API를 활용하여 써드파티/외부 액티비티 뎁스까지 완벽 정리.
 - **모드 간 코드 재사용성 극대화**: 카테고리 메뉴 탐색 및 실행 로직이 Wide/Narrow 분기 없이 단일 브릿지로 통합.
-- **세련된 UX**: Narrow 모드에서 크기 왜곡 없는 80dp 원형 버튼과 35% 서랍 간의 부드러운 하드웨어 가속 슬라이드/페이드 애니메이션 제공.
+- **세련되고 안정적인 UX**: Narrow 모드에서 크기 왜곡 없는 80dp 원형 버튼과 35% 서랍 간의 부드러운 하드웨어 가속 슬라이드/페이드 애니메이션 및 클리핑/ANR 없는 완벽한 제어 제공.

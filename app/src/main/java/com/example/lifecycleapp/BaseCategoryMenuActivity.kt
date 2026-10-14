@@ -85,6 +85,30 @@ abstract class BaseCategoryMenuActivity : BaseLoggingActivity() {
         }
     }
 
+    private val homeRevealedListener: () -> Unit = {
+        runOnUiThread {
+            if (categoryAdapter?.selectedPosition != 0) {
+                Log.d(tag, "[$activityName] Home revealed -> updating selectedPosition to 0")
+                categoryAdapter?.selectedPosition = 0
+                categoryAdapter?.notifyDataSetChanged()
+                listViewCategories.smoothScrollToPosition(0)
+            }
+        }
+    }
+
+    private val categorySelectedListener: (String) -> Unit = { categoryId ->
+        runOnUiThread {
+            val matchedIndex = categories.indexOfFirst { it.id.equals(categoryId, ignoreCase = true) }
+            if (matchedIndex >= 0 && categoryAdapter?.selectedPosition != matchedIndex) {
+                Log.d(tag, "[$activityName] Category selected from Home search -> updating selectedPosition to $matchedIndex ($categoryId)")
+                categoryAdapter?.selectedPosition = matchedIndex
+                categoryAdapter?.notifyDataSetChanged()
+                listViewCategories.smoothScrollToPosition(matchedIndex)
+                onBeforeCategoryLaunch()
+            }
+        }
+    }
+
     protected fun initCategoryMenuViews() {
         tvDiscoveryStatus = findViewById(R.id.tvDiscoveryStatus)
         listViewCategories = findViewById(R.id.listViewCategories)
@@ -103,35 +127,14 @@ abstract class BaseCategoryMenuActivity : BaseLoggingActivity() {
             launchCategory(selectedCategory)
         }
 
-        HomeNavigationBridge.onHomeRevealed = {
-            runOnUiThread {
-                if (categoryAdapter?.selectedPosition != 0) {
-                    Log.d(tag, "[$activityName] Home revealed -> updating selectedPosition to 0")
-                    categoryAdapter?.selectedPosition = 0
-                    categoryAdapter?.notifyDataSetChanged()
-                    listViewCategories.smoothScrollToPosition(0)
-                }
-            }
-        }
-
-        HomeNavigationBridge.onCategorySelected = { categoryId ->
-            runOnUiThread {
-                val matchedIndex = categories.indexOfFirst { it.id.equals(categoryId, ignoreCase = true) }
-                if (matchedIndex >= 0 && categoryAdapter?.selectedPosition != matchedIndex) {
-                    Log.d(tag, "[$activityName] Category selected from Home search -> updating selectedPosition to $matchedIndex ($categoryId)")
-                    categoryAdapter?.selectedPosition = matchedIndex
-                    categoryAdapter?.notifyDataSetChanged()
-                    listViewCategories.smoothScrollToPosition(matchedIndex)
-                    onBeforeCategoryLaunch()
-                }
-            }
-        }
+        HomeNavigationBridge.registerHomeRevealedListener(homeRevealedListener)
+        HomeNavigationBridge.registerCategorySelectedListener(categorySelectedListener)
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        HomeNavigationBridge.onHomeRevealed = null
-        HomeNavigationBridge.onCategorySelected = null
+        HomeNavigationBridge.unregisterHomeRevealedListener(homeRevealedListener)
+        HomeNavigationBridge.unregisterCategorySelectedListener(categorySelectedListener)
         try {
             contentResolver.unregisterContentObserver(categoryObserver)
             Log.d(tag, "[$activityName] Unregistered categoryObserver")

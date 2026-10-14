@@ -17,11 +17,36 @@ import java.util.concurrent.CopyOnWriteArraySet
  */
 object HomeNavigationBridge {
 
+    private val homeRevealedListeners = CopyOnWriteArraySet<() -> Unit>()
+    private val categorySelectedListeners = CopyOnWriteArraySet<(String) -> Unit>()
+
     @Volatile
     var onHomeRevealed: (() -> Unit)? = null
+        set(value) {
+            field = value
+        }
 
     @Volatile
     var onCategorySelected: ((String) -> Unit)? = null
+        set(value) {
+            field = value
+        }
+
+    fun registerHomeRevealedListener(listener: () -> Unit) {
+        homeRevealedListeners.add(listener)
+    }
+
+    fun unregisterHomeRevealedListener(listener: () -> Unit) {
+        homeRevealedListeners.remove(listener)
+    }
+
+    fun registerCategorySelectedListener(listener: (String) -> Unit) {
+        categorySelectedListeners.add(listener)
+    }
+
+    fun unregisterCategorySelectedListener(listener: (String) -> Unit) {
+        categorySelectedListeners.remove(listener)
+    }
 
     private val categoryDismissListeners = CopyOnWriteArraySet<() -> Unit>()
     private var taskRootLaunchListener: ((Intent) -> Unit)? = null
@@ -35,10 +60,16 @@ object HomeNavigationBridge {
 
     fun notifyHomeRevealed() {
         onHomeRevealed?.invoke()
+        for (listener in homeRevealedListeners) {
+            listener.invoke()
+        }
     }
 
     fun notifyCategorySelected(categoryId: String) {
         onCategorySelected?.invoke(categoryId)
+        for (listener in categorySelectedListeners) {
+            listener.invoke(categoryId)
+        }
     }
 
     /**

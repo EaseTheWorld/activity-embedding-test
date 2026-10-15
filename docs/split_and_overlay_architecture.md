@@ -94,11 +94,14 @@ flowchart TD
 - **애니메이션 및 윈도우 리사이징 순서 동기화**:
   - **열림 전환 (Collapsed → Expanded)**: 윈도우 바운즈를 먼저 35% 너비로 즉시 확장(`applyOverlayBounds(true)`)한 뒤, 서랍 뷰를 `slide-in-left` 및 `fade-in` 합니다.
   - **닫힘 전환 (Expanded → Collapsed)**: 서랍 뷰가 완전히 화면 왼쪽 밖으로 슬라이드아웃(`withEndAction`)된 이후에 뷰를 `GONE` 처리하고 윈도우 바운즈를 `80dp × 80dp`로 축소(`applyOverlayBounds(false)`)합니다. 애니메이션 시작 시점에 윈도우를 미리 축소할 경우 서랍 뷰가 80dp 경계에서 중간에 잘리는(Clipping) 문제를 원천 방지합니다.
-- **Back 키 처리 및 윈도우 포커스 분기**:
-  - `FLAG_NOT_FOCUSABLE`을 적용할 경우 WindowManager의 입력 디스패치 타임아웃(ANR)이 발생하므로, 표준 윈도우 플래그를 유지합니다.
-  - 대신 서랍 확장 여부에 따라 `OnBackPressedCallback.isEnabled = isDrawerExpanded`를 동적으로 바인딩합니다.
-    - 서랍 확장 시 (`isEnabled = true`): 오버레이 액티비티가 Back 입력을 처리하여 서랍만 닫음.
-    - 서랍 축소 시 (`isEnabled = false`): Back 입력이 아래에 깔린 콘텐츠 액티비티(`GenericSettingsActivity` 또는 `HomeActivity`)로 직접 전달되어 정상적인 뒤로가기 탐색 보장.
+- **Back 키 처리 및 윈도우 포커스 위임 메커니즘 (Back Key Routing)**:
+  - `FLAG_NOT_FOCUSABLE`을 적용할 경우 WindowManager의 `mCurrentFocus`가 null이 되어 `InputDispatcher`의 입력 디스패치 타임아웃(ANR, 5초 먹통)이 발생하므로, 표준 포커서블 윈도우 플래그를 유지합니다.
+  - 사용자가 마지막으로 좌측 메뉴(Primary)를 터치했는지 여부와 무관하게, Back 키 입력은 **항상 우측/배후의 Secondary 액티비티가 처리**하도록 [`LifecycleApp.kt`](../app/src/main/java/com/example/lifecycleapp/LifecycleApp.kt)에서 `Application.ActivityLifecycleCallbacks`를 통해 최상단 활성 Secondary 액티비티 스택([`LifecycleApp.getTopSecondaryActivity()`](../app/src/main/java/com/example/lifecycleapp/LifecycleApp.kt))을 실시간 추적합니다.
+  - **Narrow (Overlay) Mode**:
+    - 서랍 확장 시 (`isDrawerExpanded == true`): 메뉴 서랍을 80dp 원형 버튼으로 닫음 (`setDrawerExpanded(false)`).
+    - 서랍 축소 시 (`isDrawerExpanded == false`): 80dp 원형 버튼을 마지막으로 터치해 포커스가 머물러 있더라도, `LifecycleApp.getTopSecondaryActivity()?.onBackPressedDispatcher?.onBackPressed()`로 위임하여 배후의 콘텐츠 화면(`GenericSubActivity` -> `GenericSettingsActivity` -> `HomeActivity`)이 정상 뒤로가기 탐색을 수행.
+  - **Wide (Split) Mode**:
+    - 좌측 35% `PrimaryActivity`가 포커스를 가지고 있더라도, Back 키는 무조건 `LifecycleApp.getTopSecondaryActivity()?.onBackPressedDispatcher?.onBackPressed()`로 위임되어 우측 65% Secondary 화면의 자체 내비게이션 스택을 단계별로 닫고 최종적으로 `HomeActivity`에서 `finishAffinity()`로 앱을 종료.
 
 ### 4) [SplitInitializer.kt](../app/src/main/java/com/example/lifecycleapp/SplitInitializer.kt)
 - **앱 시작 시 모드별 규칙 구성**:

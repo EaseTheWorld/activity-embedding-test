@@ -67,17 +67,20 @@ class PrimaryOverlayActivity : BaseCategoryMenuActivity() {
                     setDrawerExpanded(false, "BackPressedCollapse")
                     return
                 }
-                navigateBackToHomeOrFinish()
+                val topSecondary = LifecycleApp.getTopSecondaryActivity()
+                if (topSecondary != null) {
+                    Log.d(tag, "[$activityName] Forwarding Back key to top secondary activity: ${topSecondary.javaClass.simpleName}")
+                    topSecondary.onBackPressedDispatcher.onBackPressed()
+                } else {
+                    Log.d(tag, "[$activityName] No in-process secondary activity found, fallback to navigateBackToHomeOrFinish()")
+                    navigateBackToHomeOrFinish()
+                }
             }
         }
         onBackPressedDispatcher.addCallback(this, backCallback)
     }
 
     private lateinit var backCallback: OnBackPressedCallback
-
-    private fun updateOverlayWindowFocus(expanded: Boolean) {
-        // Keeps backCallback enabled so collapsed Back key safely routes through navigateBackToHomeOrFinish
-    }
 
     private fun applyOverlayBounds(expanded: Boolean) {
         val updated = OverlayBoundsHelper.updateOverlayBounds(
@@ -185,7 +188,6 @@ class PrimaryOverlayActivity : BaseCategoryMenuActivity() {
             isDrawerExpanded = expanded
             SplitInitializer.isOverlayDrawerExpanded = expanded
             Log.d(tag, "[$activityName] Overlay drawer state changed to isDrawerExpanded=$isDrawerExpanded via $source")
-            updateOverlayWindowFocus(expanded)
             updateOverlayViews(animate = animate)
         }
     }

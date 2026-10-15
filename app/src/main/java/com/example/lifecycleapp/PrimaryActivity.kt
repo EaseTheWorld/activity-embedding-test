@@ -65,7 +65,14 @@ class PrimaryActivity : BaseCategoryMenuActivity() {
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                navigateBackToHomeOrFinish()
+                val topSecondary = LifecycleApp.getTopSecondaryActivity()
+                if (topSecondary != null) {
+                    Log.d(tag, "[$activityName] Forwarding Back key to top secondary activity: ${topSecondary.javaClass.simpleName}")
+                    topSecondary.onBackPressedDispatcher.onBackPressed()
+                } else {
+                    Log.d(tag, "[$activityName] No in-process secondary activity found, fallback to navigateBackToHomeOrFinish()")
+                    navigateBackToHomeOrFinish()
+                }
             }
         })
     }

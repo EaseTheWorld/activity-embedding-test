@@ -61,11 +61,13 @@ class PrimaryOverlayActivity : BaseCategoryMenuActivity() {
             }
         }
 
-        backCallback = object : OnBackPressedCallback(isDrawerExpanded) {
+        backCallback = object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 if (isDrawerExpanded) {
                     setDrawerExpanded(false, "BackPressedCollapse")
+                    return
                 }
+                navigateBackToHomeOrFinish()
             }
         }
         onBackPressedDispatcher.addCallback(this, backCallback)
@@ -74,21 +76,26 @@ class PrimaryOverlayActivity : BaseCategoryMenuActivity() {
     private lateinit var backCallback: OnBackPressedCallback
 
     private fun updateOverlayWindowFocus(expanded: Boolean) {
-        if (::backCallback.isInitialized) {
-            backCallback.isEnabled = expanded
-        }
+        // Keeps backCallback enabled so collapsed Back key safely routes through navigateBackToHomeOrFinish
     }
 
     private fun applyOverlayBounds(expanded: Boolean) {
-        try {
-            val bounds = SplitInitializer.computeOverlayBounds(this, expanded)
-            OverlayController.getInstance(this).updateOverlayAttributes(
-                AppConfig.TAG_PRIMARY_OVERLAY,
-                OverlayAttributes(bounds)
-            )
-            Log.d(tag, "[$activityName] Updated overlay bounds: isExpanded=$expanded, bounds=$bounds")
-        } catch (e: Exception) {
-            Log.e(tag, "[$activityName] Failed to update overlay attributes: $e", e)
+        val updated = OverlayBoundsHelper.updateOverlayBounds(
+            this,
+            AppConfig.TAG_PRIMARY_OVERLAY,
+            expanded
+        )
+        if (!updated) {
+            try {
+                val bounds = SplitInitializer.computeOverlayBounds(this, expanded)
+                OverlayController.getInstance(this).updateOverlayAttributes(
+                    AppConfig.TAG_PRIMARY_OVERLAY,
+                    OverlayAttributes(bounds)
+                )
+                Log.d(tag, "[$activityName] Fallback overlay bounds: isExpanded=$expanded, bounds=$bounds")
+            } catch (e: Exception) {
+                Log.e(tag, "[$activityName] Failed to update overlay attributes: $e", e)
+            }
         }
     }
 
@@ -181,6 +188,21 @@ class PrimaryOverlayActivity : BaseCategoryMenuActivity() {
             updateOverlayWindowFocus(expanded)
             updateOverlayViews(animate = animate)
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        applyOverlayBounds(isDrawerExpanded)
+    }
+
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        applyOverlayBounds(isDrawerExpanded)
+    }
+
+    override fun onHomeRevealed() {
+        super.onHomeRevealed()
+        applyOverlayBounds(false)
     }
 
     override fun onBeforeCategoryLaunch() {

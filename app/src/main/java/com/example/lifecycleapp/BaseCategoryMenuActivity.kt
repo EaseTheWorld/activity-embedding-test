@@ -93,8 +93,11 @@ abstract class BaseCategoryMenuActivity : BaseLoggingActivity() {
                 categoryAdapter?.notifyDataSetChanged()
                 listViewCategories.smoothScrollToPosition(0)
             }
+            onHomeRevealed()
         }
     }
+
+    protected open fun onHomeRevealed() {}
 
     private val categorySelectedListener: (String) -> Unit = { categoryId ->
         runOnUiThread {

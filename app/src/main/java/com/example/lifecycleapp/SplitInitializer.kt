@@ -69,15 +69,7 @@ class SplitInitializer : Initializer<RuleController> {
                 .build()
             ruleController.setRules(setOf(expandRule))
 
-            try {
-                OverlayController.getInstance(context).setOverlayAttributesCalculator { params ->
-                    val bounds = computeOverlayBounds(context, isExpanded = isOverlayDrawerExpanded)
-                    Log.d("LifecycleLog", "[SplitInitializer] OverlayAttributesCalculator (tag=${params.overlayTag}) -> isExpanded=$isOverlayDrawerExpanded, bounds=$bounds")
-                    OverlayAttributes(bounds)
-                }
-            } catch (e: Exception) {
-                Log.w("LifecycleLog", "[SplitInitializer] OverlayAttributesCalculator registration skipped: $e")
-            }
+            OverlayBoundsHelper.initCalculator(context)
             Log.d("LifecycleLog", "[SplitInitializer] Initialized Narrow Mode (ActivityRule alwaysExpand on HomeActivity & CategoryHostActivity + Pinned Overlay)")
         } else {
             // Wide Mode:

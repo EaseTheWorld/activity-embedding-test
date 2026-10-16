@@ -1,14 +1,13 @@
 package com.example.lifecycleapp
 
-import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import android.view.View
+import android.view.WindowManager
 import androidx.activity.OnBackPressedCallback
 import androidx.window.embedding.OverlayAttributes
 import androidx.window.embedding.OverlayController
 import com.example.core.item.AppConfig
-import com.example.feature.home.HomeActivity
 
 /**
  * Narrow Mode Pinned Overlay Menu Activity (`Theme.LifecycleApp.Translucent` - Translucent).
@@ -18,8 +17,10 @@ import com.example.feature.home.HomeActivity
  *    (`setOverlayCreateParams` + `shouldAssociateWithLaunchingActivity = false`).
  * 2. Toggles between a collapsed `80dp × 80dp` floating `MENU` button and an expanded `35%` drawer
  *    via `OverlayController.updateOverlayAttributes`.
- * 3. Delegates category launches to `HomeActivity.launchCategoryInTask()` so content activities
- *    stack inside `HomeActivity`'s single fullscreen `ExpandedTaskFragment` underneath this overlay.
+ * 3. Uses [WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL] so touches outside the overlay bounds
+ *    pass 100% through to Secondary while keeping valid window focus (`mCurrentFocus != null`, zero ANR)
+ *    and routing Back key events to the active Secondary stack (`HomeActivity`, `GenericSettingsActivity`,
+ *    `SubSettingActivity`, or `CategoryHostActivity` for external app categories).
  */
 class PrimaryOverlayActivity : BaseCategoryMenuActivity() {
 
@@ -34,6 +35,10 @@ class PrimaryOverlayActivity : BaseCategoryMenuActivity() {
 
         isDrawerExpanded = false
         SplitInitializer.isOverlayDrawerExpanded = false
+
+        // Allow pointer events outside [0, 48][160, 208] to pass through to Secondary
+        // while keeping this window focusable (preventing mCurrentFocus = null ANRs).
+        window.addFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL)
 
         setContentView(R.layout.activity_primary_overlay)
 
@@ -52,7 +57,7 @@ class PrimaryOverlayActivity : BaseCategoryMenuActivity() {
             setDrawerExpanded(false, "CollapseButtonClicked")
         }
 
-        updateOverlayViews()
+        updateOverlayViews(animate = false)
         initCategoryMenuViews()
 
         if (intent?.data != null || intent?.action == "com.example.lifecycleapp.open") {
@@ -83,6 +88,7 @@ class PrimaryOverlayActivity : BaseCategoryMenuActivity() {
     private lateinit var backCallback: OnBackPressedCallback
 
     private fun applyOverlayBounds(expanded: Boolean) {
+        window.addFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL)
         val updated = OverlayBoundsHelper.updateOverlayBounds(
             this,
             AppConfig.TAG_PRIMARY_OVERLAY,
@@ -204,7 +210,9 @@ class PrimaryOverlayActivity : BaseCategoryMenuActivity() {
 
     override fun onHomeRevealed() {
         super.onHomeRevealed()
-        applyOverlayBounds(false)
+        if (isDrawerExpanded) {
+            setDrawerExpanded(false, "HomeRevealed", animate = false)
+        }
     }
 
     override fun onBeforeCategoryLaunch() {

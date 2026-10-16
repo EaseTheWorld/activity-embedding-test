@@ -35,6 +35,17 @@ class LifecycleApp : Application() {
             }
             return null
         }
+
+        private fun pushSecondaryActivity(activity: Activity) {
+            if (activity is ComponentActivity &&
+                activity !is com.example.lifecycleapp.PrimaryActivity &&
+                activity !is com.example.lifecycleapp.PrimaryOverlayActivity
+            ) {
+                secondaryActivities.removeAll { it.get() === activity || it.get() == null }
+                secondaryActivities.addFirst(WeakReference(activity))
+                Log.d("LifecycleLog", "[LifecycleApp] Top secondary activity updated: ${activity.javaClass.simpleName}")
+            }
+        }
     }
 
     override fun onCreate() {
@@ -46,18 +57,14 @@ class LifecycleApp : Application() {
         VehicleHardwareSimulator.attachRegistry(hiltViewModelRegistry)
 
         registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
-            override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {}
+            override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {
+                pushSecondaryActivity(activity)
+            }
+
             override fun onActivityStarted(activity: Activity) {}
 
             override fun onActivityResumed(activity: Activity) {
-                if (activity is ComponentActivity &&
-                    activity !is com.example.lifecycleapp.PrimaryActivity &&
-                    activity !is com.example.lifecycleapp.PrimaryOverlayActivity
-                ) {
-                    secondaryActivities.removeAll { it.get() === activity || it.get() == null }
-                    secondaryActivities.addFirst(WeakReference(activity))
-                    Log.d("LifecycleLog", "[LifecycleApp] Top secondary activity registered: ${activity.javaClass.simpleName}")
-                }
+                pushSecondaryActivity(activity)
             }
 
             override fun onActivityPaused(activity: Activity) {}

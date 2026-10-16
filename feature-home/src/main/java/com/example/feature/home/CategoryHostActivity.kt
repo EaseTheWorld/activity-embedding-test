@@ -6,6 +6,7 @@ import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
+import androidx.activity.OnBackPressedCallback
 import androidx.window.embedding.ActivityEmbeddingController
 import androidx.window.embedding.setLaunchingActivityStack
 
@@ -16,9 +17,10 @@ import androidx.window.embedding.setLaunchingActivityStack
  * - No static `Activity` or `WeakReference` is stored in `companion object`.
  * - Each instance registers its own [dismissListener] with [HomeNavigationBridge] in [onCreate]
  *   and unregisters it in [onDestroy].
- * - When `Primary` or `Home` notifies [HomeNavigationBridge.notifyDismissCategoryStacks], the active
- *   [CategoryHostActivity] instance receives the callback and finishes its own `ActivityStack`
- *   (including any internal or external sub-activities) via `finishActivityStacks(setOf(stack))`.
+ * - Registers an [OnBackPressedCallback] that finishes its entire `ActivityStack`
+ *   (including any external app activities running on top of this host) via
+ *   `ActivityEmbeddingController.finishActivityStacks(setOf(stack))` when Back is delegated
+ *   from `PrimaryActivity` or `PrimaryOverlayActivity`.
  */
 class CategoryHostActivity : ComponentActivity() {
 
@@ -48,6 +50,15 @@ class CategoryHostActivity : ComponentActivity() {
         // Ensure any previous CategoryHostActivity stack is dismissed before registering this instance
         HomeNavigationBridge.notifyDismissCategoryStacks()
         HomeNavigationBridge.registerCategoryHostDismissListener(dismissListener)
+
+        // Use the non-LifecycleOwner overload so this callback remains active even when
+        // CategoryHostActivity is STOPPED underneath a fullscreen child (e.g. external LightSettingsActivity).
+        onBackPressedDispatcher.addCallback(object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                Log.d(TAG, "[CategoryHostActivity] handleOnBackPressed() -> finishing own category ActivityStack")
+                finishOwnActivityStack()
+            }
+        })
 
         Log.d(TAG, "[CategoryHostActivity] onCreate(savedInstanceState=$savedInstanceState, hash=${System.identityHashCode(this)})")
 

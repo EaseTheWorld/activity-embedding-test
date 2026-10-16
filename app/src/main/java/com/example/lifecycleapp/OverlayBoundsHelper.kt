@@ -12,7 +12,7 @@ import java.lang.reflect.Proxy
  * Jetpack WindowManager's public [androidx.window.embedding.EmbeddingBounds] only supports
  * 4 centered alignments (ALIGN_LEFT centers vertically, ALIGN_TOP centers horizontally).
  * To position the 80dp floating circular MENU button at the TOP-LEFT corner without blocking
- * touch events elsewhere, this helper directly interacts with Android WindowManager Extension's
+ * touch events elsewhere, this helper interacts with Android WindowManager Extension's
  * [androidx.window.extensions.embedding.ActivityEmbeddingComponent]:
  * 1. Registers an [ActivityStackAttributesCalculator] dynamic proxy to provide top-left bounds
  *    whenever WindowManager recalculates task/stack attributes.

@@ -94,14 +94,19 @@ flowchart TD
 - **애니메이션 및 윈도우 리사이징 순서 동기화**:
   - **열림 전환 (Collapsed → Expanded)**: 윈도우 바운즈를 먼저 35% 너비로 즉시 확장(`applyOverlayBounds(true)`)한 뒤, 서랍 뷰를 `slide-in-left` 및 `fade-in` 합니다.
   - **닫힘 전환 (Expanded → Collapsed)**: 서랍 뷰가 완전히 화면 왼쪽 밖으로 슬라이드아웃(`withEndAction`)된 이후에 뷰를 `GONE` 처리하고 윈도우 바운즈를 `80dp × 80dp`로 축소(`applyOverlayBounds(false)`)합니다. 애니메이션 시작 시점에 윈도우를 미리 축소할 경우 서랍 뷰가 80dp 경계에서 중간에 잘리는(Clipping) 문제를 원천 방지합니다.
-- **Back 키 처리 및 윈도우 포커스 위임 메커니즘 (Back Key Routing)**:
-  - `FLAG_NOT_FOCUSABLE`을 적용할 경우 WindowManager의 `mCurrentFocus`가 null이 되어 `InputDispatcher`의 입력 디스패치 타임아웃(ANR, 5초 먹통)이 발생하므로, 표준 포커서블 윈도우 플래그를 유지합니다.
-  - 사용자가 마지막으로 좌측 메뉴(Primary)를 터치했는지 여부와 무관하게, Back 키 입력은 **항상 우측/배후의 Secondary 액티비티가 처리**하도록 [`LifecycleApp.kt`](../app/src/main/java/com/example/lifecycleapp/LifecycleApp.kt)에서 `Application.ActivityLifecycleCallbacks`를 통해 최상단 활성 Secondary 액티비티 스택([`LifecycleApp.getTopSecondaryActivity()`](../app/src/main/java/com/example/lifecycleapp/LifecycleApp.kt))을 실시간 추적합니다.
-  - **Narrow (Overlay) Mode**:
-    - 서랍 확장 시 (`isDrawerExpanded == true`): 메뉴 서랍을 80dp 원형 버튼으로 닫음 (`setDrawerExpanded(false)`).
-    - 서랍 축소 시 (`isDrawerExpanded == false`): 80dp 원형 버튼을 마지막으로 터치해 포커스가 머물러 있더라도, `LifecycleApp.getTopSecondaryActivity()?.onBackPressedDispatcher?.onBackPressed()`로 위임하여 배후의 콘텐츠 화면(`GenericSubActivity` -> `GenericSettingsActivity` -> `HomeActivity`)이 정상 뒤로가기 탐색을 수행.
-  - **Wide (Split) Mode**:
-    - 좌측 35% `PrimaryActivity`가 포커스를 가지고 있더라도, Back 키는 무조건 `LifecycleApp.getTopSecondaryActivity()?.onBackPressedDispatcher?.onBackPressed()`로 위임되어 우측 65% Secondary 화면의 자체 내비게이션 스택을 단계별로 닫고 최종적으로 `HomeActivity`에서 `finishAffinity()`로 앱을 종료.
+- **순수 인-프로세스 백키 라우팅 (Zero-WCT, Zero-HiddenApiBypass, No-ANR)**:
+  - **`FLAG_NOT_TOUCH_MODAL` 활용 (Narrow Mode 오버레이)**:
+    - 접힌 상태(`80dp × 80dp`)의 `PrimaryOverlayActivity`에 `FLAG_NOT_FOCUSABLE` 대신 **`FLAG_NOT_TOUCH_MODAL`**을 부여합니다.
+    - `FLAG_NOT_FOCUSABLE`을 쓰지 않으므로 `mCurrentFocus`가 `null`이 되는 ANR 교착 상태를 근본적으로 원천 차단합니다.
+    - 동시에 `FLAG_NOT_TOUCH_MODAL` 덕분에 `[0, 48][160, 208]` 바운즈 바깥의 모든 화면 터치는 뒤편 Secondary(Home, 서브 설정 화면, 외부 플러그인)로 100% 정상 전달됩니다.
+  - **동일 프로세스 `CategoryHostActivity`를 활용한 백키 위임**:
+    - `PrimaryActivity`와 `PrimaryOverlayActivity`, `HomeActivity`, `CategoryHostActivity`는 모두 **동일한 앱 프로세스(`com.example.lifecycleapp`)**에서 동작합니다.
+    - 사용자가 좌측 메뉴나 상단 오버레이를 터치하여 Primary에 윈도우 포커스가 있을 때 Back 키를 누르면, Primary의 `onBackPressedDispatcher`가 `LifecycleApp.getTopSecondaryActivity()`의 `onBackPressedDispatcher.onBackPressed()`를 호출합니다.
+    - `CategoryHostActivity`는 non-LifecycleOwner `onBackPressedDispatcher.addCallback`을 등록하여, 외부 액티비티(`LightSettingsActivity` 등) 아래에 깔려 `STOPPED` 상태일 때도 콜백이 항상 활성 상태를 유지합니다.
+    - 따라서 외부 앱 액티비티가 최상단에 떠 있는 상태에서 Back 키가 위임되면, `CategoryHostActivity`의 콜백이 공용 API인 `ActivityEmbeddingController.finishActivityStacks(setOf(stack))`를 호출하여 **자신의 스택에 속한 외부 앱 액티비티들을 일괄 정리하고 안전하게 `HomeActivity`를 노출**합니다.
+    - 내부 설정 화면(`GenericSubActivity` -> `GenericSettingsActivity`)이나 `HomeActivity` 역시 각자의 백 콜백이 순차적으로 실행되어 단계별 뒤로가기 및 앱 종료가 완벽히 처리됩니다.
+    - **결과**: 숨겨진 시스템 API(`WindowContainerTransaction`)나 메모리 우회 라이브러리(`HiddenApiBypass`), 인위적인 포커스 핑 액티비티 없이 **순수 Jetpack 공개 API 및 Android Activity Lifecycle만으로 Wide/Narrow 모드 모두에서 외부 앱 백키 제어가 완성**되었습니다.
+
 
 ### 4) [SplitInitializer.kt](../app/src/main/java/com/example/lifecycleapp/SplitInitializer.kt)
 - **앱 시작 시 모드별 규칙 구성**:

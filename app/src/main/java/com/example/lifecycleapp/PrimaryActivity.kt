@@ -16,6 +16,9 @@ import com.example.feature.home.HomeActivity
  *      (which in turn spawns [PrimaryOverlayActivity] as a Pinned Overlay) and finishes.
  * 2. In Wide Mode (`AppConfig.isOverlayMode == false`), acts as the permanently visible left 35%
  *    pane of `SplitPairRule` and launches `HomeActivity` + categories into the right 65% `SecondaryTaskFragment`.
+ * 3. Forwards any Back key press received while `PrimaryActivity` has focus to the active Secondary
+ *    activity (`HomeActivity`, `GenericSettingsActivity`, `SubSettingActivity`, or `CategoryHostActivity`
+ *    when an external app activity is on top of Secondary).
  */
 class PrimaryActivity : BaseCategoryMenuActivity() {
 
@@ -30,7 +33,7 @@ class PrimaryActivity : BaseCategoryMenuActivity() {
                 if (intent?.data != null) {
                     putExtra(HomeActivity.EXTRA_INITIAL_DEEPLINK_URI, intent.data.toString())
                 }
-                if (intent?.action != null && intent.action != Intent.ACTION_MAIN) {
+                if (intent?.action != null && intent?.action != Intent.ACTION_MAIN) {
                     putExtra(HomeActivity.EXTRA_INITIAL_DEEPLINK_ACTION, intent.action)
                 }
                 if (intent?.extras != null) {

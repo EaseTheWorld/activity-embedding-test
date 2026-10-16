@@ -3,6 +3,7 @@ package com.example.lifecycleapp
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
+import android.view.MotionEvent
 import androidx.activity.OnBackPressedCallback
 import com.example.core.item.AppConfig
 import com.example.feature.home.HomeActivity
@@ -16,6 +17,8 @@ import com.example.feature.home.HomeActivity
  *      (which in turn spawns [PrimaryOverlayActivity] as a Pinned Overlay) and finishes.
  * 2. In Wide Mode (`AppConfig.isOverlayMode == false`), acts as the permanently visible left 35%
  *    pane of `SplitPairRule` and launches `HomeActivity` + categories into the right 65% `SecondaryTaskFragment`.
+ * 3. Uses `FLAG_NOT_FOCUSABLE` and `ensureSecondaryFocus()` via `OverlayBoundsHelper.requestFocusOnSecondary(this)`
+ *    so WindowManager focus remains strictly on the Secondary container (including external apps).
  */
 class PrimaryActivity : BaseCategoryMenuActivity() {
 
@@ -30,7 +33,7 @@ class PrimaryActivity : BaseCategoryMenuActivity() {
                 if (intent?.data != null) {
                     putExtra(HomeActivity.EXTRA_INITIAL_DEEPLINK_URI, intent.data.toString())
                 }
-                if (intent?.action != null && intent.action != Intent.ACTION_MAIN) {
+                if (intent?.action != null && intent?.action != Intent.ACTION_MAIN) {
                     putExtra(HomeActivity.EXTRA_INITIAL_DEEPLINK_ACTION, intent.action)
                 }
                 if (intent?.extras != null) {
@@ -45,6 +48,9 @@ class PrimaryActivity : BaseCategoryMenuActivity() {
         }
 
         // Wide Mode: Static opaque sidebar layout (no overlay toggle buttons)
+        // Prevent PrimaryActivity from stealing window focus while keeping touch input active,
+        // paired with requestFocusOnSecondary() so mFocusedApp always points to Secondary.
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE)
         setContentView(R.layout.activity_primary)
         initCategoryMenuViews()
 
@@ -75,5 +81,40 @@ class PrimaryActivity : BaseCategoryMenuActivity() {
                 }
             }
         })
+    }
+
+    private fun ensureSecondaryFocus() {
+        if (isFinishing) return
+        OverlayBoundsHelper.requestFocusOnSecondary(this)
+        window.decorView.postDelayed({
+            if (!isFinishing) {
+                OverlayBoundsHelper.requestFocusOnSecondary(this)
+            }
+        }, 50L)
+        window.decorView.postDelayed({
+            if (!isFinishing) {
+                OverlayBoundsHelper.requestFocusOnSecondary(this)
+            }
+        }, 300L)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        ensureSecondaryFocus()
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus && !isFinishing) {
+            ensureSecondaryFocus()
+        }
+    }
+
+    override fun dispatchTouchEvent(ev: MotionEvent?): Boolean {
+        val handled = super.dispatchTouchEvent(ev)
+        if (ev != null && (ev.actionMasked == MotionEvent.ACTION_UP || ev.actionMasked == MotionEvent.ACTION_CANCEL)) {
+            ensureSecondaryFocus()
+        }
+        return handled
     }
 }

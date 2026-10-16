@@ -75,6 +75,9 @@ dependencies {
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
 
+    // Hidden API exemption for WindowContainerTransaction.requestFocusOnTaskFragment
+    implementation("org.lsposed.hiddenapibypass:hiddenapibypass:4.3")
+
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
 }

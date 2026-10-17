@@ -5,7 +5,6 @@ import com.example.sample.DualAudioToggleController
 import com.example.sample.SettingItems
 import com.example.sample.WifiMasterToggleController
 import com.example.uifw.controller.ItemController
-import com.example.uifw.controller.ItemControllerFactory
 import com.example.uifw.controller.ItemControllerRegistry
 import com.example.uifw.controller.ScreenHostViewModel
 import com.example.uifw.controller.ToggleController
@@ -199,27 +198,19 @@ class ItemTreeArchitectureTest {
 
     @Test
     fun testItemControllerRegistryGetOrCreateAndCaching() {
-        val btFactory = object : ItemControllerFactory<BluetoothMasterToggleController> {
-            override val targetItem: UiItem = SettingItems.Bluetooth.masterToggle
-            override fun create(item: UiItem): BluetoothMasterToggleController =
-                BluetoothMasterToggleController(item)
-        }
-        val wifiFactory = object : ItemControllerFactory<WifiMasterToggleController> {
-            override val targetItem: UiItem = SettingItems.Wifi.masterToggle
-            override fun create(item: UiItem): WifiMasterToggleController =
-                WifiMasterToggleController(item)
-        }
+        val btController = BluetoothMasterToggleController()
+        val wifiController = WifiMasterToggleController()
 
-        val registry = ItemControllerRegistry(setOf(btFactory, wifiFactory))
+        val registry = ItemControllerRegistry(setOf(btController, wifiController))
 
-        // First call creates the Controller
-        val vm1: ToggleController = registry.getOrCreate(SettingItems.Bluetooth.masterToggle)
+        // First call returns the Controller
+        val vm1: ToggleController = registry.get(SettingItems.Bluetooth.masterToggle)
         assertNotNull(vm1)
         assertTrue(vm1.isChecked.value)
 
-        // Second call returns cached instance
-        val vm2: ToggleController = registry.getOrCreate(SettingItems.Bluetooth.masterToggle)
-        assertSame("Subsequent getOrCreate calls must return the cached instance", vm1, vm2)
+        // Second call returns the same instance
+        val vm2: ToggleController = registry.get(SettingItems.Bluetooth.masterToggle)
+        assertSame("Subsequent get calls must return the same instance", vm1, vm2)
 
         // State changes persist across retrievals
         vm1.onToggleChange(false)
@@ -228,24 +219,16 @@ class ItemTreeArchitectureTest {
 
     @Test
     fun testItemControllerRegistryDuplicateDetection() {
-        val factory1 = object : ItemControllerFactory<BluetoothMasterToggleController> {
-            override val targetItem: UiItem = SettingItems.Bluetooth.masterToggle
-            override fun create(item: UiItem): BluetoothMasterToggleController =
-                BluetoothMasterToggleController(item)
-        }
-        val factory2 = object : ItemControllerFactory<BluetoothMasterToggleController> {
-            override val targetItem: UiItem = SettingItems.Bluetooth.masterToggle
-            override fun create(item: UiItem): BluetoothMasterToggleController =
-                BluetoothMasterToggleController(item)
-        }
+        val ctrl1 = BluetoothMasterToggleController()
+        val ctrl2 = BluetoothMasterToggleController()
 
         try {
-            ItemControllerRegistry(setOf(factory1, factory2))
-            fail("Expected IllegalArgumentException for duplicate factory registration")
+            ItemControllerRegistry(setOf(ctrl1, ctrl2))
+            fail("Expected IllegalArgumentException for duplicate controller registration")
         } catch (e: IllegalArgumentException) {
             assertTrue(
                 "Error message should mention duplicate key",
-                e.message!!.contains("Duplicate ItemControllerFactory registered for key 'SettingItems/Bluetooth/masterToggle'")
+                e.message!!.contains("Duplicate ItemController registered for key 'SettingItems/Bluetooth/masterToggle'")
             )
         }
     }
@@ -254,11 +237,11 @@ class ItemTreeArchitectureTest {
     fun testItemControllerRegistryUnregisteredItemThrowsError() {
         val registry = ItemControllerRegistry(emptySet())
         try {
-            registry.getOrCreate<ToggleController>(SettingItems.Bluetooth.masterToggle)
+            registry.get<ToggleController>(SettingItems.Bluetooth.masterToggle)
             fail("Expected IllegalStateException for unregistered item")
         } catch (e: IllegalStateException) {
             assertTrue(
-                e.message!!.contains("No Factory registered for item key='SettingItems/Bluetooth/masterToggle'")
+                e.message!!.contains("No ItemController registered for item key='SettingItems/Bluetooth/masterToggle'")
             )
         }
     }
@@ -268,7 +251,8 @@ class ItemTreeArchitectureTest {
         var onClearedCalled = false
         val testItem = SettingItems.Bluetooth.masterToggle
 
-        class TestController(item: UiItem) : ItemController(), ToggleController {
+        class TestController : ItemController(), ToggleController {
+            override val targetItem: UiItem = testItem
             override val isChecked = kotlinx.coroutines.flow.MutableStateFlow(true)
             override val isEnabled = kotlinx.coroutines.flow.MutableStateFlow(true)
             override fun onToggleChange(checked: Boolean) {}
@@ -278,21 +262,13 @@ class ItemTreeArchitectureTest {
             }
         }
 
-        val factory = object : ItemControllerFactory<TestController> {
-            override val targetItem: UiItem = testItem
-            override fun create(item: UiItem): TestController = TestController(item)
-        }
-
-        val registry = ItemControllerRegistry(setOf(factory))
-        val ctrl = registry.getOrCreate<TestController>(testItem)
+        val controller = TestController()
+        val registry = ItemControllerRegistry(setOf(controller))
+        val ctrl = registry.get<TestController>(testItem)
         assertNotNull(ctrl)
 
         registry.clear(testItem.key)
         assertTrue("onCleared() should have been called upon clear(key)", onClearedCalled)
-
-        // After clearing, a subsequent getOrCreate recreates a fresh instance
-        val newCtrl = registry.getOrCreate<TestController>(testItem)
-        assertNotEquals("A new instance must be created after clear()", System.identityHashCode(ctrl), System.identityHashCode(newCtrl))
     }
 
     @Test
@@ -300,7 +276,8 @@ class ItemTreeArchitectureTest {
         var onClearedCount = 0
         val testItem = SettingItems.Bluetooth.masterToggle
 
-        class TestController(item: UiItem) : ItemController(), ToggleController {
+        class TestController : ItemController(), ToggleController {
+            override val targetItem: UiItem = testItem
             override val isChecked = kotlinx.coroutines.flow.MutableStateFlow(true)
             override val isEnabled = kotlinx.coroutines.flow.MutableStateFlow(true)
             override fun onToggleChange(checked: Boolean) {}
@@ -310,15 +287,11 @@ class ItemTreeArchitectureTest {
             }
         }
 
-        val factory = object : ItemControllerFactory<TestController> {
-            override val targetItem: UiItem = testItem
-            override fun create(item: UiItem): TestController = TestController(item)
-        }
-
-        val registry = ItemControllerRegistry(setOf(factory))
+        val controller = TestController()
+        val registry = ItemControllerRegistry(setOf(controller))
         val hostVm = ScreenHostViewModel(registry)
 
-        registry.getOrCreate<TestController>(testItem)
+        registry.get<TestController>(testItem)
         assertEquals(0, onClearedCount)
 
         // ScreenHostViewModel.onCleared clears the registry
@@ -331,43 +304,39 @@ class ItemTreeArchitectureTest {
 
     @Test
     fun testKeyBasedControllerAndItemLookupInRegistry() {
-        val btFactory = object : ItemControllerFactory<BluetoothMasterToggleController> {
-            override val targetItem: UiItem = SettingItems.Bluetooth.masterToggle
-            override fun create(item: UiItem): BluetoothMasterToggleController =
-                BluetoothMasterToggleController(item)
-        }
-        val registry = ItemControllerRegistry(setOf(btFactory))
+        val btController = BluetoothMasterToggleController()
+        val registry = ItemControllerRegistry(setOf(btController))
         val key = "SettingItems/Bluetooth/masterToggle"
 
-        // 1. Check factory existence
-        assertTrue(registry.hasFactory(key))
-        assertEquals(false, registry.hasFactory("NonExistent/key"))
+        // 1. Check controller existence
+        assertTrue(registry.hasController(key))
+        assertEquals(false, registry.hasController("NonExistent/key"))
 
         // 2. Find targetItem directly from key string
         val itemFromKey = registry.findItem(key)
         assertNotNull(itemFromKey)
         assertSame(SettingItems.Bluetooth.masterToggle, itemFromKey)
 
-        // 3. getOrNull returns null prior to creation
-        val notCreatedYet: ToggleController? = registry.getOrNull(key)
-        assertEquals(null, notCreatedYet)
+        // 3. getOrNull returns controller instance if registered, null if not
+        val activeCtrl: ToggleController? = registry.getOrNull(key)
+        assertNotNull(activeCtrl)
+        assertSame(btController, activeCtrl)
 
-        // 4. getOrCreate via Key string creates instance
-        val ctrlFromKey: ToggleController = registry.getOrCreate(key)
+        val nonExistent: ToggleController? = registry.getOrNull("NonExistent/key")
+        assertEquals(null, nonExistent)
+
+        // 4. get / getOrCreate via Key string returns instance
+        val ctrlFromKey: ToggleController = registry.get(key)
         assertNotNull(ctrlFromKey)
         assertTrue(ctrlFromKey.isChecked.value)
 
-        // 5. getOrNull now returns the created instance
-        val activeCtrl: ToggleController? = registry.getOrNull(key)
-        assertSame(ctrlFromKey, activeCtrl)
-
-        // 6. getOrCreate(item) and getOrCreate(key) return the exact same instance
-        val ctrlFromItem: ToggleController = registry.getOrCreate(SettingItems.Bluetooth.masterToggle)
+        // 5. get(item) and get(key) return the exact same instance
+        val ctrlFromItem: ToggleController = registry.get(SettingItems.Bluetooth.masterToggle)
         assertSame(ctrlFromKey, ctrlFromItem)
 
-        // 7. State changes persist across key lookups
+        // 6. State changes persist across key lookups
         ctrlFromKey.onToggleChange(false)
-        val ctrlRefetched: ToggleController = registry.getOrCreate(key)
+        val ctrlRefetched: ToggleController = registry.get(key)
         assertEquals(false, ctrlRefetched.isChecked.value)
     }
 

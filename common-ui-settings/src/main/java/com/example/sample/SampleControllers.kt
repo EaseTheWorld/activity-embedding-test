@@ -2,24 +2,20 @@ package com.example.sample
 
 import com.example.uifw.item.UiItem
 import com.example.uifw.controller.ItemController
-import com.example.uifw.controller.ItemControllerFactory
 import com.example.uifw.controller.ToggleController
 import dagger.Binds
 import dagger.Module
-import dagger.assisted.Assisted
-import dagger.assisted.AssistedFactory
-import dagger.assisted.AssistedInject
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import dagger.multibindings.IntoSet
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import javax.inject.Inject
 
 // 1. 블루투스 마스터 토글 ItemController
-class BluetoothMasterToggleController @AssistedInject constructor(
-    @Assisted private val item: UiItem
-) : ItemController(), ToggleController {
+class BluetoothMasterToggleController @Inject constructor() : ItemController(), ToggleController {
+    override val targetItem: UiItem = SettingItems.Bluetooth.masterToggle
 
     private val _isChecked = MutableStateFlow(true)
     override val isChecked: StateFlow<Boolean> = _isChecked.asStateFlow()
@@ -29,20 +25,11 @@ class BluetoothMasterToggleController @AssistedInject constructor(
     override fun onToggleChange(checked: Boolean) {
         _isChecked.value = checked
     }
-
-    @AssistedFactory
-    interface Factory : ItemControllerFactory<BluetoothMasterToggleController> {
-        override val targetItem: UiItem
-            get() = SettingItems.Bluetooth.masterToggle
-
-        override fun create(item: UiItem): BluetoothMasterToggleController
-    }
 }
 
 // 2. Wi-Fi 마스터 토글 ItemController
-class WifiMasterToggleController @AssistedInject constructor(
-    @Assisted private val item: UiItem
-) : ItemController(), ToggleController {
+class WifiMasterToggleController @Inject constructor() : ItemController(), ToggleController {
+    override val targetItem: UiItem = SettingItems.Wifi.masterToggle
 
     private val _isChecked = MutableStateFlow(false)
     override val isChecked: StateFlow<Boolean> = _isChecked.asStateFlow()
@@ -51,21 +38,12 @@ class WifiMasterToggleController @AssistedInject constructor(
 
     override fun onToggleChange(checked: Boolean) {
         _isChecked.value = checked
-    }
-
-    @AssistedFactory
-    interface Factory : ItemControllerFactory<WifiMasterToggleController> {
-        override val targetItem: UiItem
-            get() = SettingItems.Wifi.masterToggle
-
-        override fun create(item: UiItem): WifiMasterToggleController
     }
 }
 
 // 3. 블루투스 듀얼 오디오 토글 ItemController
-class DualAudioToggleController @AssistedInject constructor(
-    @Assisted private val item: UiItem
-) : ItemController(), ToggleController {
+class DualAudioToggleController @Inject constructor() : ItemController(), ToggleController {
+    override val targetItem: UiItem = SettingItems.Bluetooth.Advanced.dualAudio
 
     private val _isChecked = MutableStateFlow(false)
     override val isChecked: StateFlow<Boolean> = _isChecked.asStateFlow()
@@ -75,17 +53,9 @@ class DualAudioToggleController @AssistedInject constructor(
     override fun onToggleChange(checked: Boolean) {
         _isChecked.value = checked
     }
-
-    @AssistedFactory
-    interface Factory : ItemControllerFactory<DualAudioToggleController> {
-        override val targetItem: UiItem
-            get() = SettingItems.Bluetooth.Advanced.dualAudio
-
-        override fun create(item: UiItem): DualAudioToggleController
-    }
 }
 
-// 4. Hilt Multi-binding 모듈
+// 4. Hilt Multi-binding 모듈 (ItemController IntoSet)
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class SampleItemControllerModule {
@@ -93,18 +63,18 @@ abstract class SampleItemControllerModule {
     @Binds
     @IntoSet
     abstract fun bindBluetoothMasterToggle(
-        factory: BluetoothMasterToggleController.Factory
-    ): ItemControllerFactory<*>
+        controller: BluetoothMasterToggleController
+    ): ItemController
 
     @Binds
     @IntoSet
     abstract fun bindWifiMasterToggle(
-        factory: WifiMasterToggleController.Factory
-    ): ItemControllerFactory<*>
+        controller: WifiMasterToggleController
+    ): ItemController
 
     @Binds
     @IntoSet
     abstract fun bindDualAudioToggle(
-        factory: DualAudioToggleController.Factory
-    ): ItemControllerFactory<*>
+        controller: DualAudioToggleController
+    ): ItemController
 }

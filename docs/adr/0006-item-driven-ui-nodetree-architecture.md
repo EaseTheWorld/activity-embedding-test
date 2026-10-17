@@ -28,10 +28,12 @@ All items implement immutable sealed interfaces:
 - Observable setting items are declared as immutable `val` properties on screen objects.
 - Visual hierarchy and layout containers (`column`, `row`, `staticText`) are composed via `@UiTreeDsl TreeBuilderScope` using the unary plus operator (`+item`).
 
-### 4. Type-Safe ItemController Multi-Binding (`Hilt @IntoSet`)
-- ItemControllers expose standardized contracts (`ToggleController`, `TextController`).
-- Factories implement `ItemControllerFactory<out C : ItemController>`, referencing `targetItem.key` directly in code.
-- Multi-bound via Dagger Hilt `@IntoSet` into `ItemControllerRegistry`. Duplicate factory registrations are detected and rejected at initialization time.
+### 4. Type-Safe Direct ItemController Multi-Binding (`Hilt @IntoSet`)
+- **Non-AndroidX ViewModel**: `ItemController` is **NOT an AndroidX `ViewModel`**, but a lightweight, lifecycle-aware POJO with its own `controllerScope` (`SupervisorJob() + Dispatchers.Main.immediate`) and `onCleared()` callback.
+- **Direct `targetItem` Reference**: Each `ItemController` declares `override val targetItem: UiItem` directly referencing its compile-time declared item (e.g., `SettingItems.Bluetooth.masterToggle`). This eliminates runtime `@AssistedInject` and separate `Factory` boilerplate.
+- **`Set<ItemController>` via `@IntoSet`**: Binds directly into `Set<@JvmSuppressWildcards ItemController>` using Hilt `@Binds @IntoSet`. Unlike `@IntoMap`, this avoids string literals (`@StringKey`) entirely.
+- **Startup Integrity & Key Lookup**: `ItemControllerRegistry` injects `Set<ItemController>` and converts it into `Map<String, ItemController>` keyed by `controller.targetItem.key`. Duplicate registrations are detected at startup, and items can be retrieved dynamically by `key: String` (e.g., deeplink handler) or `item: UiItem`.
+- **Screen-Level Lifecycle**: `ScreenHostViewModel` (an AndroidX `ViewModel`) retains `ItemControllerRegistry` and triggers `registry.clearAll()` when the hosting screen is cleared.
 
 ```mermaid
 graph TD
@@ -45,19 +47,22 @@ graph TD
     end
 
     subgraph Renderer["Compose Renderer (DrawTree)"]
-        Draw["DrawTree(tree)"]
+        Draw["DrawTree(tree) { customItem -> ... }"]
         DrawItem["DrawItem(item)"]
         LocalReg["LocalItemControllerRegistry.current"]
         Draw --> DrawItem
-        DrawItem -.->|getOrCreate(item)| LocalReg
+        DrawItem -.->|get(item)| LocalReg
     end
 
     subgraph ControllerManagement["Hilt Multi-Binding & Registry"]
-        Registry["ItemControllerRegistry<br/>Map&lt;String, ItemControllerFactory&gt;"]
-        Factory["BluetoothMasterToggleController.Factory<br/>targetItem: SettingItems.Bluetooth.masterToggle"]
-        Controller["BluetoothMasterToggleController<br/>ToggleController (isChecked, isEnabled)"]
-        Registry --> Factory
-        Factory --> Controller
+        Hilt["Hilt Module (@Binds @IntoSet)"]
+        Controller["BluetoothMasterToggleController<br/>targetItem: SettingItems.Bluetooth.masterToggle<br/>(Lightweight POJO, not AndroidX ViewModel)"]
+        Registry["ItemControllerRegistry<br/>Map&lt;String, ItemController&gt;"]
+        HostVM["ScreenHostViewModel (AndroidX ViewModel)<br/>onCleared() -> registry.clearAll()"]
+        Hilt -->|Set&lt;ItemController&gt;| Registry
+        Controller -->|IntoSet| Hilt
+        Registry --> Controller
+        HostVM --> Registry
         LocalReg --> Registry
     end
 ```

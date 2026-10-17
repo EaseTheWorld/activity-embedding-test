@@ -7,67 +7,71 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 
 class ItemControllerRegistry @Inject constructor(
-    factories: Set<@JvmSuppressWildcards ItemControllerFactory<*>>
+    controllers: Set<@JvmSuppressWildcards ItemController>
 ) {
-    // 초기화 시점에 Set을 Map으로 변환하며 중복 바인딩 검증
-    private val factoryMap: Map<String, ItemControllerFactory<*>> = buildMap {
-        for (factory in factories) {
-            val key = factory.targetItem.key
-            val prev = put(key, factory)
+    // 초기화 시점에 Set을 Map으로 변환하며 targetItem.key 중복 바인딩 검증
+    private val controllerMap: Map<String, ItemController> = buildMap {
+        for (controller in controllers) {
+            val key = controller.targetItem.key
+            val prev = put(key, controller)
             require(prev == null) {
-                "Duplicate ItemControllerFactory registered for key '$key': " +
-                    "${prev!!::class.qualifiedName} and ${factory::class.qualifiedName}"
+                "Duplicate ItemController registered for key '$key': " +
+                    "${prev!!::class.qualifiedName} and ${controller::class.qualifiedName}"
             }
         }
     }
 
-    private val store = mutableMapOf<String, ItemController>()
-
     /**
-     * 해당 key에 매핑된 Factory가 등록되어 있는지 여부를 반환합니다.
+     * 해당 key에 매핑된 Controller가 등록되어 있는지 여부를 반환합니다.
      */
-    fun hasFactory(key: String): Boolean = factoryMap.containsKey(key)
+    fun hasController(key: String): Boolean = controllerMap.containsKey(key)
 
     /**
      * key 문자열을 통해 해당 Controller가 담당하는 원본 UiItem 인스턴스를 반환합니다.
      */
-    fun findItem(key: String): UiItem? = factoryMap[key]?.targetItem
+    fun findItem(key: String): UiItem? = controllerMap[key]?.targetItem
 
     /**
-     * 메모리에 이미 생성/캐시된 Controller를 key 문자열로 조회합니다. (없으면 null 반환)
+     * key 문자열을 통해 ItemController를 조회합니다. (없으면 error)
      */
     @Suppress("UNCHECKED_CAST")
-    fun <T> getOrNull(key: String): T? = store[key] as? T
+    fun <T> get(key: String): T {
+        return (controllerMap[key]
+            ?: error("No ItemController registered for item key='$key'")) as T
+    }
 
     /**
-     * 메모리에 이미 생성/캐시된 Controller를 UiItem 인스턴스로 조회합니다. (없으면 null 반환)
+     * UiItem 인스턴스를 통해 ItemController를 조회합니다. (없으면 error)
+     */
+    fun <T> get(item: UiItem): T = get(item.key)
+
+    /**
+     * key 문자열로 ItemController를 조회합니다. (없으면 null 반환)
+     */
+    @Suppress("UNCHECKED_CAST")
+    fun <T> getOrNull(key: String): T? = controllerMap[key] as? T
+
+    /**
+     * UiItem 인스턴스로 ItemController를 조회합니다. (없으면 null 반환)
      */
     fun <T> getOrNull(item: UiItem): T? = getOrNull(item.key)
 
     /**
-     * UiItem 인스턴스로부터 Controller를 조회하거나 생성합니다.
+     * get과 동일한 편의 함수 (기존 getOrCreate 호출 호환)
      */
-    fun <T> getOrCreate(item: UiItem): T = getOrCreate(item.key)
+    fun <T> getOrCreate(key: String): T = get(key)
 
     /**
-     * key 문자열 또는 DeepLink 경로로부터 Controller를 조회하거나 생성합니다.
+     * get과 동일한 편의 함수 (기존 getOrCreate 호출 호환)
      */
-    @Suppress("UNCHECKED_CAST")
-    fun <T> getOrCreate(key: String): T {
-        return store.getOrPut(key) {
-            val factory = factoryMap[key]
-                ?: error("No Factory registered for item key='$key'")
-            factory.create(factory.targetItem)
-        } as T
-    }
+    fun <T> getOrCreate(item: UiItem): T = get(item.key)
 
     fun clear(key: String) {
-        store.remove(key)?.onCleared()
+        controllerMap[key]?.onCleared()
     }
 
     fun clearAll() {
-        store.values.forEach { it.onCleared() }
-        store.clear()
+        controllerMap.values.forEach { it.onCleared() }
     }
 }
 

@@ -324,4 +324,83 @@ class ItemTreeArchitectureTest {
 
         assertEquals("All Controllers should be cleared on ScreenHostViewModel.onCleared", 1, onClearedCount)
     }
+
+    @Test
+    fun testKeyBasedControllerAndItemLookupInRegistry() {
+        val btFactory = object : ItemControllerFactory<BluetoothMasterToggleController> {
+            override val targetItem: UiItem = SettingItems.Bluetooth.masterToggle
+            override fun create(item: UiItem): BluetoothMasterToggleController =
+                BluetoothMasterToggleController(item)
+        }
+        val registry = ItemControllerRegistry(setOf(btFactory))
+        val key = "SettingItems/Bluetooth/masterToggle"
+
+        // 1. Check factory existence
+        assertTrue(registry.hasFactory(key))
+        assertEquals(false, registry.hasFactory("NonExistent/key"))
+
+        // 2. Find targetItem directly from key string
+        val itemFromKey = registry.findItem(key)
+        assertNotNull(itemFromKey)
+        assertSame(SettingItems.Bluetooth.masterToggle, itemFromKey)
+
+        // 3. getOrNull returns null prior to creation
+        val notCreatedYet: ToggleController? = registry.getOrNull(key)
+        assertEquals(null, notCreatedYet)
+
+        // 4. getOrCreate via Key string creates instance
+        val ctrlFromKey: ToggleController = registry.getOrCreate(key)
+        assertNotNull(ctrlFromKey)
+        assertTrue(ctrlFromKey.isChecked.value)
+
+        // 5. getOrNull now returns the created instance
+        val activeCtrl: ToggleController? = registry.getOrNull(key)
+        assertSame(ctrlFromKey, activeCtrl)
+
+        // 6. getOrCreate(item) and getOrCreate(key) return the exact same instance
+        val ctrlFromItem: ToggleController = registry.getOrCreate(SettingItems.Bluetooth.masterToggle)
+        assertSame(ctrlFromKey, ctrlFromItem)
+
+        // 7. State changes persist across key lookups
+        ctrlFromKey.onToggleChange(false)
+        val ctrlRefetched: ToggleController = registry.getOrCreate(key)
+        assertEquals(false, ctrlRefetched.isChecked.value)
+    }
+
+    @Test
+    fun testTreeAndScreenKeyLookupAndGlobalKeyMap() {
+        // 1. Local Tree search
+        val localItem = SettingItems.tree.findItem("SettingItems/bluetoothEntry")
+        assertNotNull(localItem)
+        assertSame(SettingItems.bluetoothEntry, localItem)
+
+        // Local tree should NOT find subscreen child directly
+        val notInLocalTree = SettingItems.tree.findItem("SettingItems/Bluetooth/masterToggle")
+        assertEquals(null, notInLocalTree)
+
+        // 2. Recursive Screen search finds items at any depth
+        val rootSection = SettingItems.findItemRecursively("SettingItems/mainSection")
+        assertNotNull(rootSection)
+        assertTrue(rootSection is UiSectionItem)
+
+        val depth1Item = SettingItems.findItemRecursively("SettingItems/Bluetooth/masterToggle")
+        assertNotNull(depth1Item)
+        assertSame(SettingItems.Bluetooth.masterToggle, depth1Item)
+
+        val depth2Item = SettingItems.findItemRecursively("SettingItems/Bluetooth/Advanced/dualAudio")
+        assertNotNull(depth2Item)
+        assertSame(SettingItems.Bluetooth.Advanced.dualAudio, depth2Item)
+
+        val depth2Section = SettingItems.findItemRecursively("SettingItems/Bluetooth/Advanced/audioSection")
+        assertNotNull(depth2Section)
+        assertEquals("오디오 고급 설정", (depth2Section as UiSectionItem).title)
+
+        // 3. Global Key Map
+        val globalMap = SettingItems.buildGlobalKeyMap()
+        assertTrue("Global map should index all items across screens", globalMap.size >= 8)
+        assertSame(SettingItems.Bluetooth.masterToggle, globalMap["SettingItems/Bluetooth/masterToggle"])
+        assertSame(SettingItems.Bluetooth.Advanced.dualAudio, globalMap["SettingItems/Bluetooth/Advanced/dualAudio"])
+        assertSame(SettingItems.Wifi.masterToggle, globalMap["SettingItems/Wifi/masterToggle"])
+    }
 }
+

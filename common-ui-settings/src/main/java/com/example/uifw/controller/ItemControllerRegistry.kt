@@ -23,12 +23,41 @@ class ItemControllerRegistry @Inject constructor(
 
     private val store = mutableMapOf<String, ItemController>()
 
+    /**
+     * 해당 key에 매핑된 Factory가 등록되어 있는지 여부를 반환합니다.
+     */
+    fun hasFactory(key: String): Boolean = factoryMap.containsKey(key)
+
+    /**
+     * key 문자열을 통해 해당 Controller가 담당하는 원본 UiItem 인스턴스를 반환합니다.
+     */
+    fun findItem(key: String): UiItem? = factoryMap[key]?.targetItem
+
+    /**
+     * 메모리에 이미 생성/캐시된 Controller를 key 문자열로 조회합니다. (없으면 null 반환)
+     */
     @Suppress("UNCHECKED_CAST")
-    fun <T> getOrCreate(item: UiItem): T {
-        return store.getOrPut(item.key) {
-            val factory = factoryMap[item.key]
-                ?: error("No Factory registered for item key='${item.key}'")
-            factory.create(item)
+    fun <T> getOrNull(key: String): T? = store[key] as? T
+
+    /**
+     * 메모리에 이미 생성/캐시된 Controller를 UiItem 인스턴스로 조회합니다. (없으면 null 반환)
+     */
+    fun <T> getOrNull(item: UiItem): T? = getOrNull(item.key)
+
+    /**
+     * UiItem 인스턴스로부터 Controller를 조회하거나 생성합니다.
+     */
+    fun <T> getOrCreate(item: UiItem): T = getOrCreate(item.key)
+
+    /**
+     * key 문자열 또는 DeepLink 경로로부터 Controller를 조회하거나 생성합니다.
+     */
+    @Suppress("UNCHECKED_CAST")
+    fun <T> getOrCreate(key: String): T {
+        return store.getOrPut(key) {
+            val factory = factoryMap[key]
+                ?: error("No Factory registered for item key='$key'")
+            factory.create(factory.targetItem)
         } as T
     }
 

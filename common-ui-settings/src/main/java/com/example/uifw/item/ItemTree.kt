@@ -10,6 +10,36 @@ class ItemTree(val root: UiContainerItem) {
     override fun equals(other: Any?): Boolean = other is ItemTree && root == other.root
     override fun hashCode(): Int = root.hashCode()
     override fun toString(): String = "ItemTree(root=$root)"
+
+    /**
+     * Tree 내의 모든 자식 노드를 순회하여 일치하는 key를 가진 UiItem을 검색합니다.
+     */
+    fun findItem(key: String): UiItem? {
+        fun search(item: UiItem): UiItem? {
+            if (item.key == key) return item
+            if (item is UiContainerItem) {
+                for (child in item.children) {
+                    val found = search(child)
+                    if (found != null) return found
+                }
+            }
+            return null
+        }
+        return search(root)
+    }
+
+    /**
+     * Tree 내의 모든 노드를 key -> UiItem 형태의 Map으로 플랫하게 반환합니다.
+     */
+    fun toKeyMap(): Map<String, UiItem> = buildMap {
+        fun collect(item: UiItem) {
+            put(item.key, item)
+            if (item is UiContainerItem) {
+                item.children.forEach(::collect)
+            }
+        }
+        collect(root)
+    }
 }
 
 @UiTreeDsl

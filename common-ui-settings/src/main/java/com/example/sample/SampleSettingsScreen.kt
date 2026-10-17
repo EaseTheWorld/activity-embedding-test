@@ -276,7 +276,99 @@ private fun ItemScreenScaffold(
             }
         }
         HorizontalDivider()
-        DrawTree(tree = screen.tree)
+        DrawTree(tree = screen.tree) { customItem ->
+            when (customItem) {
+                is UiAudioLatencyVisualizerItem -> {
+                    AudioLatencyVisualizerCard(item = customItem)
+                }
+                else -> {
+                    Text(
+                        text = "Unsupported custom item: ${customItem.key}",
+                        modifier = Modifier.padding(16.dp)
+                    )
+                }
+            }
+        }
         Spacer(modifier = Modifier.height(24.dp))
     }
 }
+
+@Composable
+private fun AudioLatencyVisualizerCard(
+    item: UiAudioLatencyVisualizerItem,
+    modifier: Modifier = Modifier
+) {
+    var latency by remember { mutableIntStateOf(item.defaultLatencyMs) }
+
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.45f)
+        ),
+        shape = RoundedCornerShape(10.dp)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "⚡ " + (item.title ?: "Custom Item"),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Surface(
+                        color = MaterialTheme.colorScheme.tertiary,
+                        shape = RoundedCornerShape(4.dp)
+                    ) {
+                        Text(
+                            text = "CUSTOM COMPONENT",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onTertiary,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+                Text(
+                    text = "${latency}ms",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.tertiary
+                )
+            }
+            Text(
+                text = "Key: ${item.key}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 2.dp, bottom = 8.dp)
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                FilterChip(
+                    selected = latency == 20,
+                    onClick = { latency = 20 },
+                    label = { Text("초저지연 (20ms)") }
+                )
+                FilterChip(
+                    selected = latency == 45,
+                    onClick = { latency = 45 },
+                    label = { Text("표준 게임 (45ms)") }
+                )
+                FilterChip(
+                    selected = latency == 120,
+                    onClick = { latency = 120 },
+                    label = { Text("고음질 HD (120ms)") }
+                )
+            }
+        }
+    }
+}
+

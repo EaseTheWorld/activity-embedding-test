@@ -117,13 +117,17 @@ class ItemTreeArchitectureTest {
         val audioSec = advRoot.children[0] as UiSectionItem
         assertEquals("SettingItems/Bluetooth/Advanced/audioSection", audioSec.key)
         assertEquals("오디오 고급 설정", audioSec.title)
-        assertEquals(2, audioSec.children.size)
+        assertEquals(3, audioSec.children.size)
 
         val dualAudio = audioSec.children[0] as UiToggleItem
         assertEquals("SettingItems/Bluetooth/Advanced/dualAudio", dualAudio.key)
         assertEquals("듀얼 오디오", dualAudio.title)
 
-        val audioCodec = audioSec.children[1] as UiTextItem
+        val latencyVis = audioSec.children[1] as UiCustomItem
+        assertEquals("SettingItems/Bluetooth/Advanced/latencyVisualizer", latencyVis.key)
+        assertEquals("오디오 레이턴시 시각화", latencyVis.title)
+
+        val audioCodec = audioSec.children[2] as UiTextItem
         assertEquals("SettingItems/Bluetooth/Advanced/audio_codec", audioCodec.key)
         assertEquals("Audio Codec: LDAC / aptX HD", audioCodec.text)
     }
@@ -402,5 +406,34 @@ class ItemTreeArchitectureTest {
         assertSame(SettingItems.Bluetooth.Advanced.dualAudio, globalMap["SettingItems/Bluetooth/Advanced/dualAudio"])
         assertSame(SettingItems.Wifi.masterToggle, globalMap["SettingItems/Wifi/masterToggle"])
     }
+
+    @Test
+    fun testCustomItemSubclassHierarchyAndSearch() {
+        val latencyItem = SettingItems.Bluetooth.Advanced.latencyVisualizer
+        assertTrue("Must implement UiCustomItem", latencyItem is UiCustomItem)
+        assertEquals("SettingItems/Bluetooth/Advanced/latencyVisualizer", latencyItem.key)
+        assertEquals("오디오 레이턴시 시각화", latencyItem.title)
+
+        // Recursive tree lookup
+        val found = SettingItems.findItemRecursively("SettingItems/Bluetooth/Advanced/latencyVisualizer")
+        assertNotNull(found)
+        assertSame(latencyItem, found)
+
+        // Search Indexer includes custom item with full breadcrumb
+        val index = ItemSearchIndexer.indexTree(SettingItems)
+        val customEntry = index.find { it.targetKey == latencyItem.key }
+        assertNotNull("Custom item should be indexed", customEntry)
+        assertEquals("오디오 레이턴시 시각화", customEntry!!.title)
+        assertEquals(
+            "환경 설정 > 블루투스 설정 > 블루투스 고급 설정 > 오디오 고급 설정 > 오디오 레이턴시 시각화",
+            customEntry.formattedBreadcrumb
+        )
+
+        // Search filtering by custom item title
+        val searchResults = ItemSearchIndexer.search(index, "레이턴시")
+        assertEquals(1, searchResults.size)
+        assertEquals(latencyItem.key, searchResults[0].targetKey)
+    }
 }
+
 

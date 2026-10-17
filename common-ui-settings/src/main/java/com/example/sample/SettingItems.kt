@@ -1,6 +1,17 @@
 package com.example.sample
 
+import androidx.compose.runtime.Immutable
 import com.example.uifw.item.*
+
+/**
+ * 커스텀 컴포넌트 데이터 노드 정의 (UiCustomItem 구현체)
+ */
+@Immutable
+data class UiAudioLatencyVisualizerItem(
+    override val key: String,
+    override val title: String = "오디오 레이턴시 시각화",
+    val defaultLatencyMs: Int = 45
+) : UiCustomItem
 
 /**
  * 한 파일 안에 중첩 object로 화면 계층을 구성하여
@@ -57,9 +68,15 @@ object SettingItems : ItemScreen(title = "환경 설정") {
             // Key: "SettingItems/Bluetooth/Advanced/dualAudio"
             val dualAudio by toggle(title = "듀얼 오디오")
 
+            // Key: "SettingItems/Bluetooth/Advanced/latencyVisualizer"
+            val latencyVisualizer by screenItem { key ->
+                UiAudioLatencyVisualizerItem(key = key)
+            }
+
             override val tree = buildTree {
                 audioSection {
                     +dualAudio
+                    +latencyVisualizer
                     staticText("audio_codec", text = "Audio Codec: LDAC / aptX HD")
                 }
             }

@@ -34,15 +34,17 @@ val LocalHighlightKey = staticCompositionLocalOf<String?> { null }
 @Composable
 fun DrawTree(
     tree: ItemTree,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    customContent: @Composable (customItem: UiCustomItem) -> Unit = {}
 ) {
-    DrawItem(item = tree.root, modifier = modifier)
+    DrawItem(item = tree.root, modifier = modifier, customContent = customContent)
 }
 
 @Composable
 private fun DrawItem(
     item: UiItem,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    customContent: @Composable (UiCustomItem) -> Unit
 ) {
     key(item.key) {
         when (item) {
@@ -115,7 +117,7 @@ private fun DrawItem(
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                         Spacer(modifier = Modifier.height(4.dp))
                         item.children.forEach { child ->
-                            DrawItem(child)
+                            DrawItem(child, customContent = customContent)
                         }
                     }
                 }
@@ -133,14 +135,14 @@ private fun DrawItem(
                     }
                     if (item.orientation == Orientation.VERTICAL) {
                         Column(modifier = Modifier.fillMaxWidth()) {
-                            item.children.forEach { child -> DrawItem(child) }
+                            item.children.forEach { child -> DrawItem(child, customContent = customContent) }
                         }
                     } else {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            item.children.forEach { child -> DrawItem(child) }
+                            item.children.forEach { child -> DrawItem(child, customContent = customContent) }
                         }
                     }
                 }
@@ -291,6 +293,69 @@ private fun DrawItem(
                     }
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                 }
+            }
+
+            is UiCustomItem -> {
+                val isHighlighted = LocalHighlightKey.current == item.key
+                val bringIntoViewRequester = remember { BringIntoViewRequester() }
+                LaunchedEffect(isHighlighted) {
+                    if (isHighlighted) {
+                        bringIntoViewRequester.bringIntoView()
+                    }
+                }
+
+                Box(
+                    modifier = modifier
+                        .fillMaxWidth()
+                        .bringIntoViewRequester(bringIntoViewRequester)
+                        .then(
+                            if (isHighlighted) {
+                                Modifier
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                                    .background(
+                                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
+                                        RoundedCornerShape(8.dp)
+                                    )
+                                    .border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(8.dp))
+                            } else {
+                                Modifier
+                            }
+                        )
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        if (isHighlighted) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(start = 16.dp, end = 16.dp, top = 8.dp),
+                                horizontalArrangement = Arrangement.End
+                            ) {
+                                Surface(
+                                    color = MaterialTheme.colorScheme.primary,
+                                    shape = RoundedCornerShape(4.dp)
+                                ) {
+                                    Text(
+                                        text = "🎯 TARGET DEEPLINK",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onPrimary,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+                        }
+                        customContent(item)
+                    }
+                }
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+            }
+
+            else -> {
+                Text(
+                    text = "Unhandled item: ${item.key}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = modifier.padding(16.dp)
+                )
             }
         }
     }

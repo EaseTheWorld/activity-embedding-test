@@ -90,6 +90,23 @@ object ItemSearchIndexer {
                                 screenBreadcrumb = screenBreadcrumb + child.targetScreen.title
                             )
                         }
+                        is UiCustomItem -> {
+                            val customTitle = child.title
+                            if (customTitle != null) {
+                                results.add(
+                                    SearchIndexEntry(
+                                        title = customTitle,
+                                        targetKey = child.key,
+                                        screenRoute = screen.route,
+                                        breadcrumb = currentBreadcrumb + customTitle,
+                                        isSection = false
+                                    )
+                                )
+                            }
+                        }
+                        else -> {
+                            // Non-standard UiItem without custom handling
+                        }
                     }
                 }
             }

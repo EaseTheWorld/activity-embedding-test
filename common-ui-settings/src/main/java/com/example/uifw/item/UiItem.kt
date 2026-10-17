@@ -3,8 +3,13 @@ package com.example.uifw.item
 import androidx.compose.runtime.Immutable
 
 @Immutable
-sealed interface UiItem {
+interface UiItem {
     val key: String
+}
+
+@Immutable
+interface UiCustomItem : UiItem {
+    val title: String? get() = null
 }
 
 @Immutable

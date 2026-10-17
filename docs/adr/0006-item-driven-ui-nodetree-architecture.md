@@ -30,9 +30,9 @@ All items implement immutable sealed interfaces:
 
 ### 4. Type-Safe Direct ItemController Multi-Binding (`Hilt @IntoSet`)
 - **Non-AndroidX ViewModel**: `ItemController` is **NOT an AndroidX `ViewModel`**, but a lightweight, lifecycle-aware POJO with its own `controllerScope` (`SupervisorJob() + Dispatchers.Main.immediate`) and `onCleared()` callback.
-- **Direct `targetItem` Reference**: Each `ItemController` declares `override val targetItem: UiItem` directly referencing its compile-time declared item (e.g., `SettingItems.Bluetooth.masterToggle`). This eliminates runtime `@AssistedInject` and separate `Factory` boilerplate.
+- **Direct `item` Reference**: Each `ItemController` declares `override val item: UiItem` directly referencing its compile-time declared item (e.g., `SettingItems.Bluetooth.masterToggle`). This eliminates runtime `@AssistedInject` and separate `Factory` boilerplate. Redundant `key` property on `ItemController` is removed in favor of `controller.item.key`.
 - **`Set<ItemController>` via `@IntoSet`**: Binds directly into `Set<@JvmSuppressWildcards ItemController>` using Hilt `@Binds @IntoSet`. Unlike `@IntoMap`, this avoids string literals (`@StringKey`) entirely.
-- **Startup Integrity & Key Lookup**: `ItemControllerRegistry` injects `Set<ItemController>` and converts it into `Map<String, ItemController>` keyed by `controller.targetItem.key`. Duplicate registrations are detected at startup, and items can be retrieved dynamically by `key: String` (e.g., deeplink handler) or `item: UiItem`.
+- **Startup Integrity & Key Lookup**: `ItemControllerRegistry` injects `Set<ItemController>` and converts it into `Map<String, ItemController>` keyed by `controller.item.key`. Duplicate registrations are detected at startup, and items can be retrieved dynamically by `key: String` (e.g., deeplink handler) or `item: UiItem`.
 - **Screen-Level Lifecycle**: `ScreenHostViewModel` (an AndroidX `ViewModel`) retains `ItemControllerRegistry` and triggers `registry.clearAll()` when the hosting screen is cleared.
 
 ```mermaid
@@ -56,7 +56,7 @@ graph TD
 
     subgraph ControllerManagement["Hilt Multi-Binding & Registry"]
         Hilt["Hilt Module (@Binds @IntoSet)"]
-        Controller["BluetoothMasterToggleController<br/>targetItem: SettingItems.Bluetooth.masterToggle<br/>(Lightweight POJO, not AndroidX ViewModel)"]
+        Controller["BluetoothMasterToggleController<br/>item: SettingItems.Bluetooth.masterToggle<br/>(Lightweight POJO, not AndroidX ViewModel)"]
         Registry["ItemControllerRegistry<br/>Map&lt;String, ItemController&gt;"]
         HostVM["ScreenHostViewModel (AndroidX ViewModel)<br/>onCleared() -> registry.clearAll()"]
         Hilt -->|Set&lt;ItemController&gt;| Registry

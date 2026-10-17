@@ -15,7 +15,7 @@ import javax.inject.Inject
 
 // 1. 블루투스 마스터 토글 ItemController
 class BluetoothMasterToggleController @Inject constructor() : ItemController(), ToggleController {
-    override val targetItem: UiItem = SettingItems.Bluetooth.masterToggle
+    override val item: UiItem = SettingItems.Bluetooth.masterToggle
 
     private val _isChecked = MutableStateFlow(true)
     override val isChecked: StateFlow<Boolean> = _isChecked.asStateFlow()
@@ -29,7 +29,7 @@ class BluetoothMasterToggleController @Inject constructor() : ItemController(), 
 
 // 2. Wi-Fi 마스터 토글 ItemController
 class WifiMasterToggleController @Inject constructor() : ItemController(), ToggleController {
-    override val targetItem: UiItem = SettingItems.Wifi.masterToggle
+    override val item: UiItem = SettingItems.Wifi.masterToggle
 
     private val _isChecked = MutableStateFlow(false)
     override val isChecked: StateFlow<Boolean> = _isChecked.asStateFlow()
@@ -43,7 +43,7 @@ class WifiMasterToggleController @Inject constructor() : ItemController(), Toggl
 
 // 3. 블루투스 듀얼 오디오 토글 ItemController
 class DualAudioToggleController @Inject constructor() : ItemController(), ToggleController {
-    override val targetItem: UiItem = SettingItems.Bluetooth.Advanced.dualAudio
+    override val item: UiItem = SettingItems.Bluetooth.Advanced.dualAudio
 
     private val _isChecked = MutableStateFlow(false)
     override val isChecked: StateFlow<Boolean> = _isChecked.asStateFlow()

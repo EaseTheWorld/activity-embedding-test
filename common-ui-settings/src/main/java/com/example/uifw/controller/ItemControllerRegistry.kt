@@ -9,10 +9,10 @@ import javax.inject.Inject
 class ItemControllerRegistry @Inject constructor(
     controllers: Set<@JvmSuppressWildcards ItemController>
 ) {
-    // 초기화 시점에 Set을 Map으로 변환하며 targetItem.key 중복 바인딩 검증
+    // 초기화 시점에 Set을 Map으로 변환하며 item.key 중복 바인딩 검증
     private val controllerMap: Map<String, ItemController> = buildMap {
         for (controller in controllers) {
-            val key = controller.targetItem.key
+            val key = controller.item.key
             val prev = put(key, controller)
             require(prev == null) {
                 "Duplicate ItemController registered for key '$key': " +
@@ -29,7 +29,7 @@ class ItemControllerRegistry @Inject constructor(
     /**
      * key 문자열을 통해 해당 Controller가 담당하는 원본 UiItem 인스턴스를 반환합니다.
      */
-    fun findItem(key: String): UiItem? = controllerMap[key]?.targetItem
+    fun findItem(key: String): UiItem? = controllerMap[key]?.item
 
     /**
      * key 문자열을 통해 ItemController를 조회합니다. (없으면 error)

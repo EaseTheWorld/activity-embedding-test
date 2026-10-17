@@ -252,7 +252,7 @@ class ItemTreeArchitectureTest {
         val testItem = SettingItems.Bluetooth.masterToggle
 
         class TestController : ItemController(), ToggleController {
-            override val targetItem: UiItem = testItem
+            override val item: UiItem = testItem
             override val isChecked = kotlinx.coroutines.flow.MutableStateFlow(true)
             override val isEnabled = kotlinx.coroutines.flow.MutableStateFlow(true)
             override fun onToggleChange(checked: Boolean) {}
@@ -277,7 +277,7 @@ class ItemTreeArchitectureTest {
         val testItem = SettingItems.Bluetooth.masterToggle
 
         class TestController : ItemController(), ToggleController {
-            override val targetItem: UiItem = testItem
+            override val item: UiItem = testItem
             override val isChecked = kotlinx.coroutines.flow.MutableStateFlow(true)
             override val isEnabled = kotlinx.coroutines.flow.MutableStateFlow(true)
             override fun onToggleChange(checked: Boolean) {}
@@ -312,7 +312,7 @@ class ItemTreeArchitectureTest {
         assertTrue(registry.hasController(key))
         assertEquals(false, registry.hasController("NonExistent/key"))
 
-        // 2. Find targetItem directly from key string
+        // 2. Find item directly from key string
         val itemFromKey = registry.findItem(key)
         assertNotNull(itemFromKey)
         assertSame(SettingItems.Bluetooth.masterToggle, itemFromKey)

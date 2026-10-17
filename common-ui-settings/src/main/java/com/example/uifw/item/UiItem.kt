@@ -1,41 +1,41 @@
-package com.example.uifw.node
+package com.example.uifw.item
 
 import androidx.compose.runtime.Immutable
 
 @Immutable
-sealed interface UiNode {
+sealed interface UiItem {
     val key: String
 }
 
 @Immutable
-sealed interface UiContainerNode : UiNode {
-    val children: List<UiNode>
+sealed interface UiContainerItem : UiItem {
+    val children: List<UiItem>
 }
 
 enum class Orientation { VERTICAL, HORIZONTAL }
 
 @Immutable
-data class UiLinearNode(
+data class UiLinearItem(
     override val key: String,
     val orientation: Orientation,
-    override val children: List<UiNode>
-) : UiContainerNode
+    override val children: List<UiItem>
+) : UiContainerItem
 
 @Immutable
-data class UiToggleNode(
+data class UiToggleItem(
     override val key: String,
     val title: String
-) : UiNode
+) : UiItem
 
 @Immutable
-data class UiTextNode(
+data class UiTextItem(
     override val key: String,
     val text: String
-) : UiNode
+) : UiItem
 
 @Immutable
-data class UiSubScreenEntryNode(
+data class UiSubScreenEntryItem(
     override val key: String,
     val title: String,
-    val targetScreen: NodeScreen
-) : UiNode
+    val targetScreen: ItemScreen
+) : UiItem

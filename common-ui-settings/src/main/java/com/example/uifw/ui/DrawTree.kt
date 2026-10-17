@@ -13,55 +13,55 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.example.uifw.node.*
-import com.example.uifw.vm.LocalNodeViewModelRegistry
-import com.example.uifw.vm.TextController
-import com.example.uifw.vm.ToggleController
+import com.example.uifw.item.*
+import com.example.uifw.controller.LocalItemControllerRegistry
+import com.example.uifw.controller.TextController
+import com.example.uifw.controller.ToggleController
 
-val LocalNodeNavigator = staticCompositionLocalOf<(NodeScreen) -> Unit> {
-    error("No NodeNavigator provided")
+val LocalItemNavigator = staticCompositionLocalOf<(ItemScreen) -> Unit> {
+    error("No ItemNavigator provided")
 }
 
 @Composable
 fun DrawTree(
-    tree: NodeTree,
+    tree: ItemTree,
     modifier: Modifier = Modifier
 ) {
-    DrawNode(node = tree.root, modifier = modifier)
+    DrawItem(item = tree.root, modifier = modifier)
 }
 
 @Composable
-private fun DrawNode(
-    node: UiNode,
+private fun DrawItem(
+    item: UiItem,
     modifier: Modifier = Modifier
 ) {
-    key(node.key) {
-        when (node) {
-            is UiLinearNode -> {
-                if (node.orientation == Orientation.VERTICAL) {
+    key(item.key) {
+        when (item) {
+            is UiLinearItem -> {
+                if (item.orientation == Orientation.VERTICAL) {
                     Column(modifier = modifier) {
-                        node.children.forEach { child -> DrawNode(child) }
+                        item.children.forEach { child -> DrawItem(child) }
                     }
                 } else {
                     Row(
                         modifier = modifier,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        node.children.forEach { child -> DrawNode(child) }
+                        item.children.forEach { child -> DrawItem(child) }
                     }
                 }
             }
 
-            is UiToggleNode -> {
-                val registry = LocalNodeViewModelRegistry.current
-                val controller = remember(node.key) {
-                    registry.getOrCreate<ToggleController>(node)
+            is UiToggleItem -> {
+                val registry = LocalItemControllerRegistry.current
+                val controller = remember(item.key) {
+                    registry.getOrCreate<ToggleController>(item)
                 }
                 val isChecked by controller.isChecked.collectAsStateWithLifecycle()
                 val isEnabled by controller.isEnabled.collectAsStateWithLifecycle()
 
-                RenderToggleNode(
-                    title = node.title,
+                RenderToggleItem(
+                    title = item.title,
                     isChecked = isChecked,
                     isEnabled = isEnabled,
                     onToggleChange = controller::onToggleChange,
@@ -69,24 +69,24 @@ private fun DrawNode(
                 )
             }
 
-            is UiTextNode -> {
+            is UiTextItem -> {
                 Text(
-                    text = node.text,
+                    text = item.text,
                     modifier = modifier.padding(16.dp)
                 )
             }
 
-            is UiSubScreenEntryNode -> {
-                val navigator = LocalNodeNavigator.current
+            is UiSubScreenEntryItem -> {
+                val navigator = LocalItemNavigator.current
                 Row(
                     modifier = modifier
                         .fillMaxWidth()
-                        .clickable { navigator(node.targetScreen) }
+                        .clickable { navigator(item.targetScreen) }
                         .padding(16.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(text = node.title)
+                    Text(text = item.title)
                     Text(text = ">")
                 }
             }
@@ -95,7 +95,7 @@ private fun DrawNode(
 }
 
 @Composable
-private fun RenderToggleNode(
+private fun RenderToggleItem(
     title: String,
     isChecked: Boolean,
     isEnabled: Boolean,

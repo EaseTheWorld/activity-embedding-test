@@ -12,11 +12,11 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.example.uifw.node.NodeScreen
+import com.example.uifw.item.ItemScreen
 import com.example.uifw.ui.DrawTree
-import com.example.uifw.ui.LocalNodeNavigator
-import com.example.uifw.vm.LocalNodeViewModelRegistry
-import com.example.uifw.vm.ScreenHostViewModel
+import com.example.uifw.ui.LocalItemNavigator
+import com.example.uifw.controller.LocalItemControllerRegistry
+import com.example.uifw.controller.ScreenHostViewModel
 
 @Composable
 fun SampleSettingsScreen(
@@ -25,26 +25,25 @@ fun SampleSettingsScreen(
     val navController = rememberNavController()
 
     CompositionLocalProvider(
-        LocalNodeViewModelRegistry provides hostViewModel.nodeRegistry,
-        LocalNodeNavigator provides { targetScreen ->
+        LocalItemControllerRegistry provides hostViewModel.itemRegistry,
+        LocalItemNavigator provides { targetScreen ->
             navController.navigate(targetScreen.route)
         }
     ) {
         NavHost(
             navController = navController,
-            startDestination = SettingNodes.route
+            startDestination = SettingItems.route
         ) {
-            // 타입 안전한 route 참조로 SubScreen 등록
             val screens = listOf(
-                SettingNodes,
-                SettingNodes.Bluetooth,
-                SettingNodes.Bluetooth.Advanced,
-                SettingNodes.Wifi
+                SettingItems,
+                SettingItems.Bluetooth,
+                SettingItems.Bluetooth.Advanced,
+                SettingItems.Wifi
             )
 
             screens.forEach { screen ->
                 composable(route = screen.route) {
-                    NodeScreenScaffold(screen = screen)
+                    ItemScreenScaffold(screen = screen)
                 }
             }
         }
@@ -52,7 +51,7 @@ fun SampleSettingsScreen(
 }
 
 @Composable
-private fun NodeScreenScaffold(screen: NodeScreen) {
+private fun ItemScreenScaffold(screen: ItemScreen) {
     Column {
         Text(
             text = screen.title,

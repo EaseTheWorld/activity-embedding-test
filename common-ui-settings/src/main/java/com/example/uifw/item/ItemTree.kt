@@ -13,7 +13,7 @@ class ItemTree(val root: UiContainerItem) {
 }
 
 @UiTreeDsl
-class TreeBuilderScope(private val screenRoute: String) {
+class TreeBuilderScope(val screenRoute: String) {
     private val children = mutableListOf<UiItem>()
 
     // 1. 외부에 val로 선언된 아이템을 트리에 배치
@@ -21,6 +21,30 @@ class TreeBuilderScope(private val screenRoute: String) {
         children.add(this)
         return this
     }
+
+    /**
+     * 외부에 val로 선언된 SectionDefinition을 DSL에서 호출하여
+     * Section 고유 Key와 Title을 유지하면서 자식 아이템들을 조립.
+     */
+    operator fun SectionDefinition.invoke(block: TreeBuilderScope.() -> Unit): UiSectionItem {
+        val sectionItem = UiSectionItem(
+            key = this.key,
+            title = this.title,
+            children = TreeBuilderScope(screenRoute).apply(block).build()
+        )
+        +sectionItem
+        return sectionItem
+    }
+
+    /**
+     * 인라인 Section 컨테이너
+     */
+    fun section(title: String, groupKey: String, block: TreeBuilderScope.() -> Unit) =
+        +UiSectionItem(
+            key = "$screenRoute/$groupKey",
+            title = title,
+            children = TreeBuilderScope(screenRoute).apply(block).build()
+        )
 
     // 2. 레이아웃 컨테이너 (중간 컨테이너의 key는 Recomposition 식별용으로만 사용)
     fun column(groupKey: String, block: TreeBuilderScope.() -> Unit) =

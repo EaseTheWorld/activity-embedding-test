@@ -28,7 +28,7 @@ abstract class ItemScreen(val title: String) {
 
 /**
  * ItemScreen 내부 프로퍼티 전용 Delegate.
- * 중간 Column/Row와 무관하게 "${screen.route}/${property.name}"으로 고유 Key(DeepLink)를 생성.
+ * 중간 Container와 무관하게 "${screen.route}/${property.name}"으로 고유 Key(DeepLink)를 생성.
  */
 inline fun <T : UiItem> screenItem(
     crossinline creator: (fullKey: String) -> T
@@ -37,6 +37,26 @@ inline fun <T : UiItem> screenItem(
     val item = creator(fullKey) // 최초 1회 생성 후 캐싱
     ReadOnlyProperty { _, _ -> item }
 }
+
+/**
+ * Definition of a Section declared via val on ItemScreen.
+ * Encapsulates the section's unique deep link key and localized title.
+ */
+class SectionDefinition(
+    val key: String,
+    val title: String
+)
+
+/**
+ * Delegate for declaring a Section as a val property on an ItemScreen.
+ * Automatically derives the unique key: "${screen.route}/${property.name}".
+ */
+fun ItemScreen.section(title: String) =
+    PropertyDelegateProvider<ItemScreen, ReadOnlyProperty<ItemScreen, SectionDefinition>> { screen, property ->
+        val fullKey = "${screen.route}/${property.name}"
+        val def = SectionDefinition(key = fullKey, title = title)
+        ReadOnlyProperty { _, _ -> def }
+    }
 
 fun ItemScreen.toggle(title: String) = screenItem { key ->
     UiToggleItem(key = key, title = title)

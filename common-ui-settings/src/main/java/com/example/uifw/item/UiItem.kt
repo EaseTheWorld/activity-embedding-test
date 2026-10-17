@@ -22,6 +22,13 @@ data class UiLinearItem(
 ) : UiContainerItem
 
 @Immutable
+data class UiSectionItem(
+    override val key: String,
+    val title: String,
+    override val children: List<UiItem>
+) : UiContainerItem
+
+@Immutable
 data class UiToggleItem(
     override val key: String,
     val title: String

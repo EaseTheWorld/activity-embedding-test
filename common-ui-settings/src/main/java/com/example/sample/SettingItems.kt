@@ -37,6 +37,7 @@ object SettingItems : ItemScreen(title = "환경 설정") {
         }
 
         // ── SubScreen 1-1: Bluetooth Advanced (Depth 2) ──────────
+        // Scenario 3: Screen - Subscreen - Subscreen - Item
         object Advanced : ItemScreen(title = "블루투스 고급 설정") {
             // Route: "SettingItems/Bluetooth/Advanced"
 
@@ -44,9 +45,8 @@ object SettingItems : ItemScreen(title = "환경 설정") {
             val dualAudio by toggle(title = "듀얼 오디오")
 
             override val tree = buildTree {
-                column("bt_adv_section") {
-                    +dualAudio
-                }
+                +dualAudio
+                staticText("audio_codec", text = "Audio Codec: LDAC / aptX HD")
             }
         }
     }

@@ -2,6 +2,8 @@ package com.example.uifw.ui
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -15,7 +17,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.uifw.item.*
 import com.example.uifw.controller.LocalItemControllerRegistry
-import com.example.uifw.controller.TextController
 import com.example.uifw.controller.ToggleController
 
 val LocalItemNavigator = staticCompositionLocalOf<(ItemScreen) -> Unit> {
@@ -38,16 +39,26 @@ private fun DrawItem(
     key(item.key) {
         when (item) {
             is UiLinearItem -> {
-                if (item.orientation == Orientation.VERTICAL) {
-                    Column(modifier = modifier) {
-                        item.children.forEach { child -> DrawItem(child) }
+                Column(modifier = modifier.fillMaxWidth()) {
+                    if (!item.key.endsWith("/root")) {
+                        Text(
+                            text = "📁 [Column: ${item.key}]",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.tertiary,
+                            modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 4.dp)
+                        )
                     }
-                } else {
-                    Row(
-                        modifier = modifier,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        item.children.forEach { child -> DrawItem(child) }
+                    if (item.orientation == Orientation.VERTICAL) {
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            item.children.forEach { child -> DrawItem(child) }
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            item.children.forEach { child -> DrawItem(child) }
+                        }
                     }
                 }
             }
@@ -62,6 +73,7 @@ private fun DrawItem(
 
                 RenderToggleItem(
                     title = item.title,
+                    itemKey = item.key,
                     isChecked = isChecked,
                     isEnabled = isEnabled,
                     onToggleChange = controller::onToggleChange,
@@ -70,10 +82,18 @@ private fun DrawItem(
             }
 
             is UiTextItem -> {
-                Text(
-                    text = item.text,
-                    modifier = modifier.padding(16.dp)
-                )
+                Column(
+                    modifier = modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    Text(text = item.text, style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        text = "Key: ${item.key}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
 
             is UiSubScreenEntryItem -> {
@@ -82,13 +102,25 @@ private fun DrawItem(
                     modifier = modifier
                         .fillMaxWidth()
                         .clickable { navigator(item.targetScreen) }
-                        .padding(16.dp),
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(text = item.title)
-                    Text(text = ">")
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(text = item.title, style = MaterialTheme.typography.bodyLarge)
+                        Text(
+                            text = "Key: ${item.key}  ➔  Target: ${item.targetScreen.route}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    Text(
+                        text = "›",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.primary
+                    )
                 }
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
             }
         }
     }
@@ -97,6 +129,7 @@ private fun DrawItem(
 @Composable
 private fun RenderToggleItem(
     title: String,
+    itemKey: String,
     isChecked: Boolean,
     isEnabled: Boolean,
     onToggleChange: (Boolean) -> Unit,
@@ -109,11 +142,19 @@ private fun RenderToggleItem(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(text = title)
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = title, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                text = "Key: $itemKey",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
         Switch(
             checked = isChecked,
             enabled = isEnabled,
             onCheckedChange = onToggleChange
         )
     }
+    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
 }

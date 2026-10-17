@@ -99,14 +99,16 @@ class ItemTreeArchitectureTest {
         assertEquals(SettingItems.Bluetooth.Advanced, btAdvEntry.targetScreen)
 
         // Bluetooth Advanced screen tree
-        val advRoot = SettingItems.Bluetooth.Advanced.tree.root
+        // Scenario 3: Screen - Subscreen - Subscreen - Item (Direct child of root without intermediate column)
+        val advRoot = SettingItems.Bluetooth.Advanced.tree.root as UiLinearItem
         assertEquals("SettingItems/Bluetooth/Advanced/root", advRoot.key)
-        val advSection = advRoot.children[0] as UiLinearItem
-        assertEquals("SettingItems/Bluetooth/Advanced/bt_adv_section", advSection.key)
-        assertEquals(1, advSection.children.size)
-        val dualAudio = advSection.children[0] as UiToggleItem
+        assertEquals(2, advRoot.children.size)
+        val dualAudio = advRoot.children[0] as UiToggleItem
         assertEquals("SettingItems/Bluetooth/Advanced/dualAudio", dualAudio.key)
         assertEquals("듀얼 오디오", dualAudio.title)
+        val audioCodec = advRoot.children[1] as UiTextItem
+        assertEquals("SettingItems/Bluetooth/Advanced/audio_codec", audioCodec.key)
+        assertEquals("Audio Codec: LDAC / aptX HD", audioCodec.text)
     }
 
     @Test

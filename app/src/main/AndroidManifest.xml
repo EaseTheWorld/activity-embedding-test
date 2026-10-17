@@ -85,6 +85,16 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".SampleSettingsActivity"
+            android:exported="true"
+            android:label="Item-Driven UI Demo">
+            <intent-filter>
+                <action android:name="com.example.lifecycleapp.ITEM_DRIVEN_UI" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
         <receiver
             android:name=".HardwareSimulationReceiver"
             android:exported="true">

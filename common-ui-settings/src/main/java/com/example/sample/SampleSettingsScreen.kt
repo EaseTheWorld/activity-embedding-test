@@ -1,11 +1,12 @@
 package com.example.sample
 
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -43,7 +44,11 @@ fun SampleSettingsScreen(
 
             screens.forEach { screen ->
                 composable(route = screen.route) {
-                    ItemScreenScaffold(screen = screen)
+                    ItemScreenScaffold(
+                        screen = screen,
+                        canNavigateBack = screen.route != SettingItems.route,
+                        onNavigateBack = { navController.popBackStack() }
+                    )
                 }
             }
         }
@@ -51,13 +56,41 @@ fun SampleSettingsScreen(
 }
 
 @Composable
-private fun ItemScreenScaffold(screen: ItemScreen) {
-    Column {
-        Text(
-            text = screen.title,
-            style = MaterialTheme.typography.headlineSmall,
-            modifier = Modifier.padding(16.dp)
-        )
-        DrawTree(tree = screen.tree)
+private fun ItemScreenScaffold(
+    screen: ItemScreen,
+    canNavigateBack: Boolean,
+    onNavigateBack: () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background
+    ) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (canNavigateBack) {
+                    IconButton(onClick = onNavigateBack) {
+                        Text("←", style = MaterialTheme.typography.headlineMedium)
+                    }
+                }
+                Column(modifier = Modifier.padding(start = if (canNavigateBack) 4.dp else 12.dp)) {
+                    Text(
+                        text = screen.title,
+                        style = MaterialTheme.typography.headlineSmall
+                    )
+                    Text(
+                        text = "Route: ${screen.route}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+            HorizontalDivider()
+            DrawTree(tree = screen.tree)
+        }
     }
 }

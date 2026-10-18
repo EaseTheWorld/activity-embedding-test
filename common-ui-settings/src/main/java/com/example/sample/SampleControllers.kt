@@ -84,7 +84,72 @@ class BluetoothAdvancedEntryController @Inject constructor() : ItemController(),
     }
 }
 
-// 7. Hilt Multi-binding 모듈 (ItemController IntoSet)
+// 7. 정적 인자 SubScreen(DriverSeat / PassengerSeat)을 위한 재사용 가능한 시트 토글 Controller
+abstract class BaseSeatToggleController(
+    override val item: UiItem,
+    initialChecked: Boolean = false
+) : ItemController(), ToggleController {
+    private val _isChecked = MutableStateFlow(initialChecked)
+    override val isChecked: StateFlow<Boolean> = _isChecked.asStateFlow()
+    override val isEnabled: StateFlow<Boolean> = MutableStateFlow(true)
+
+    override fun onToggleChange(checked: Boolean) {
+        _isChecked.value = checked
+    }
+}
+
+class DriverSeatHeaterController @Inject constructor() :
+    BaseSeatToggleController(SettingItems.DriverSeat.heaterToggle, initialChecked = true)
+
+class DriverSeatVentilationController @Inject constructor() :
+    BaseSeatToggleController(SettingItems.DriverSeat.ventilationToggle, initialChecked = false)
+
+class PassengerSeatHeaterController @Inject constructor() :
+    BaseSeatToggleController(SettingItems.PassengerSeat.heaterToggle, initialChecked = false)
+
+class PassengerSeatVentilationController @Inject constructor() :
+    BaseSeatToggleController(SettingItems.PassengerSeat.ventilationToggle, initialChecked = false)
+
+// 8. 동적 인자(deviceId)를 전달하여 DeviceDetail SubScreen으로 이동하는 EntryController
+class BudsDeviceEntryController @Inject constructor() : ItemController(), EntryController {
+    override val item: UiItem = SettingItems.Bluetooth.budsDeviceEntry
+
+    override fun onClick(navigator: (ItemScreen) -> Unit) {
+        navigator(SettingItems.Bluetooth.DeviceDetail)
+    }
+
+    override fun onNavigate(
+        screenNavigator: (ItemScreen) -> Unit,
+        routeNavigator: (String) -> Unit
+    ) {
+        // 런타임 동적 인자("Galaxy_Buds3_Pro")를 포함한 라우트로 이동
+        routeNavigator(SettingItems.Bluetooth.DeviceDetail.createRoute("Galaxy_Buds3_Pro"))
+    }
+}
+
+class CarKitDeviceEntryController @Inject constructor() : ItemController(), EntryController {
+    override val item: UiItem = SettingItems.Bluetooth.carKitDeviceEntry
+
+    override fun onClick(navigator: (ItemScreen) -> Unit) {
+        navigator(SettingItems.Bluetooth.DeviceDetail)
+    }
+
+    override fun onNavigate(
+        screenNavigator: (ItemScreen) -> Unit,
+        routeNavigator: (String) -> Unit
+    ) {
+        // 런타임 동적 인자("Car_Audio_Kit")를 포함한 라우트로 이동
+        routeNavigator(SettingItems.Bluetooth.DeviceDetail.createRoute("Car_Audio_Kit"))
+    }
+}
+
+class DeviceCallAudioToggleController @Inject constructor() :
+    BaseSeatToggleController(SettingItems.Bluetooth.DeviceDetail.callAudioToggle, initialChecked = true)
+
+class DeviceMediaAudioToggleController @Inject constructor() :
+    BaseSeatToggleController(SettingItems.Bluetooth.DeviceDetail.mediaAudioToggle, initialChecked = true)
+
+// 9. Hilt Multi-binding 모듈 (ItemController IntoSet)
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class SampleItemControllerModule {
@@ -124,4 +189,53 @@ abstract class SampleItemControllerModule {
     abstract fun bindBluetoothAdvancedEntry(
         controller: BluetoothAdvancedEntryController
     ): ItemController
+
+    @Binds
+    @IntoSet
+    abstract fun bindDriverSeatHeater(
+        controller: DriverSeatHeaterController
+    ): ItemController
+
+    @Binds
+    @IntoSet
+    abstract fun bindDriverSeatVentilation(
+        controller: DriverSeatVentilationController
+    ): ItemController
+
+    @Binds
+    @IntoSet
+    abstract fun bindPassengerSeatHeater(
+        controller: PassengerSeatHeaterController
+    ): ItemController
+
+    @Binds
+    @IntoSet
+    abstract fun bindPassengerSeatVentilation(
+        controller: PassengerSeatVentilationController
+    ): ItemController
+
+    @Binds
+    @IntoSet
+    abstract fun bindBudsDeviceEntry(
+        controller: BudsDeviceEntryController
+    ): ItemController
+
+    @Binds
+    @IntoSet
+    abstract fun bindCarKitDeviceEntry(
+        controller: CarKitDeviceEntryController
+    ): ItemController
+
+    @Binds
+    @IntoSet
+    abstract fun bindDeviceCallAudioToggle(
+        controller: DeviceCallAudioToggleController
+    ): ItemController
+
+    @Binds
+    @IntoSet
+    abstract fun bindDeviceMediaAudioToggle(
+        controller: DeviceMediaAudioToggleController
+    ): ItemController
 }
+

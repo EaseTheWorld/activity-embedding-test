@@ -38,5 +38,17 @@ interface TextController {
 }
 
 interface EntryController {
-    fun onClick(navigator: (com.example.uifw.item.ItemScreen) -> Unit)
+    fun onClick(navigator: (com.example.uifw.item.ItemScreen) -> Unit) {}
+
+    /**
+     * 동적 라우트 인자(예: screen.createRoute("Galaxy_Buds3_Pro"))를 포함한 경로로 이동할 때 사용.
+     * 기본 구현은 onClick(screenNavigator)으로 위임합니다.
+     */
+    fun onNavigate(
+        screenNavigator: (com.example.uifw.item.ItemScreen) -> Unit,
+        routeNavigator: (String) -> Unit
+    ) {
+        onClick(screenNavigator)
+    }
 }
+

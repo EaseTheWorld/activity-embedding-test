@@ -25,6 +25,7 @@ import com.example.uifw.search.SearchIndexEntry
 import com.example.uifw.ui.DrawTree
 import com.example.uifw.ui.LocalHighlightKey
 import com.example.uifw.ui.LocalItemNavigator
+import com.example.uifw.ui.LocalRouteNavigator
 
 @Composable
 fun SampleSettingsScreen(
@@ -41,8 +42,14 @@ fun SampleSettingsScreen(
     LaunchedEffect(initialDeepLinkKey) {
         if (!initialDeepLinkKey.isNullOrBlank()) {
             val matchingEntry = searchIndex.find { it.targetKey == initialDeepLinkKey }
-            val targetRoute = matchingEntry?.screenRoute ?: initialDeepLinkKey.substringBeforeLast('/')
-            navController.navigate(targetRoute) {
+            val baseRoute = matchingEntry?.screenRoute ?: initialDeepLinkKey.substringBeforeLast('/')
+            val targetScreen = SettingItems.allScreens().find { it.route == baseRoute }
+            val resolvedRoute = if (targetScreen?.routeArg != null) {
+                targetScreen.createRoute("default_device")
+            } else {
+                baseRoute
+            }
+            navController.navigate(resolvedRoute) {
                 launchSingleTop = true
             }
             activeHighlightKey = initialDeepLinkKey
@@ -53,7 +60,15 @@ fun SampleSettingsScreen(
         LocalItemControllerRegistry provides hostViewModel.itemRegistry,
         LocalHighlightKey provides activeHighlightKey,
         LocalItemNavigator provides { targetScreen ->
-            navController.navigate(targetScreen.route)
+            val route = if (targetScreen.routeArg != null) {
+                targetScreen.createRoute("default_device")
+            } else {
+                targetScreen.route
+            }
+            navController.navigate(route)
+        },
+        LocalRouteNavigator provides { targetRoute ->
+            navController.navigate(targetRoute)
         }
     ) {
         Surface(
@@ -166,9 +181,13 @@ fun SampleSettingsScreen(
                         modifier = Modifier.weight(1f)
                     ) {
                         SettingItems.allScreens().forEach { screen ->
-                            composable(route = screen.route) {
+                            composable(route = screen.routePattern) { backStackEntry ->
+                                val dynamicArgValue = screen.routeArg?.let { argName ->
+                                    backStackEntry.arguments?.getString(argName)
+                                }
                                 ItemScreenScaffold(
                                     screen = screen,
+                                    dynamicArgValue = dynamicArgValue,
                                     canNavigateBack = screen.route != SettingItems.route,
                                     onNavigateBack = { navController.popBackStack() }
                                 )
@@ -237,6 +256,7 @@ private fun SearchResultCard(
 @Composable
 private fun ItemScreenScaffold(
     screen: ItemScreen,
+    dynamicArgValue: String? = null,
     canNavigateBack: Boolean,
     onNavigateBack: () -> Unit
 ) {
@@ -258,11 +278,15 @@ private fun ItemScreenScaffold(
             }
             Column(modifier = Modifier.padding(start = if (canNavigateBack) 4.dp else 12.dp)) {
                 Text(
-                    text = screen.title,
+                    text = if (dynamicArgValue != null) "${screen.title} ($dynamicArgValue)" else screen.title,
                     style = MaterialTheme.typography.headlineSmall
                 )
                 Text(
-                    text = "Route: ${screen.route}",
+                    text = if (dynamicArgValue != null) {
+                        "Route: ${screen.createRoute(dynamicArgValue)} (Pattern: ${screen.routePattern})"
+                    } else {
+                        "Route: ${screen.route}"
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.primary
                 )

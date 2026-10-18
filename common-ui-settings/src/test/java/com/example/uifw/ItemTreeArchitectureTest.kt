@@ -70,8 +70,8 @@ class ItemTreeArchitectureTest {
         assertEquals("SettingItems/root", root.key)
         assertEquals(Orientation.VERTICAL, root.orientation)
 
-        // Root has 1 child: the "mainSection" UiSectionItem
-        assertEquals(1, root.children.size)
+        // Root has 2 children: "mainSection" and "seatSection" UiSectionItems
+        assertEquals(2, root.children.size)
         val mainSection = root.children[0] as UiSectionItem
         assertEquals("SettingItems/mainSection", mainSection.key)
         assertEquals("주요 설정", mainSection.title)
@@ -532,7 +532,10 @@ class ItemTreeArchitectureTest {
         // 2. Automatic registration in parent.subScreens and root.allScreens()
         assertTrue(SettingItems.subScreens.contains(SettingItems.Bluetooth))
         assertTrue(SettingItems.subScreens.contains(SettingItems.Wifi))
+        assertTrue(SettingItems.subScreens.contains(SettingItems.DriverSeat))
+        assertTrue(SettingItems.subScreens.contains(SettingItems.PassengerSeat))
         assertTrue(SettingItems.Bluetooth.subScreens.contains(SettingItems.Bluetooth.Advanced))
+        assertTrue(SettingItems.Bluetooth.subScreens.contains(SettingItems.Bluetooth.DeviceDetail))
 
         val all = SettingItems.allScreens()
         assertEquals(
@@ -540,9 +543,110 @@ class ItemTreeArchitectureTest {
                 SettingItems,
                 SettingItems.Bluetooth,
                 SettingItems.Bluetooth.Advanced,
-                SettingItems.Wifi
+                SettingItems.Bluetooth.DeviceDetail,
+                SettingItems.Wifi,
+                SettingItems.DriverSeat,
+                SettingItems.PassengerSeat
             ),
             all
+        )
+    }
+
+    @Test
+    fun testStaticArgumentSubScreenReuseAndDistinctKeysAndBreadcrumbs() {
+        val driverScreen = SettingItems.DriverSeat
+        val passengerScreen = SettingItems.PassengerSeat
+
+        // 1. Same class reused with different static arguments, cached as distinct singletons
+        assertSame(driverScreen, SettingItems.DriverSeat)
+        assertSame(passengerScreen, SettingItems.PassengerSeat)
+        assertNotEquals(driverScreen, passengerScreen)
+        assertEquals( com.example.sample.SeatPosition.DRIVER, driverScreen.seatPosition)
+        assertEquals(com.example.sample.SeatPosition.PASSENGER, passengerScreen.seatPosition)
+
+        // 2. Distinct Routes derived from property names via `by subScreen`
+        assertEquals("SettingItems/DriverSeat", driverScreen.route)
+        assertEquals("SettingItems/PassengerSeat", passengerScreen.route)
+
+        // 3. Distinct DeepLink Keys for identical internal properties
+        assertEquals("SettingItems/DriverSeat/heaterToggle", driverScreen.heaterToggle.key)
+        assertEquals("SettingItems/PassengerSeat/heaterToggle", passengerScreen.heaterToggle.key)
+        assertEquals("SettingItems/DriverSeat/ventilationToggle", driverScreen.ventilationToggle.key)
+        assertEquals("SettingItems/PassengerSeat/ventilationToggle", passengerScreen.ventilationToggle.key)
+
+        // 4. Full Breadcrumbs including enclosing section ("차량 시트 설정") and localized titles
+        val index = ItemSearchIndexer.indexTree(SettingItems)
+        val driverHeaterEntry = index.find { it.targetKey == driverScreen.heaterToggle.key }
+        val passengerHeaterEntry = index.find { it.targetKey == passengerScreen.heaterToggle.key }
+        assertNotNull(driverHeaterEntry)
+        assertNotNull(passengerHeaterEntry)
+
+        assertEquals(
+            "환경 설정 > 차량 시트 설정 > 운전석 시트 설정 > 운전석 열선/통풍 > 운전석 열선 시트",
+            driverHeaterEntry!!.formattedBreadcrumb
+        )
+        assertEquals(
+            "환경 설정 > 차량 시트 설정 > 동승석 시트 설정 > 동승석 열선/통풍 > 동승석 열선 시트",
+            passengerHeaterEntry!!.formattedBreadcrumb
+        )
+
+        // 5. Parameterized Controllers operate independently on each screen's items
+        val driverCtrl = com.example.sample.DriverSeatHeaterController()
+        val passengerCtrl = com.example.sample.PassengerSeatHeaterController()
+        val registry = ItemControllerRegistry(setOf(driverCtrl, passengerCtrl))
+
+        val dVm = registry.get<ToggleController>(driverScreen.heaterToggle)
+        val pVm = registry.get<ToggleController>(passengerScreen.heaterToggle)
+        assertEquals(true, dVm.isChecked.value)
+        assertEquals(false, pVm.isChecked.value)
+
+        pVm.onToggleChange(true)
+        assertEquals(true, pVm.isChecked.value)
+    }
+
+    @Test
+    fun testDynamicArgumentSubScreenRoutePatternAndRuntimeNavigation() {
+        val deviceDetail = SettingItems.Bluetooth.DeviceDetail
+
+        // 1. Compile-time base route and NavGraph routePattern with "{deviceId}"
+        assertEquals("SettingItems/Bluetooth/DeviceDetail", deviceDetail.route)
+        assertEquals("deviceId", deviceDetail.routeArg)
+        assertEquals("SettingItems/Bluetooth/DeviceDetail/{deviceId}", deviceDetail.routePattern)
+
+        // 2. Runtime route binding via createRoute(argValue)
+        assertEquals(
+            "SettingItems/Bluetooth/DeviceDetail/Galaxy_Buds3_Pro",
+            deviceDetail.createRoute("Galaxy_Buds3_Pro")
+        )
+        assertEquals(
+            "SettingItems/Bluetooth/DeviceDetail/Car_Audio_Kit",
+            deviceDetail.createRoute("Car_Audio_Kit")
+        )
+
+        // 3. EntryControllers navigate with runtime arguments
+        val budsController = com.example.sample.BudsDeviceEntryController()
+        val carKitController = com.example.sample.CarKitDeviceEntryController()
+
+        var navigatedRoute: String? = null
+        budsController.onNavigate(
+            screenNavigator = {},
+            routeNavigator = { navigatedRoute = it }
+        )
+        assertEquals("SettingItems/Bluetooth/DeviceDetail/Galaxy_Buds3_Pro", navigatedRoute)
+
+        carKitController.onNavigate(
+            screenNavigator = {},
+            routeNavigator = { navigatedRoute = it }
+        )
+        assertEquals("SettingItems/Bluetooth/DeviceDetail/Car_Audio_Kit", navigatedRoute)
+
+        // 4. Search Indexer still indexes internal items with full hierarchy breadcrumb
+        val index = ItemSearchIndexer.indexTree(SettingItems)
+        val callAudioEntry = index.find { it.targetKey == deviceDetail.callAudioToggle.key }
+        assertNotNull(callAudioEntry)
+        assertEquals(
+            "환경 설정 > 주요 설정 > 블루투스 설정 > 페어링된 기기 > 블루투스 기기 상세 설정 > 연결 프로필 설정 > 통화 오디오",
+            callAudioEntry!!.formattedBreadcrumb
         )
     }
 

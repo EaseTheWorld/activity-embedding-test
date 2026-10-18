@@ -29,6 +29,8 @@ val LocalItemNavigator = staticCompositionLocalOf<(ItemScreen) -> Unit> {
     error("No ItemNavigator provided")
 }
 
+val LocalRouteNavigator = staticCompositionLocalOf<((String) -> Unit)?> { null }
+
 val LocalHighlightKey = staticCompositionLocalOf<String?> { null }
 
 @Composable
@@ -227,6 +229,7 @@ private fun DrawItem(
 
             is UiSubScreenEntryItem -> {
                 val navigator = LocalItemNavigator.current
+                val routeNavigator = LocalRouteNavigator.current
                 val isHighlighted = LocalHighlightKey.current == item.key
                 val controller = LocalItemControllerRegistry.current.getOrNull<com.example.uifw.controller.EntryController>(item)
                 val bringIntoViewRequester = remember { BringIntoViewRequester() }
@@ -259,7 +262,14 @@ private fun DrawItem(
                             .fillMaxWidth()
                             .clickable {
                                 if (controller != null) {
-                                    controller.onClick(navigator)
+                                    if (routeNavigator != null) {
+                                        controller.onNavigate(
+                                            screenNavigator = navigator,
+                                            routeNavigator = routeNavigator
+                                        )
+                                    } else {
+                                        controller.onClick(navigator)
+                                    }
                                 } else if (item.targetScreen != null) {
                                     navigator(item.targetScreen)
                                 }

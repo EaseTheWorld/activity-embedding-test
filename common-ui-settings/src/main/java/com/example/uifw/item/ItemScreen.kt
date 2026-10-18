@@ -8,7 +8,8 @@ abstract class ItemScreen(
     parent: ItemScreen? = null,
     val parentSection: SectionDefinition? = null,
     explicitName: String? = null,
-    explicitRoute: String? = null
+    explicitRoute: String? = null,
+    val routeArg: String? = null
 ) {
     /**
      * parentSection이 지정된 경우 해당 섹션의 소속 화면을 parent로 자동 추론,
@@ -30,6 +31,24 @@ abstract class ItemScreen(
      * - parent가 없으면 "$name"
      */
     val route: String = explicitRoute ?: if (this.parent != null) "${this.parent.route}/$name" else name
+
+    /**
+     * NavGraph 등록용 Route 패턴.
+     * 동적 인자(routeArg)가 정의된 경우 "$route/{$routeArg}" 형태를 반환하고,
+     * 정적 화면인 경우 route와 동일한 값을 반환합니다.
+     */
+    val routePattern: String = if (routeArg != null) "$route/{$routeArg}" else route
+
+    /**
+     * 동적 인자(routeArg)가 있는 화면에 대해 실제 런타임 인자 값을 바인딩한 이동 경로를 생성합니다.
+     * 예: "SettingItems/Bluetooth/DeviceDetail/Galaxy_Buds3_Pro"
+     */
+    fun createRoute(argValue: String): String {
+        require(routeArg != null) {
+            "Screen '$route' does not declare a dynamic routeArg."
+        }
+        return "$route/$argValue"
+    }
 
     private val _subScreens = mutableListOf<ItemScreen>()
 

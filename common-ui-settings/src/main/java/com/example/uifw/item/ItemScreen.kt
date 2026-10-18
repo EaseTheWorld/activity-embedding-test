@@ -33,11 +33,17 @@ abstract class ItemScreen(
     val route: String = explicitRoute ?: if (this.parent != null) "${this.parent.route}/$name" else name
 
     /**
-     * NavGraph 등록용 Route 패턴.
+     * NavGraph 등록용 Route 1 패턴 (화면 자체로 이동하는 용도).
      * 동적 인자(routeArg)가 정의된 경우 "$route/{$routeArg}" 형태를 반환하고,
      * 정적 화면인 경우 route와 동일한 값을 반환합니다.
      */
     val routePattern: String = if (routeArg != null) "$route/{$routeArg}" else route
+
+    /**
+     * NavGraph 등록용 Route 2 패턴 (화면 내 특정 아이템으로 앵커링 & 하이라이트하는 용도).
+     * 예: "SettingItems/Bluetooth/{itemKey}" 또는 "SettingItems/Bluetooth/DeviceDetail/{deviceId}/{itemKey}"
+     */
+    val itemRoutePattern: String = "$routePattern/{$ITEM_KEY_ARG}"
 
     /**
      * 동적 인자(routeArg)가 있는 화면에 대해 실제 런타임 인자 값을 바인딩한 이동 경로를 생성합니다.
@@ -48,6 +54,45 @@ abstract class ItemScreen(
             "Screen '$route' does not declare a dynamic routeArg."
         }
         return "$route/$argValue"
+    }
+
+    /**
+     * 화면 내 특정 아이템으로 앵커링 & 하이라이트하기 위한 이동 경로(Route 2)를 생성합니다.
+     * - 정적 화면: "SettingItems/Bluetooth/masterToggle" (기본 item.key와 동일)
+     * - 동적 인자 화면: "SettingItems/Bluetooth/DeviceDetail/Galaxy_Buds3_Pro/callAudioToggle"
+     */
+    fun createItemRoute(itemKey: String, argValue: String? = null): String {
+        val relativeItemKey = itemKey.removePrefix("$route/").substringAfterLast('/')
+        return if (routeArg != null) {
+            val resolvedArg = requireNotNull(argValue) {
+                "Screen '$route' requires argValue for routeArg '$routeArg' when creating an item route."
+            }
+            "${createRoute(resolvedArg)}/$relativeItemKey"
+        } else {
+            "$route/$relativeItemKey"
+        }
+    }
+
+    fun createItemRoute(item: UiItem, argValue: String? = null): String =
+        createItemRoute(item.key, argValue)
+
+    /**
+     * Route 2 ("$routePattern/{itemKey}")의 "{itemKey}" 인자 값으로부터
+     * 트리 내 실제 아이템의 전체 DeepLink Key를 복원합니다.
+     */
+    fun resolveHighlightKey(itemKeyArg: String?): String? {
+        if (itemKeyArg.isNullOrBlank()) return null
+        val candidateKey = "$route/$itemKeyArg"
+        if (findItem(candidateKey) != null) return candidateKey
+        // explicitKey 등으로 인해 경로 형태가 다른 경우 말단 키 이름으로 탐색
+        val matched = tree.toKeyMap().keys.find { key ->
+            key == itemKeyArg || key.substringAfterLast('/') == itemKeyArg
+        }
+        return matched ?: candidateKey
+    }
+
+    companion object {
+        const val ITEM_KEY_ARG = "itemKey"
     }
 
     private val _subScreens = mutableListOf<ItemScreen>()

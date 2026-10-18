@@ -36,23 +36,27 @@ fun SampleSettingsScreen(
     val navController = rememberNavController()
     val searchIndex = remember { ItemSearchIndexer.indexTree(SettingItems) }
     var searchQuery by remember { mutableStateOf(initialSearchQuery ?: "") }
-    var activeHighlightKey by remember { mutableStateOf<String?>(initialDeepLinkKey) }
 
-    // Initial Deeplink navigation
+    // Helper: 특정 DeepLink 아이템/섹션 키로 이동할 때 그 화면의 Route 2 ("screen_route/{itemKey}") 경로 계산
+    fun resolveItemNavigationRoute(targetKey: String): String {
+        val matchingEntry = searchIndex.find { it.targetKey == targetKey }
+        val baseRoute = matchingEntry?.screenRoute ?: targetKey.substringBeforeLast('/')
+        val targetScreen = SettingItems.allScreens().find { it.route == baseRoute }
+        return if (targetScreen != null) {
+            val defaultArg = if (targetScreen.routeArg != null) "default_device" else null
+            targetScreen.createItemRoute(targetKey, defaultArg)
+        } else {
+            targetKey
+        }
+    }
+
+    // Initial Deeplink navigation: Route 2 ("screen_route/{itemKey}")로 직접 이동하여 앵커링 & 하이라이트
     LaunchedEffect(initialDeepLinkKey) {
         if (!initialDeepLinkKey.isNullOrBlank()) {
-            val matchingEntry = searchIndex.find { it.targetKey == initialDeepLinkKey }
-            val baseRoute = matchingEntry?.screenRoute ?: initialDeepLinkKey.substringBeforeLast('/')
-            val targetScreen = SettingItems.allScreens().find { it.route == baseRoute }
-            val resolvedRoute = if (targetScreen?.routeArg != null) {
-                targetScreen.createRoute("default_device")
-            } else {
-                baseRoute
-            }
-            navController.navigate(resolvedRoute) {
+            val targetRoute = resolveItemNavigationRoute(initialDeepLinkKey)
+            navController.navigate(targetRoute) {
                 launchSingleTop = true
             }
-            activeHighlightKey = initialDeepLinkKey
         }
     }
 
@@ -75,7 +79,6 @@ fun SampleSettingsScreen(
 
     CompositionLocalProvider(
         LocalItemControllerRegistry provides hostViewModel.itemRegistry,
-        LocalHighlightKey provides activeHighlightKey,
         LocalItemNavigator provides itemNavigator
     ) {
         Surface(
@@ -134,10 +137,10 @@ fun SampleSettingsScreen(
                                 SearchResultCard(
                                     entry = entry,
                                     onClick = {
-                                        navController.navigate(entry.screenRoute) {
+                                        val itemRoute = resolveItemNavigationRoute(entry.targetKey)
+                                        navController.navigate(itemRoute) {
                                             launchSingleTop = true
                                         }
-                                        activeHighlightKey = entry.targetKey
                                         searchQuery = ""
                                     }
                                 )
@@ -145,49 +148,16 @@ fun SampleSettingsScreen(
                         }
                     }
                 } else {
-                    // Active DeepLink Banner
-                    if (activeHighlightKey != null) {
-                        Surface(
-                            color = MaterialTheme.colorScheme.primaryContainer,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 4.dp),
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 12.dp, vertical = 6.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = "🎯 DeepLink 활성화됨",
-                                        style = MaterialTheme.typography.labelMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                                    )
-                                    Text(
-                                        text = activeHighlightKey!!,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                                    )
-                                }
-                                TextButton(onClick = { activeHighlightKey = null }) {
-                                    Text("강조 해제")
-                                }
-                            }
-                        }
-                    }
-
-                    // Screen NavHost (루트 트리에서 모든 하위 화면을 자동 수집하여 등록)
+                    // Screen NavHost: 각 Screen마다 2개의 Route를 자동 등록
+                    // 1) screen.routePattern: 화면 자체로 이동하는 용도
+                    // 2) screen.itemRoutePattern ("${screen.routePattern}/{itemKey}"): 화면 내 특정 아이템 앵커링 & 하이라이트 용도
                     NavHost(
                         navController = navController,
                         startDestination = SettingItems.route,
                         modifier = Modifier.weight(1f)
                     ) {
                         SettingItems.allScreens().forEach { screen ->
+                            // Route 1: 화면 자체 진입
                             composable(route = screen.routePattern) { backStackEntry ->
                                 val dynamicArgValue = screen.routeArg?.let { argName ->
                                     backStackEntry.arguments?.getString(argName)
@@ -195,7 +165,24 @@ fun SampleSettingsScreen(
                                 ItemScreenScaffold(
                                     screen = screen,
                                     dynamicArgValue = dynamicArgValue,
-                                    canNavigateBack = screen.route != SettingItems.route,
+                                    initialHighlightKey = null,
+                                    canNavigateBack = navController.previousBackStackEntry != null,
+                                    onNavigateBack = { navController.popBackStack() }
+                                )
+                            }
+
+                            // Route 2: 화면 내 특정 아이템 앵커링 & 하이라이트 진입 ("screen_route/{itemKey}")
+                            composable(route = screen.itemRoutePattern) { backStackEntry ->
+                                val dynamicArgValue = screen.routeArg?.let { argName ->
+                                    backStackEntry.arguments?.getString(argName)
+                                }
+                                val itemKeyArg = backStackEntry.arguments?.getString(ItemScreen.ITEM_KEY_ARG)
+                                val resolvedHighlightKey = screen.resolveHighlightKey(itemKeyArg)
+                                ItemScreenScaffold(
+                                    screen = screen,
+                                    dynamicArgValue = dynamicArgValue,
+                                    initialHighlightKey = resolvedHighlightKey,
+                                    canNavigateBack = navController.previousBackStackEntry != null,
                                     onNavigateBack = { navController.popBackStack() }
                                 )
                             }
@@ -264,56 +251,96 @@ private fun SearchResultCard(
 private fun ItemScreenScaffold(
     screen: ItemScreen,
     dynamicArgValue: String? = null,
+    initialHighlightKey: String? = null,
     canNavigateBack: Boolean,
     onNavigateBack: () -> Unit
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-    ) {
-        Row(
+    var activeHighlightKey by remember(initialHighlightKey) { mutableStateOf(initialHighlightKey) }
+
+    CompositionLocalProvider(LocalHighlightKey provides activeHighlightKey) {
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
         ) {
-            if (canNavigateBack) {
-                IconButton(onClick = onNavigateBack) {
-                    Text("←", style = MaterialTheme.typography.headlineMedium)
+            if (activeHighlightKey != null) {
+                Surface(
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "🎯 DeepLink 앵커링 & 하이라이트 활성화됨",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                            Text(
+                                text = activeHighlightKey!!,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                        TextButton(onClick = { activeHighlightKey = null }) {
+                            Text("강조 해제")
+                        }
+                    }
                 }
             }
-            Column(modifier = Modifier.padding(start = if (canNavigateBack) 4.dp else 12.dp)) {
-                Text(
-                    text = if (dynamicArgValue != null) "${screen.title} ($dynamicArgValue)" else screen.title,
-                    style = MaterialTheme.typography.headlineSmall
-                )
-                Text(
-                    text = if (dynamicArgValue != null) {
-                        "Route: ${screen.createRoute(dynamicArgValue)} (Pattern: ${screen.routePattern})"
-                    } else {
-                        "Route: ${screen.route}"
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-        }
-        HorizontalDivider()
-        DrawTree(tree = screen.tree) { customItem ->
-            when (customItem) {
-                is UiAudioLatencyVisualizerItem -> {
-                    AudioLatencyVisualizerCard(item = customItem)
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (canNavigateBack) {
+                    IconButton(onClick = onNavigateBack) {
+                        Text("←", style = MaterialTheme.typography.headlineMedium)
+                    }
                 }
-                else -> {
+                Column(modifier = Modifier.padding(start = if (canNavigateBack) 4.dp else 12.dp)) {
                     Text(
-                        text = "Unsupported custom item: ${customItem.key}",
-                        modifier = Modifier.padding(16.dp)
+                        text = if (dynamicArgValue != null) "${screen.title} ($dynamicArgValue)" else screen.title,
+                        style = MaterialTheme.typography.headlineSmall
+                    )
+                    Text(
+                        text = if (dynamicArgValue != null) {
+                            "Route: ${screen.createRoute(dynamicArgValue)} (Pattern: ${screen.routePattern})"
+                        } else {
+                            "Route: ${screen.route}"
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
             }
+            HorizontalDivider()
+            DrawTree(tree = screen.tree) { customItem ->
+                when (customItem) {
+                    is UiAudioLatencyVisualizerItem -> {
+                        AudioLatencyVisualizerCard(item = customItem)
+                    }
+                    else -> {
+                        Text(
+                            text = "Unsupported custom item: ${customItem.key}",
+                            modifier = Modifier.padding(16.dp)
+                        )
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(24.dp))
         }
-        Spacer(modifier = Modifier.height(24.dp))
     }
 }
 

@@ -679,6 +679,46 @@ class ItemTreeArchitectureTest {
     }
 
     @Test
+    fun testDualRoutesPerScreenForDirectEntryAndItemHighlight() {
+        // 1. Static screen: Route 1 (screen itself) and Route 2 (screen + {itemKey})
+        val btScreen = SettingItems.Bluetooth
+        assertEquals("SettingItems/Bluetooth", btScreen.routePattern)
+        assertEquals("SettingItems/Bluetooth/{itemKey}", btScreen.itemRoutePattern)
+
+        // Navigating to an item produces its exact DeepLink key as Route 2
+        val btToggleItemRoute = btScreen.createItemRoute(btScreen.masterToggle)
+        assertEquals("SettingItems/Bluetooth/masterToggle", btToggleItemRoute)
+        assertEquals(btScreen.masterToggle.key, btToggleItemRoute)
+
+        // Extracting {itemKey} ("masterToggle") from NavBackStackEntry resolves back to full item key
+        assertEquals(
+            "SettingItems/Bluetooth/masterToggle",
+            btScreen.resolveHighlightKey("masterToggle")
+        )
+
+        // 2. Dynamic argument screen: Route 1 (".../{deviceId}") and Route 2 (".../{deviceId}/{itemKey}")
+        val deviceDetail = SettingItems.Bluetooth.DeviceDetail
+        assertEquals("SettingItems/Bluetooth/DeviceDetail/{deviceId}", deviceDetail.routePattern)
+        assertEquals(
+            "SettingItems/Bluetooth/DeviceDetail/{deviceId}/{itemKey}",
+            deviceDetail.itemRoutePattern
+        )
+
+        val callAudioItemRoute = deviceDetail.createItemRoute(
+            item = deviceDetail.callAudioToggle,
+            argValue = "Galaxy_Buds3_Pro"
+        )
+        assertEquals(
+            "SettingItems/Bluetooth/DeviceDetail/Galaxy_Buds3_Pro/callAudioToggle",
+            callAudioItemRoute
+        )
+        assertEquals(
+            "SettingItems/Bluetooth/DeviceDetail/callAudioToggle",
+            deviceDetail.resolveHighlightKey("callAudioToggle")
+        )
+    }
+
+    @Test
     fun testVerifyNoCircularParentReferencesInScreens() {
         val allScreens = SettingItems.allScreens() + listOf(
             ExplicitKeyTestScreen,

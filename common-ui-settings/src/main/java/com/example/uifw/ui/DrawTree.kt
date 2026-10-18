@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
@@ -30,7 +31,7 @@ val LocalItemNavigator = staticCompositionLocalOf<ItemNavigator> {
     error("No ItemNavigator provided")
 }
 
-val LocalHighlightKey = staticCompositionLocalOf<String?> { null }
+val LocalHighlightKey = compositionLocalOf<String?> { null }
 
 @Composable
 fun DrawTree(

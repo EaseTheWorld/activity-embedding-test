@@ -361,15 +361,16 @@ private fun ItemScreenScaffold(
 }
 
 /**
- * Custom Item(UiAudioLatencyVisualizerItem)도 Common Item과 완전히 동일한 ItemRenderer<T> 구조로 구현하여
- * Hilt @IntoSet으로 ItemRendererRegistry에 자동 등록됩니다.
+ * Custom Item 렌더러도 ItemUiState 하위 클래스(AudioLatencyUiState)를 기준으로 매핑되며,
+ * 순수 `state: AudioLatencyUiState`와 `onValueChanged: (Int) -> Unit` (`controller::onValueChanged`)을 분리해서 전달받습니다.
  */
 class AudioLatencyVisualizerRenderer @Inject constructor() :
-    ItemRenderer<UiAudioLatencyVisualizerItem>(UiAudioLatencyVisualizerItem::class) {
+    ItemRenderer<AudioLatencyUiState, Int>(AudioLatencyUiState::class) {
 
     @Composable
     override fun Render(
-        item: UiAudioLatencyVisualizerItem,
+        state: AudioLatencyUiState,
+        onValueChanged: (Int) -> Unit,
         isHighlighted: Boolean,
         modifier: Modifier
     ) {
@@ -389,7 +390,10 @@ class AudioLatencyVisualizerRenderer @Inject constructor() :
                         DeepLinkTargetBadge()
                     }
                 }
-                AudioLatencyVisualizerCard(item = item)
+                AudioLatencyVisualizerCard(
+                    state = state,
+                    onLatencyChanged = onValueChanged
+                )
             }
         }
         HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
@@ -398,11 +402,10 @@ class AudioLatencyVisualizerRenderer @Inject constructor() :
 
 @Composable
 private fun AudioLatencyVisualizerCard(
-    item: UiAudioLatencyVisualizerItem,
+    state: AudioLatencyUiState,
+    onLatencyChanged: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var latency by remember { mutableIntStateOf(item.defaultLatencyMs) }
-
     Card(
         modifier = modifier
             .fillMaxWidth()
@@ -420,7 +423,7 @@ private fun AudioLatencyVisualizerCard(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = "⚡ ${item.title}",
+                        text = "⚡ ${state.title}",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
@@ -438,14 +441,14 @@ private fun AudioLatencyVisualizerCard(
                     }
                 }
                 Text(
-                    text = "${latency}ms",
+                    text = "${state.latencyMs}ms",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.tertiary
                 )
             }
             Text(
-                text = "Key: ${item.key}",
+                text = "Key: ${state.item.key}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 2.dp, bottom = 8.dp)
@@ -456,18 +459,21 @@ private fun AudioLatencyVisualizerCard(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 FilterChip(
-                    selected = latency == 20,
-                    onClick = { latency = 20 },
+                    selected = state.latencyMs == 20,
+                    enabled = state.isEnabled,
+                    onClick = { onLatencyChanged(20) },
                     label = { Text("초저지연 (20ms)") }
                 )
                 FilterChip(
-                    selected = latency == 45,
-                    onClick = { latency = 45 },
+                    selected = state.latencyMs == 45,
+                    enabled = state.isEnabled,
+                    onClick = { onLatencyChanged(45) },
                     label = { Text("표준 게임 (45ms)") }
                 )
                 FilterChip(
-                    selected = latency == 120,
-                    onClick = { latency = 120 },
+                    selected = state.latencyMs == 120,
+                    enabled = state.isEnabled,
+                    onClick = { onLatencyChanged(120) },
                     label = { Text("고음질 HD (120ms)") }
                 )
             }

@@ -1,10 +1,14 @@
 package com.example.sample
 
+import androidx.compose.runtime.Immutable
 import com.example.uifw.controller.EntryController
 import com.example.uifw.controller.ItemController
 import com.example.uifw.controller.ItemNavigator
-import com.example.uifw.controller.ToggleController
+import com.example.uifw.controller.ItemUiState
+import com.example.uifw.controller.StatefulItemController
+import com.example.uifw.controller.ToggleItemController
 import com.example.uifw.item.UiItem
+import com.example.uifw.item.UiToggleItem
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -15,47 +19,23 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import javax.inject.Inject
 
-// 1. 블루투스 마스터 토글 ItemController
-class BluetoothMasterToggleController @Inject constructor() : ItemController(), ToggleController {
-    override val item: UiItem = SettingItems.Bluetooth.masterToggle
+// 1. 블루투스 마스터 토글 ItemController (ToggleUiState 방출)
+class BluetoothMasterToggleController @Inject constructor() : ToggleItemController(
+    item = SettingItems.Bluetooth.masterToggle,
+    initialChecked = true
+)
 
-    private val _isChecked = MutableStateFlow(true)
-    override val isChecked: StateFlow<Boolean> = _isChecked.asStateFlow()
+// 2. Wi-Fi 마스터 토글 ItemController (ToggleUiState 방출)
+class WifiMasterToggleController @Inject constructor() : ToggleItemController(
+    item = SettingItems.Wifi.masterToggle,
+    initialChecked = false
+)
 
-    override val isEnabled: StateFlow<Boolean> = MutableStateFlow(true)
-
-    override fun onToggleChange(checked: Boolean) {
-        _isChecked.value = checked
-    }
-}
-
-// 2. Wi-Fi 마스터 토글 ItemController
-class WifiMasterToggleController @Inject constructor() : ItemController(), ToggleController {
-    override val item: UiItem = SettingItems.Wifi.masterToggle
-
-    private val _isChecked = MutableStateFlow(false)
-    override val isChecked: StateFlow<Boolean> = _isChecked.asStateFlow()
-
-    override val isEnabled: StateFlow<Boolean> = MutableStateFlow(true)
-
-    override fun onToggleChange(checked: Boolean) {
-        _isChecked.value = checked
-    }
-}
-
-// 3. 블루투스 듀얼 오디오 토글 ItemController
-class DualAudioToggleController @Inject constructor() : ItemController(), ToggleController {
-    override val item: UiItem = SettingItems.Bluetooth.Advanced.dualAudio
-
-    private val _isChecked = MutableStateFlow(false)
-    override val isChecked: StateFlow<Boolean> = _isChecked.asStateFlow()
-
-    override val isEnabled: StateFlow<Boolean> = MutableStateFlow(true)
-
-    override fun onToggleChange(checked: Boolean) {
-        _isChecked.value = checked
-    }
-}
+// 3. 블루투스 듀얼 오디오 토글 ItemController (ToggleUiState 방출)
+class DualAudioToggleController @Inject constructor() : ToggleItemController(
+    item = SettingItems.Bluetooth.Advanced.dualAudio,
+    initialChecked = false
+)
 
 // 4. 블루투스 화면 진입 EntryController
 // onClick을 오버라이드하지 않으면 EntryItem(SettingItems.bluetoothEntry)에 선언된 targetScreen(SettingItems.Bluetooth)으로 자동 이동합니다.
@@ -75,17 +55,9 @@ class BluetoothAdvancedEntryController @Inject constructor() : ItemController(),
 
 // 7. 정적 인자 SubScreen(DriverSeat / PassengerSeat)을 위한 재사용 가능한 시트 토글 Controller
 abstract class BaseSeatToggleController(
-    override val item: UiItem,
+    item: UiToggleItem,
     initialChecked: Boolean = false
-) : ItemController(), ToggleController {
-    private val _isChecked = MutableStateFlow(initialChecked)
-    override val isChecked: StateFlow<Boolean> = _isChecked.asStateFlow()
-    override val isEnabled: StateFlow<Boolean> = MutableStateFlow(true)
-
-    override fun onToggleChange(checked: Boolean) {
-        _isChecked.value = checked
-    }
-}
+) : ToggleItemController(item = item, initialChecked = initialChecked)
 
 class DriverSeatHeaterController @Inject constructor() :
     BaseSeatToggleController(SettingItems.DriverSeat.heaterToggle, initialChecked = true)
@@ -124,7 +96,39 @@ class DeviceCallAudioToggleController @Inject constructor() :
 class DeviceMediaAudioToggleController @Inject constructor() :
     BaseSeatToggleController(SettingItems.Bluetooth.DeviceDetail.mediaAudioToggle, initialChecked = true)
 
-// 9. Hilt Multi-binding 모듈 (ItemController IntoSet)
+// 9. 커스텀 아이템(UiAudioLatencyVisualizerItem)을 위한 순수 불변 UiState 및 Controller
+@Immutable
+data class AudioLatencyUiState(
+    override val item: UiAudioLatencyVisualizerItem,
+    val title: String = item.title,
+    val latencyMs: Int = item.defaultLatencyMs,
+    override val isVisible: Boolean = true,
+    override val isEnabled: Boolean = true
+) : ItemUiState
+
+class AudioLatencyVisualizerController @Inject constructor() :
+    StatefulItemController<AudioLatencyUiState, Int>() {
+
+    override val item: UiAudioLatencyVisualizerItem =
+        SettingItems.Bluetooth.Advanced.latencyVisualizer
+
+    private val _uiState = MutableStateFlow(AudioLatencyUiState(item = item))
+    override val uiState: StateFlow<AudioLatencyUiState> = _uiState.asStateFlow()
+
+    override fun onValueChange(value: Int) {
+        _uiState.value = _uiState.value.copy(latencyMs = value)
+    }
+
+    fun setVisible(visible: Boolean) {
+        _uiState.value = _uiState.value.copy(isVisible = visible)
+    }
+
+    fun setEnabled(enabled: Boolean) {
+        _uiState.value = _uiState.value.copy(isEnabled = enabled)
+    }
+}
+
+// 10. Hilt Multi-binding 모듈 (ItemController & ItemRenderer IntoSet)
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class SampleItemControllerModule {
@@ -215,8 +219,13 @@ abstract class SampleItemControllerModule {
 
     @Binds
     @IntoSet
+    abstract fun bindAudioLatencyVisualizerController(
+        controller: AudioLatencyVisualizerController
+    ): ItemController
+
+    @Binds
+    @IntoSet
     abstract fun bindAudioLatencyVisualizerRenderer(
         renderer: AudioLatencyVisualizerRenderer
-    ): com.example.uifw.ui.ItemRenderer<*>
+    ): com.example.uifw.ui.ItemRenderer<*, *>
 }
-

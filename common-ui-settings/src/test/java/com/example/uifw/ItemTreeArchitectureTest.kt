@@ -759,34 +759,73 @@ class ItemTreeArchitectureTest {
     }
 
     @Test
-    fun testUnifiedItemRendererRegistryForCommonAndCustomItems() {
+    fun testControllerEmitsUiStateAndHandlesOnValueChanged() {
+        // 1. ToggleItemController emits pure ToggleUiState (isChecked, isVisible, isEnabled)
+        val btController = BluetoothMasterToggleController()
+        assertEquals(
+            com.example.uifw.controller.ToggleUiState(
+                item = SettingItems.Bluetooth.masterToggle,
+                isChecked = true,
+                isVisible = true,
+                isEnabled = true
+            ),
+            btController.uiState.value
+        )
+
+        // Invoking controller::onValueChanged updates uiState
+        val onValueChangedLambda: (Any?) -> Unit = btController::onValueChanged
+        onValueChangedLambda(false)
+        assertEquals(false, btController.uiState.value.isChecked)
+
+        btController.setEnabled(false)
+        btController.setVisible(false)
+        assertEquals(false, btController.uiState.value.isEnabled)
+        assertEquals(false, btController.uiState.value.isVisible)
+
+        // 2. Custom StatefulItemController emits pure AudioLatencyUiState
+        val latencyController = com.example.sample.AudioLatencyVisualizerController()
+        assertEquals(45, latencyController.uiState.value.latencyMs)
+        assertTrue(latencyController.uiState.value.isVisible)
+        assertTrue(latencyController.uiState.value.isEnabled)
+
+        val customValueChanged: (Any?) -> Unit = latencyController::onValueChanged
+        customValueChanged(20)
+        assertEquals(20, latencyController.uiState.value.latencyMs)
+    }
+
+    @Test
+    fun testUnifiedItemRendererRegistryAggregatedByUiState() {
         val customRenderer = com.example.sample.AudioLatencyVisualizerRenderer()
         val registry = com.example.uifw.ui.ItemRendererRegistry(setOf(customRenderer))
 
-        // 1. Built-in Common Item Renderers are registered by default
-        assertTrue(registry.hasRenderer(UiSectionItem::class))
-        assertTrue(registry.hasRenderer(UiLinearItem::class))
-        assertTrue(registry.hasRenderer(UiToggleItem::class))
-        assertTrue(registry.hasRenderer(UiTextItem::class))
-        assertTrue(registry.hasRenderer(UiSubScreenEntryItem::class))
+        // 1. Built-in Common UiState Renderers are registered by default
+        assertTrue(registry.hasRenderer(com.example.uifw.controller.SectionUiState::class))
+        assertTrue(registry.hasRenderer(com.example.uifw.controller.LinearUiState::class))
+        assertTrue(registry.hasRenderer(com.example.uifw.controller.ToggleUiState::class))
+        assertTrue(registry.hasRenderer(com.example.uifw.controller.TextUiState::class))
+        assertTrue(registry.hasRenderer(com.example.uifw.controller.EntryUiState::class))
 
+        val btController = BluetoothMasterToggleController()
         assertSame(
             com.example.uifw.ui.ToggleItemRenderer,
-            registry.get(SettingItems.Bluetooth.masterToggle)
+            registry.get(btController.uiState.value)
         )
+
+        val btEntryController = com.example.sample.BluetoothEntryController()
         assertSame(
             com.example.uifw.ui.SubScreenEntryItemRenderer,
-            registry.get(SettingItems.bluetoothEntry)
+            registry.get(btEntryController.uiState.value)
         )
 
-        // 2. Custom Item Renderer is resolved through the exact same registry & pipeline
-        assertTrue(registry.hasRenderer(com.example.sample.UiAudioLatencyVisualizerItem::class))
+        // 2. Custom UiState Renderer is resolved by AudioLatencyUiState::class
+        val latencyController = com.example.sample.AudioLatencyVisualizerController()
+        assertTrue(registry.hasRenderer(com.example.sample.AudioLatencyUiState::class))
         assertSame(
             customRenderer,
-            registry.get(SettingItems.Bluetooth.Advanced.latencyVisualizer)
+            registry.get(latencyController.uiState.value)
         )
 
-        // 3. Duplicate Custom Item Renderer for the same KClass throws IllegalArgumentException
+        // 3. Duplicate Custom ItemRenderer for the same UiState class throws IllegalArgumentException
         try {
             com.example.uifw.ui.ItemRendererRegistry(
                 setOf(

@@ -22,10 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.example.uifw.controller.EntryController
-import com.example.uifw.controller.ItemNavigator
-import com.example.uifw.controller.LocalItemControllerRegistry
-import com.example.uifw.controller.ToggleController
+import com.example.uifw.controller.*
 import com.example.uifw.item.*
 
 val LocalItemNavigator = staticCompositionLocalOf<ItemNavigator> {
@@ -35,10 +32,11 @@ val LocalItemNavigator = staticCompositionLocalOf<ItemNavigator> {
 val LocalHighlightKey = compositionLocalOf<String?> { null }
 
 /**
- * Common Item과 Custom Item 구분 없이 모든 UiItem을 ItemRendererRegistry를 통해 동일한 파이프라인으로 렌더링합니다.
- * - 고유 key(item.key) 스코핑
- * - DeepLink 하이라이트(LocalHighlightKey) 판별
- * - BringIntoViewRequester 자동 스크롤(Anchoring)
+ * 모든 UiItem에 대해:
+ * 1) Controller에서 동적 ItemUiState(value, isVisible, isEnabled)를 구독 (없는 정적 노드는 기본 UiState 생성)
+ * 2) isVisible == false 인 경우 즉시 렌더링 생략
+ * 3) ItemUiState의 클래스 타입(uiState::class) 기준으로 ItemRendererRegistry에서 렌더러 조회
+ * 4) 렌더러에 순수 `state`와 `controller::onValueChanged` 람다를 분리하여 전달
  */
 @Composable
 fun DrawTree(
@@ -53,9 +51,25 @@ private fun DrawItem(
     item: UiItem,
     modifier: Modifier = Modifier
 ) {
+    val controllerRegistry = LocalItemControllerRegistry.current
     val rendererRegistry = LocalItemRendererRegistry.current
 
     key(item.key) {
+        val controller = remember(item.key) {
+            controllerRegistry.getOrNull<ItemController>(item)
+        }
+
+        val uiState: ItemUiState = if (controller != null) {
+            val collected by controller.uiState.collectAsStateWithLifecycle()
+            collected
+        } else {
+            remember(item) { createDefaultUiState(item) }
+        }
+
+        // 1. 공통 가시성(isVisible) 제어: false이면 하위 트리 및 자신을 렌더링하지 않음
+        if (!uiState.isVisible) return@key
+
+        // 2. 공통 DeepLink 하이라이트 및 자동 스크롤(Anchoring)
         val isHighlighted = LocalHighlightKey.current == item.key
         val bringIntoViewRequester = remember { BringIntoViewRequester() }
         LaunchedEffect(isHighlighted) {
@@ -65,18 +79,34 @@ private fun DrawItem(
         }
 
         val anchoredModifier = modifier.bringIntoViewRequester(bringIntoViewRequester)
-        val renderer = rendererRegistry.getOrNull(item)
+
+        // 3. UiState 타입 기준으로 ItemRenderer 조회 및 controller::onValueChanged 바인딩
+        val renderer = rendererRegistry.getOrNull(uiState)
+        val onValueChanged: (Any?) -> Unit = remember(controller, item) {
+            if (controller != null) {
+                val callback: (Any?) -> Unit = controller::onValueChanged
+                callback
+            } else {
+                val fallback: (Any?) -> Unit = { value ->
+                    if (value is ItemNavigator && item is UiSubScreenEntryItem && item.targetScreen != null) {
+                        value(item.targetScreen)
+                    }
+                }
+                fallback
+            }
+        }
 
         if (renderer != null) {
             renderer.Render(
-                item = item,
+                state = uiState,
+                onValueChanged = onValueChanged,
                 isHighlighted = isHighlighted,
                 modifier = anchoredModifier,
                 renderChild = { child -> DrawItem(item = child) }
             )
         } else {
             Text(
-                text = "No ItemRenderer registered for ${item::class.simpleName} (key: ${item.key})",
+                text = "No ItemRenderer registered for UiState ${uiState::class.simpleName} (key: ${item.key})",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error,
                 modifier = anchoredModifier.padding(16.dp)
@@ -121,16 +151,18 @@ fun Modifier.deepLinkHighlightBox(isHighlighted: Boolean): Modifier =
         this
     }
 
-// ── Built-in Common Item Renderers ───────────────────────────────────────────
+// ── Built-in Common UiState Renderers ────────────────────────────────────────
 
-object SectionItemRenderer : ItemRenderer<UiSectionItem>(UiSectionItem::class) {
+object SectionItemRenderer : ItemRenderer<SectionUiState, Unit>(SectionUiState::class) {
     @Composable
     override fun Render(
-        item: UiSectionItem,
+        state: SectionUiState,
+        onValueChanged: (Unit) -> Unit,
         isHighlighted: Boolean,
         modifier: Modifier,
         renderChild: @Composable (UiItem) -> Unit
     ) {
+        val item = state.item
         Card(
             modifier = modifier
                 .fillMaxWidth()
@@ -166,7 +198,7 @@ object SectionItemRenderer : ItemRenderer<UiSectionItem>(UiSectionItem::class) {
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = "📁 ${item.title}",
+                        text = "📁 ${state.title}",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -191,14 +223,16 @@ object SectionItemRenderer : ItemRenderer<UiSectionItem>(UiSectionItem::class) {
     }
 }
 
-object LinearItemRenderer : ItemRenderer<UiLinearItem>(UiLinearItem::class) {
+object LinearItemRenderer : ItemRenderer<LinearUiState, Unit>(LinearUiState::class) {
     @Composable
     override fun Render(
-        item: UiLinearItem,
+        state: LinearUiState,
+        onValueChanged: (Unit) -> Unit,
         isHighlighted: Boolean,
         modifier: Modifier,
         renderChild: @Composable (UiItem) -> Unit
     ) {
+        val item = state.item
         Column(modifier = modifier.fillMaxWidth()) {
             if (!item.key.endsWith("/root")) {
                 Text(
@@ -224,20 +258,14 @@ object LinearItemRenderer : ItemRenderer<UiLinearItem>(UiLinearItem::class) {
     }
 }
 
-object ToggleItemRenderer : ItemRenderer<UiToggleItem>(UiToggleItem::class) {
+object ToggleItemRenderer : ItemRenderer<ToggleUiState, Boolean>(ToggleUiState::class) {
     @Composable
     override fun Render(
-        item: UiToggleItem,
+        state: ToggleUiState,
+        onValueChanged: (Boolean) -> Unit,
         isHighlighted: Boolean,
         modifier: Modifier
     ) {
-        val registry = LocalItemControllerRegistry.current
-        val controller = remember(item.key) {
-            registry.getOrCreate<ToggleController>(item)
-        }
-        val isChecked by controller.isChecked.collectAsStateWithLifecycle()
-        val isEnabled by controller.isEnabled.collectAsStateWithLifecycle()
-
         Box(
             modifier = modifier
                 .fillMaxWidth()
@@ -252,22 +280,22 @@ object ToggleItemRenderer : ItemRenderer<UiToggleItem>(UiToggleItem::class) {
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(text = item.title, style = MaterialTheme.typography.bodyLarge)
+                        Text(text = state.title, style = MaterialTheme.typography.bodyLarge)
                         if (isHighlighted) {
                             Spacer(modifier = Modifier.width(8.dp))
                             DeepLinkTargetBadge()
                         }
                     }
                     Text(
-                        text = "Key: ${item.key}",
+                        text = "Key: ${state.item.key}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 Switch(
-                    checked = isChecked,
-                    enabled = isEnabled,
-                    onCheckedChange = controller::onToggleChange
+                    checked = state.isChecked,
+                    enabled = state.isEnabled,
+                    onCheckedChange = onValueChanged
                 )
             }
         }
@@ -275,10 +303,11 @@ object ToggleItemRenderer : ItemRenderer<UiToggleItem>(UiToggleItem::class) {
     }
 }
 
-object TextItemRenderer : ItemRenderer<UiTextItem>(UiTextItem::class) {
+object TextItemRenderer : ItemRenderer<TextUiState, Unit>(TextUiState::class) {
     @Composable
     override fun Render(
-        item: UiTextItem,
+        state: TextUiState,
+        onValueChanged: (Unit) -> Unit,
         isHighlighted: Boolean,
         modifier: Modifier
     ) {
@@ -293,13 +322,13 @@ object TextItemRenderer : ItemRenderer<UiTextItem>(UiTextItem::class) {
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(text = item.text, style = MaterialTheme.typography.bodyLarge)
+                Text(text = state.text, style = MaterialTheme.typography.bodyLarge)
                 if (isHighlighted) {
                     DeepLinkTargetBadge()
                 }
             }
             Text(
-                text = "Key: ${item.key}",
+                text = "Key: ${state.item.key}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -308,15 +337,15 @@ object TextItemRenderer : ItemRenderer<UiTextItem>(UiTextItem::class) {
     }
 }
 
-object SubScreenEntryItemRenderer : ItemRenderer<UiSubScreenEntryItem>(UiSubScreenEntryItem::class) {
+object SubScreenEntryItemRenderer : ItemRenderer<EntryUiState, ItemNavigator>(EntryUiState::class) {
     @Composable
     override fun Render(
-        item: UiSubScreenEntryItem,
+        state: EntryUiState,
+        onValueChanged: (ItemNavigator) -> Unit,
         isHighlighted: Boolean,
         modifier: Modifier
     ) {
         val navigator = LocalItemNavigator.current
-        val controller = LocalItemControllerRegistry.current.getOrNull<EntryController>(item)
 
         Column(
             modifier = modifier
@@ -326,12 +355,8 @@ object SubScreenEntryItemRenderer : ItemRenderer<UiSubScreenEntryItem>(UiSubScre
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable {
-                        if (controller != null) {
-                            controller.onClick(navigator)
-                        } else if (item.targetScreen != null) {
-                            navigator(item.targetScreen)
-                        }
+                    .clickable(enabled = state.isEnabled) {
+                        onValueChanged(navigator)
                     }
                     .padding(horizontal = 16.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -339,15 +364,15 @@ object SubScreenEntryItemRenderer : ItemRenderer<UiSubScreenEntryItem>(UiSubScre
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(text = item.title, style = MaterialTheme.typography.bodyLarge)
+                        Text(text = state.title, style = MaterialTheme.typography.bodyLarge)
                         if (isHighlighted) {
                             Spacer(modifier = Modifier.width(8.dp))
                             DeepLinkTargetBadge()
                         }
                     }
-                    val targetDesc = item.targetScreen?.route ?: "Dynamic (Controller)"
+                    val targetDesc = state.targetScreen?.route ?: "Dynamic (Controller)"
                     Text(
-                        text = "Key: ${item.key}  ➔  Target: $targetDesc",
+                        text = "Key: ${state.item.key}  ➔  Target: $targetDesc",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.primary
                     )
@@ -364,7 +389,7 @@ object SubScreenEntryItemRenderer : ItemRenderer<UiSubScreenEntryItem>(UiSubScre
 }
 
 object DefaultItemRenderers {
-    val all: List<ItemRenderer<*>> = listOf(
+    val all: List<ItemRenderer<*, *>> = listOf(
         SectionItemRenderer,
         LinearItemRenderer,
         ToggleItemRenderer,

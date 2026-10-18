@@ -5,16 +5,44 @@ import kotlin.properties.ReadOnlyProperty
 
 abstract class ItemScreen(
     val title: String,
+    val parent: ItemScreen? = null,
+    explicitName: String? = null,
     explicitRoute: String? = null
 ) {
     /**
-     * kotlin-reflect 없이 순수 JVM 클래스명을 사용하여 계층형 Route 자동 생성.
-     * explicitRoute가 전달된 경우 해당 route를 우선 사용.
-     * 예: "com.example.SettingItems$Bluetooth$Advanced" -> "SettingItems/Bluetooth/Advanced"
+     * 화면 식별자 이름. explicitName이 제공되면 우선 사용, 없으면 JVM 단순 클래스명 사용.
      */
-    val route: String = explicitRoute ?: this.javaClass.name
-        .substringAfterLast('.')
-        .replace('$', '/')
+    val name: String = explicitName ?: this.javaClass.simpleName
+        .removeSuffix("$")
+        .substringAfterLast('$')
+
+    /**
+     * 부모 경로와 결합하여 고유 Route 결정:
+     * - explicitRoute가 있으면 최우선 사용
+     * - parent가 있으면 "${parent.route}/$name"
+     * - parent가 없으면 "$name"
+     */
+    val route: String = explicitRoute ?: if (parent != null) "${parent.route}/$name" else name
+
+    /**
+     * 부모 체인을 따라 루트부터 현재 화면까지의 화면 레벨 Breadcrumb 목록
+     * 예: ["환경 설정", "블루투스 설정", "블루투스 고급 설정"]
+     */
+    val screenBreadcrumb: List<String> by lazy {
+        buildList {
+            var cur: ItemScreen? = this@ItemScreen
+            while (cur != null) {
+                add(0, cur.title)
+                cur = cur.parent
+            }
+        }
+    }
+
+    /**
+     * 인덱싱 및 전체 키 맵 생성을 위한 하위 스크린 목록.
+     * 클래스 초기화 순환을 방지하기 위해 'by lazy'로 오버라이드할 수 있습니다.
+     */
+    open val subScreens: List<ItemScreen> get() = emptyList()
 
     abstract val tree: ItemTree
 
@@ -35,52 +63,27 @@ abstract class ItemScreen(
     fun findItem(key: String): UiItem? = tree.findItem(key)
 
     /**
-     * 현재 화면 및 연결된 모든 하위 서브스크린(UiSubScreenEntryItem)을 재귀 순회하여 key와 일치하는 UiItem을 검색합니다.
+     * 현재 화면 및 subScreens를 재귀 순회하여 key와 일치하는 UiItem을 검색합니다.
      */
     fun findItemRecursively(key: String): UiItem? {
-        val visited = mutableSetOf<String>()
-        fun searchScreen(screen: ItemScreen): UiItem? {
-            if (!visited.add(screen.route)) return null
-            val direct = screen.tree.findItem(key)
-            if (direct != null) return direct
+        val direct = tree.findItem(key)
+        if (direct != null) return direct
 
-            fun searchContainer(container: UiContainerItem): UiItem? {
-                for (child in container.children) {
-                    if (child is UiSubScreenEntryItem) {
-                        val found = searchScreen(child.targetScreen)
-                        if (found != null) return found
-                    } else if (child is UiContainerItem) {
-                        val found = searchContainer(child)
-                        if (found != null) return found
-                    }
-                }
-                return null
-            }
-            return searchContainer(screen.tree.root)
+        for (sub in subScreens) {
+            val found = sub.findItemRecursively(key)
+            if (found != null) return found
         }
-        return searchScreen(this)
+        return null
     }
 
     /**
-     * 현재 화면 및 모든 하위 서브스크린을 순회하여 전체 노드를 key -> UiItem Map으로 구성합니다.
+     * 현재 화면 및 모든 하위 subScreens를 순회하여 전체 노드를 key -> UiItem Map으로 구성합니다.
      */
     fun buildGlobalKeyMap(): Map<String, UiItem> = buildMap {
-        val visited = mutableSetOf<String>()
-        fun collectScreen(screen: ItemScreen) {
-            if (!visited.add(screen.route)) return
-            putAll(screen.tree.toKeyMap())
-            fun collectContainer(container: UiContainerItem) {
-                for (child in container.children) {
-                    if (child is UiSubScreenEntryItem) {
-                        collectScreen(child.targetScreen)
-                    } else if (child is UiContainerItem) {
-                        collectContainer(child)
-                    }
-                }
-            }
-            collectContainer(screen.tree.root)
+        putAll(tree.toKeyMap())
+        for (sub in subScreens) {
+            putAll(sub.buildGlobalKeyMap())
         }
-        collectScreen(this@ItemScreen)
     }
 }
 
@@ -150,9 +153,17 @@ fun ItemScreen.text(
     UiTextItem(key = key, text = initialText)
 }
 
+fun ItemScreen.entry(
+    title: String,
+    target: ItemScreen? = null,
+    explicitKey: String? = null
+) = screenItem(explicitKey) { key ->
+    UiSubScreenEntryItem(key = key, title = title, targetScreen = target)
+}
+
 fun ItemScreen.subScreenEntry(
-    target: ItemScreen,
-    title: String = target.title,
+    target: ItemScreen? = null,
+    title: String = target?.title ?: "",
     explicitKey: String? = null
 ) = screenItem(explicitKey) { key ->
     UiSubScreenEntryItem(key = key, title = title, targetScreen = target)

@@ -81,11 +81,11 @@ class ItemTreeArchitectureTest {
 
         val child0 = mainSection.children[0] as UiSubScreenEntryItem
         assertEquals("SettingItems/bluetoothEntry", child0.key)
-        assertEquals(SettingItems.Bluetooth, child0.targetScreen)
+        assertEquals("블루투스 설정", child0.title)
 
         val child1 = mainSection.children[1] as UiSubScreenEntryItem
         assertEquals("SettingItems/wifiEntry", child1.key)
-        assertEquals(SettingItems.Wifi, child1.targetScreen)
+        assertEquals("Wi-Fi 설정", child1.title)
 
         val child2 = mainSection.children[2] as UiTextItem
         assertEquals("SettingItems/version_info", child2.key)
@@ -108,7 +108,7 @@ class ItemTreeArchitectureTest {
 
         val btAdvEntry = btSection.children[1] as UiSubScreenEntryItem
         assertEquals("SettingItems/Bluetooth/advancedEntry", btAdvEntry.key)
-        assertEquals(SettingItems.Bluetooth.Advanced, btAdvEntry.targetScreen)
+        assertEquals("블루투스 고급 설정", btAdvEntry.title)
 
         // Bluetooth Advanced screen tree (Depth 2 subscreen with Section)
         val advRoot = SettingItems.Bluetooth.Advanced.tree.root as UiLinearItem
@@ -447,12 +447,12 @@ class ItemTreeArchitectureTest {
 
     @Test
     fun testExplicitKeyRelativeAndAbsoluteResolution() {
-        assertEquals("ItemTreeArchitectureTest/ExplicitKeyTestScreen/defaultToggle", ExplicitKeyTestScreen.defaultToggle.key)
-        assertEquals("ItemTreeArchitectureTest/ExplicitKeyTestScreen/original_toggle_key", ExplicitKeyTestScreen.renamedToggle.key)
+        assertEquals("ExplicitKeyTestScreen/defaultToggle", ExplicitKeyTestScreen.defaultToggle.key)
+        assertEquals("ExplicitKeyTestScreen/original_toggle_key", ExplicitKeyTestScreen.renamedToggle.key)
         assertEquals("legacy/system/old_item", ExplicitKeyTestScreen.legacyItem.key)
         assertEquals("absolute/custom_key", ExplicitKeyTestScreen.slashItem.key)
-        assertEquals("ItemTreeArchitectureTest/ExplicitKeyTestScreen/my_section", ExplicitKeyTestScreen.customSection.key)
-        assertEquals("ItemTreeArchitectureTest/ExplicitKeyTestScreen/bt_entry", ExplicitKeyTestScreen.customEntry.key)
+        assertEquals("ExplicitKeyTestScreen/my_section", ExplicitKeyTestScreen.customSection.key)
+        assertEquals("ExplicitKeyTestScreen/bt_entry", ExplicitKeyTestScreen.customEntry.key)
     }
 
     @Test
@@ -460,6 +460,47 @@ class ItemTreeArchitectureTest {
         assertEquals("Settings/Custom", CustomRouteScreen.route)
         assertEquals("Settings/Custom/master", CustomRouteScreen.masterSwitch.key)
         assertEquals("Settings/Custom/defaultItem", CustomRouteScreen.defaultItem.key)
+    }
+
+    @Test
+    fun testScreenBreadcrumbHierarchyFromParent() {
+        assertEquals(listOf("환경 설정"), SettingItems.screenBreadcrumb)
+        assertEquals(listOf("환경 설정", "블루투스 설정"), SettingItems.Bluetooth.screenBreadcrumb)
+        assertEquals(listOf("환경 설정", "블루투스 설정", "블루투스 고급 설정"), SettingItems.Bluetooth.Advanced.screenBreadcrumb)
+        assertEquals(listOf("환경 설정", "Wi-Fi 설정"), SettingItems.Wifi.screenBreadcrumb)
+    }
+
+    @Test
+    fun testEntryControllerRuntimeNavigation() {
+        val btEntryController = com.example.sample.BluetoothEntryController()
+        var navigatedScreen: ItemScreen? = null
+        btEntryController.onClick { target ->
+            navigatedScreen = target
+        }
+        assertSame(SettingItems.Bluetooth, navigatedScreen)
+    }
+
+    @Test
+    fun testVerifyNoCircularParentReferencesInScreens() {
+        val allScreens = listOf(
+            SettingItems,
+            SettingItems.Bluetooth,
+            SettingItems.Bluetooth.Advanced,
+            SettingItems.Wifi,
+            ExplicitKeyTestScreen,
+            CustomRouteScreen
+        )
+
+        for (screen in allScreens) {
+            val visited = mutableSetOf<String>()
+            var current: ItemScreen? = screen
+
+            while (current != null) {
+                val isNew = visited.add(current.name)
+                assertTrue("Circular reference detected in screen ${screen.name}!", isNew)
+                current = current.parent
+            }
+        }
     }
 }
 

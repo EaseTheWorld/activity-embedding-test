@@ -49,5 +49,7 @@ data class UiTextItem(
 data class UiSubScreenEntryItem(
     override val key: String,
     val title: String,
-    val targetScreen: ItemScreen
+    val targetScreen: ItemScreen? = null
 ) : UiItem
+
+typealias UiEntryItem = UiSubScreenEntryItem

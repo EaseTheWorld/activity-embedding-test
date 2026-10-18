@@ -20,16 +20,18 @@ data class UiAudioLatencyVisualizerItem(
  * Section과 Item 모두 val 프로퍼티로 선언하여 고유 Key(DeepLink)를 자동 부여받고,
  * 계층 구조(Hierarchy)는 DSL에서 조립합니다.
  */
-object SettingItems : ItemScreen(title = "환경 설정") {
+object SettingItems : ItemScreen(title = "환경 설정", parent = null) {
+    override val subScreens by lazy { listOf(Bluetooth, Wifi) }
+
     // Route: "SettingItems"
 
     // Key: "SettingItems/mainSection"
     val mainSection by section(title = "주요 설정")
 
     // Key: "SettingItems/bluetoothEntry"
-    val bluetoothEntry by subScreenEntry(target = Bluetooth)
+    val bluetoothEntry by entry(title = "블루투스 설정")
     // Key: "SettingItems/wifiEntry"
-    val wifiEntry by subScreenEntry(target = Wifi)
+    val wifiEntry by entry(title = "Wi-Fi 설정")
 
     override val tree = buildTree {
         mainSection {
@@ -40,7 +42,9 @@ object SettingItems : ItemScreen(title = "환경 설정") {
     }
 
     // ── SubScreen 1: Bluetooth ───────────────────────────────────
-    object Bluetooth : ItemScreen(title = "블루투스 설정") {
+    object Bluetooth : ItemScreen(title = "블루투스 설정", parent = SettingItems) {
+        override val subScreens by lazy { listOf(Advanced) }
+
         // Route: "SettingItems/Bluetooth"
 
         // Key: "SettingItems/Bluetooth/connectionSection"
@@ -49,7 +53,7 @@ object SettingItems : ItemScreen(title = "환경 설정") {
         // Key: "SettingItems/Bluetooth/masterToggle"
         val masterToggle by toggle(title = "블루투스 사용")
         // Key: "SettingItems/Bluetooth/advancedEntry"
-        val advancedEntry by subScreenEntry(target = Advanced)
+        val advancedEntry by entry(title = "블루투스 고급 설정")
 
         override val tree = buildTree {
             connectionSection {
@@ -59,7 +63,7 @@ object SettingItems : ItemScreen(title = "환경 설정") {
         }
 
         // ── SubScreen 1-1: Bluetooth Advanced (Depth 2) ──────────
-        object Advanced : ItemScreen(title = "블루투스 고급 설정") {
+        object Advanced : ItemScreen(title = "블루투스 고급 설정", parent = Bluetooth) {
             // Route: "SettingItems/Bluetooth/Advanced"
 
             // Key: "SettingItems/Bluetooth/Advanced/audioSection"
@@ -84,7 +88,7 @@ object SettingItems : ItemScreen(title = "환경 설정") {
     }
 
     // ── SubScreen 2: Wi-Fi ───────────────────────────────────────
-    object Wifi : ItemScreen(title = "Wi-Fi 설정") {
+    object Wifi : ItemScreen(title = "Wi-Fi 설정", parent = SettingItems) {
         // Route: "SettingItems/Wifi"
 
         // Key: "SettingItems/Wifi/wifiSection"

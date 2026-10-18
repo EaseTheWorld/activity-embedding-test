@@ -228,6 +228,7 @@ private fun DrawItem(
             is UiSubScreenEntryItem -> {
                 val navigator = LocalItemNavigator.current
                 val isHighlighted = LocalHighlightKey.current == item.key
+                val controller = LocalItemControllerRegistry.current.getOrNull<com.example.uifw.controller.EntryController>(item)
                 val bringIntoViewRequester = remember { BringIntoViewRequester() }
                 LaunchedEffect(isHighlighted) {
                     if (isHighlighted) {
@@ -256,7 +257,13 @@ private fun DrawItem(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { navigator(item.targetScreen) }
+                            .clickable {
+                                if (controller != null) {
+                                    controller.onClick(navigator)
+                                } else if (item.targetScreen != null) {
+                                    navigator(item.targetScreen)
+                                }
+                            }
                             .padding(horizontal = 16.dp, vertical = 12.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
@@ -279,8 +286,9 @@ private fun DrawItem(
                                     }
                                 }
                             }
+                            val targetDesc = item.targetScreen?.route ?: "Dynamic (Controller)"
                             Text(
-                                text = "Key: ${item.key}  ➔  Target: ${item.targetScreen.route}",
+                                text = "Key: ${item.key}  ➔  Target: $targetDesc",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.primary
                             )

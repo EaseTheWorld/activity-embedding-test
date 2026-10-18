@@ -1,8 +1,10 @@
 package com.example.sample
 
-import com.example.uifw.item.UiItem
+import com.example.uifw.controller.EntryController
 import com.example.uifw.controller.ItemController
 import com.example.uifw.controller.ToggleController
+import com.example.uifw.item.ItemScreen
+import com.example.uifw.item.UiItem
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -55,7 +57,34 @@ class DualAudioToggleController @Inject constructor() : ItemController(), Toggle
     }
 }
 
-// 4. Hilt Multi-binding 모듈 (ItemController IntoSet)
+// 4. 블루투스 화면 진입 EntryController
+class BluetoothEntryController @Inject constructor() : ItemController(), EntryController {
+    override val item: UiItem = SettingItems.bluetoothEntry
+
+    override fun onClick(navigator: (ItemScreen) -> Unit) {
+        navigator(SettingItems.Bluetooth)
+    }
+}
+
+// 5. Wi-Fi 화면 진입 EntryController
+class WifiEntryController @Inject constructor() : ItemController(), EntryController {
+    override val item: UiItem = SettingItems.wifiEntry
+
+    override fun onClick(navigator: (ItemScreen) -> Unit) {
+        navigator(SettingItems.Wifi)
+    }
+}
+
+// 6. 블루투스 고급 화면 진입 EntryController
+class BluetoothAdvancedEntryController @Inject constructor() : ItemController(), EntryController {
+    override val item: UiItem = SettingItems.Bluetooth.advancedEntry
+
+    override fun onClick(navigator: (ItemScreen) -> Unit) {
+        navigator(SettingItems.Bluetooth.Advanced)
+    }
+}
+
+// 7. Hilt Multi-binding 모듈 (ItemController IntoSet)
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class SampleItemControllerModule {
@@ -76,5 +105,23 @@ abstract class SampleItemControllerModule {
     @IntoSet
     abstract fun bindDualAudioToggle(
         controller: DualAudioToggleController
+    ): ItemController
+
+    @Binds
+    @IntoSet
+    abstract fun bindBluetoothEntry(
+        controller: BluetoothEntryController
+    ): ItemController
+
+    @Binds
+    @IntoSet
+    abstract fun bindWifiEntry(
+        controller: WifiEntryController
+    ): ItemController
+
+    @Binds
+    @IntoSet
+    abstract fun bindBluetoothAdvancedEntry(
+        controller: BluetoothAdvancedEntryController
     ): ItemController
 }

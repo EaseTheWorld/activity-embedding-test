@@ -36,3 +36,7 @@ interface TextController {
     val text: StateFlow<String>
     fun onClick() {}
 }
+
+interface EntryController {
+    fun onClick(navigator: (com.example.uifw.item.ItemScreen) -> Unit)
+}

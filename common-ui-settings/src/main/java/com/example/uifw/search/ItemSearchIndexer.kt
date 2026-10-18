@@ -16,106 +16,124 @@ data class SearchIndexEntry(
 object ItemSearchIndexer {
 
     /**
-     * Recursively indexes the entire tree starting from the root screen.
-     * Automatically traverses SubScreenEntryItems to construct complete
-     * hierarchical breadcrumbs (e.g., Screen > Subscreen > Section > Item).
+     * 개별 ItemScreen의 트리를 색인합니다.
+     * 부모 체인(screen.screenBreadcrumb)과 로컬 트리(Section -> Item)를 결합하여
+     * "Screen > Subscreen > Section > Item" 형태의 계층형 Breadcrumb을 조립합니다.
      */
-    fun indexTree(rootScreen: ItemScreen): List<SearchIndexEntry> {
+    fun indexScreen(screen: ItemScreen): List<SearchIndexEntry> {
         val results = mutableListOf<SearchIndexEntry>()
-        val visitedScreens = mutableSetOf<String>()
+        val baseBreadcrumb = screen.screenBreadcrumb
 
-        fun traverse(
-            screen: ItemScreen,
-            screenBreadcrumb: List<String>
+        fun traverseContainer(
+            container: UiContainerItem,
+            currentBreadcrumb: List<String>
         ) {
-            if (!visitedScreens.add(screen.route)) return
-
-            fun traverseContainer(
-                container: UiContainerItem,
-                currentBreadcrumb: List<String>
-            ) {
-                container.children.forEach { child ->
-                    when (child) {
-                        is UiSectionItem -> {
-                            val sectionBreadcrumb = currentBreadcrumb + child.title
-                            results.add(
-                                SearchIndexEntry(
-                                    title = child.title,
-                                    targetKey = child.key,
-                                    screenRoute = screen.route,
-                                    breadcrumb = sectionBreadcrumb,
-                                    isSection = true
-                                )
+            container.children.forEach { child ->
+                when (child) {
+                    is UiSectionItem -> {
+                        val sectionBreadcrumb = currentBreadcrumb + child.title
+                        results.add(
+                            SearchIndexEntry(
+                                title = child.title,
+                                targetKey = child.key,
+                                screenRoute = screen.route,
+                                breadcrumb = sectionBreadcrumb,
+                                isSection = true
                             )
-                            traverseContainer(child, sectionBreadcrumb)
-                        }
-                        is UiLinearItem -> {
-                            traverseContainer(child, currentBreadcrumb)
-                        }
-                        is UiToggleItem -> {
+                        )
+                        traverseContainer(child, sectionBreadcrumb)
+                    }
+                    is UiLinearItem -> {
+                        traverseContainer(child, currentBreadcrumb)
+                    }
+                    is UiToggleItem -> {
+                        results.add(
+                            SearchIndexEntry(
+                                title = child.title,
+                                targetKey = child.key,
+                                screenRoute = screen.route,
+                                breadcrumb = currentBreadcrumb + child.title,
+                                isSection = false
+                            )
+                        )
+                    }
+                    is UiTextItem -> {
+                        results.add(
+                            SearchIndexEntry(
+                                title = child.text,
+                                targetKey = child.key,
+                                screenRoute = screen.route,
+                                breadcrumb = currentBreadcrumb + child.text,
+                                isSection = false
+                            )
+                        )
+                    }
+                    is UiSubScreenEntryItem -> {
+                        results.add(
+                            SearchIndexEntry(
+                                title = child.title,
+                                targetKey = child.key,
+                                screenRoute = screen.route,
+                                breadcrumb = currentBreadcrumb + child.title,
+                                isSection = false
+                            )
+                        )
+                    }
+                    is UiCustomItem -> {
+                        val customTitle = child.title
+                        if (customTitle != null) {
                             results.add(
                                 SearchIndexEntry(
-                                    title = child.title,
+                                    title = customTitle,
                                     targetKey = child.key,
                                     screenRoute = screen.route,
-                                    breadcrumb = currentBreadcrumb + child.title,
+                                    breadcrumb = currentBreadcrumb + customTitle,
                                     isSection = false
                                 )
                             )
                         }
-                        is UiTextItem -> {
-                            results.add(
-                                SearchIndexEntry(
-                                    title = child.text,
-                                    targetKey = child.key,
-                                    screenRoute = screen.route,
-                                    breadcrumb = currentBreadcrumb + child.text,
-                                    isSection = false
-                                )
-                            )
-                        }
-                        is UiSubScreenEntryItem -> {
-                            results.add(
-                                SearchIndexEntry(
-                                    title = child.title,
-                                    targetKey = child.key,
-                                    screenRoute = screen.route,
-                                    breadcrumb = currentBreadcrumb + child.title,
-                                    isSection = false
-                                )
-                            )
-                            // Recurse into target sub-screen with breadcrumb
-                            traverse(
-                                screen = child.targetScreen,
-                                screenBreadcrumb = screenBreadcrumb + child.targetScreen.title
-                            )
-                        }
-                        is UiCustomItem -> {
-                            val customTitle = child.title
-                            if (customTitle != null) {
-                                results.add(
-                                    SearchIndexEntry(
-                                        title = customTitle,
-                                        targetKey = child.key,
-                                        screenRoute = screen.route,
-                                        breadcrumb = currentBreadcrumb + customTitle,
-                                        isSection = false
-                                    )
-                                )
-                            }
-                        }
-                        else -> {
-                            // Non-standard UiItem without custom handling
-                        }
+                    }
+                    else -> {
+                        // Non-standard UiItem without custom handling
                     }
                 }
             }
-
-            traverseContainer(screen.tree.root, screenBreadcrumb)
         }
 
-        traverse(rootScreen, listOf(rootScreen.title))
+        traverseContainer(screen.tree.root, baseBreadcrumb)
         return results
+    }
+
+    /**
+     * 여러 Screen 컬렉션을 전달받아 일괄 색인합니다.
+     */
+    fun indexScreens(screens: Collection<ItemScreen>): List<SearchIndexEntry> {
+        return screens.flatMap { indexScreen(it) }
+    }
+
+    /**
+     * rootScreen과 그 하위 subScreens(또는 targetScreen)를 재귀 순회하여 전체 트리를 색인합니다.
+     */
+    fun indexTree(rootScreen: ItemScreen): List<SearchIndexEntry> {
+        val allScreens = mutableListOf<ItemScreen>()
+        val visited = mutableSetOf<String>()
+        fun collect(s: ItemScreen) {
+            if (!visited.add(s.route)) return
+            allScreens.add(s)
+            s.subScreens.forEach(::collect)
+            fun scanContainer(c: UiContainerItem) {
+                c.children.forEach { ch ->
+                    if (ch is UiSubScreenEntryItem && ch.targetScreen != null) {
+                        collect(ch.targetScreen)
+                    } else if (ch is UiContainerItem) {
+                        scanContainer(ch)
+                    }
+                }
+            }
+            scanContainer(s.tree.root)
+        }
+        collect(rootScreen)
+        return indexScreens(allScreens)
     }
 
     /**

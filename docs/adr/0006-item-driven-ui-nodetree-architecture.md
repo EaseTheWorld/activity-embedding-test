@@ -20,18 +20,20 @@ All items implement immutable sealed interfaces:
 - `UiContainerItem`: Container contract with immutable `children: List<UiItem>`.
 - Leaf items (`UiToggleItem`, `UiTextItem`, `UiSubScreenEntryItem`) and containers (`UiLinearItem`) are immutable data classes. Compose compiler marks them as `Skippable`.
 
-### 2. Zero-Reflection Route and DeepLink Key Guarantee (with `explicitKey` / `explicitRoute` override)
-- **Screen Route**: Automatically derived from JVM binary class name via `this.javaClass.name.substringAfterLast('.').replace('$', '/')`. Alternatively, an `explicitRoute: String?` can be provided to fix or customize the screen route. Nested Kotlin `object` hierarchies (`SettingItems.Bluetooth.Advanced`) yield compile-time route hierarchies without reflection.
-- **Item Key (DeepLink)**: Property delegation (`by screenItem { ... }`, `by toggle(...)`, `by section(...)`, etc.) derives canonical paths as `"${screen.route}/${property.name}"` by default.
-- **Refactoring Resilience via `explicitKey`**: To protect public deeplinks from variable renames or migrations, callers can pass `explicitKey: String?`. If `explicitKey` contains a `/`, it is treated as an absolute canonical key (e.g. legacy deeplinks); otherwise, it is relative to the screen route (`"${screen.route}/$explicitKey"`).
+### 2. Route & DeepLink Key Guarantee (Explicit `parent` & Unidirectional DAG)
+- **Explicit `parent` & Clean Route**: Screens declare `parent: ItemScreen? = null` directly. When `parent` is provided, `route = "${parent.route}/$name"`; otherwise, `route = name`. Because screens only point to their parents (and never down to children in static properties), the hierarchy is a strictly unidirectional DAG without classloader initialization traps or `null` injection bugs.
+- **Separate Files & Multi-Module Freedom**: Because `parent` is decoupled from JVM nested classes (`$`), screens can be declared in separate `.kt` files across different Gradle feature modules.
+- **Refactoring Resilience via `explicitKey` / `explicitRoute`**: Callers can override screen routes via `explicitRoute: String?` or individual item keys via `explicitKey: String?`. Relative keys (`explicitKey = "masterToggle"`) resolve under the screen route, while absolute keys containing `/` preserve legacy deeplinks.
+- **Section-Level Breadcrumb Integration**: Breadcrumbs merge the screen hierarchy (`screen.screenBreadcrumb` climbing up `parent`) with the tree hierarchy (`section.title` -> `item.title`), producing rich multi-level breadcrumbs: `Screen > Subscreen > Section > Item`.
 
 ### 3. Separation of Declaration (`val`) and Composition (`DSL`)
 - Observable setting items are declared as immutable `val` properties on screen objects.
 - Visual hierarchy and layout containers (`column`, `row`, `staticText`) are composed via `@UiTreeDsl TreeBuilderScope` using the unary plus operator (`+item`).
+- **Entry & Dynamic Navigation via `EntryController`**: Subscreen entry items (`val bluetoothEntry by entry(title = "...")`) no longer hardcode destination screens. The navigation destination is decided at runtime by `EntryController.onClick(navigator)`, supporting dynamic conditional routing (auth, hardware permissions) and completely eliminating static cycles.
 
 ### 4. Type-Safe Direct ItemController Multi-Binding (`Hilt @IntoSet`)
 - **Non-AndroidX ViewModel**: `ItemController` is **NOT an AndroidX `ViewModel`**, but a lightweight, lifecycle-aware POJO with its own `controllerScope` (`SupervisorJob() + Dispatchers.Main.immediate`) and `onCleared()` callback.
-- **Direct `item` Reference**: Each `ItemController` declares `override val item: UiItem` directly referencing its compile-time declared item (e.g., `SettingItems.Bluetooth.masterToggle`). This eliminates runtime `@AssistedInject` and separate `Factory` boilerplate. Redundant `key` property on `ItemController` is removed in favor of `controller.item.key`.
+- **Direct `item` Reference**: Each `ItemController` declares `override val item: UiItem` directly referencing its compile-time declared item (e.g., `SettingItems.Bluetooth.masterToggle` or `SettingItems.bluetoothEntry`). This eliminates runtime `@AssistedInject` and separate `Factory` boilerplate.
 - **`Set<ItemController>` via `@IntoSet`**: Binds directly into `Set<@JvmSuppressWildcards ItemController>` using Hilt `@Binds @IntoSet`. Unlike `@IntoMap`, this avoids string literals (`@StringKey`) entirely.
 - **Startup Integrity & Key Lookup**: `ItemControllerRegistry` injects `Set<ItemController>` and converts it into `Map<String, ItemController>` keyed by `controller.item.key`. Duplicate registrations are detected at startup, and items can be retrieved dynamically by `key: String` (e.g., deeplink handler) or `item: UiItem`.
 - **Screen-Level Lifecycle**: `ScreenHostViewModel` (an AndroidX `ViewModel`) retains `ItemControllerRegistry` and triggers `registry.clearAll()` when the hosting screen is cleared.

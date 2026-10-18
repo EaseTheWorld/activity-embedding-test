@@ -2,8 +2,8 @@ package com.example.sample
 
 import com.example.uifw.controller.EntryController
 import com.example.uifw.controller.ItemController
+import com.example.uifw.controller.ItemNavigator
 import com.example.uifw.controller.ToggleController
-import com.example.uifw.item.ItemScreen
 import com.example.uifw.item.UiItem
 import dagger.Binds
 import dagger.Module
@@ -58,30 +58,19 @@ class DualAudioToggleController @Inject constructor() : ItemController(), Toggle
 }
 
 // 4. 블루투스 화면 진입 EntryController
+// onClick을 오버라이드하지 않으면 EntryItem(SettingItems.bluetoothEntry)에 선언된 targetScreen(SettingItems.Bluetooth)으로 자동 이동합니다.
 class BluetoothEntryController @Inject constructor() : ItemController(), EntryController {
     override val item: UiItem = SettingItems.bluetoothEntry
-
-    override fun onClick(navigator: (ItemScreen) -> Unit) {
-        navigator(SettingItems.Bluetooth)
-    }
 }
 
-// 5. Wi-Fi 화면 진입 EntryController
+// 5. Wi-Fi 화면 진입 EntryController (기본 targetScreen = SettingItems.Wifi 사용)
 class WifiEntryController @Inject constructor() : ItemController(), EntryController {
     override val item: UiItem = SettingItems.wifiEntry
-
-    override fun onClick(navigator: (ItemScreen) -> Unit) {
-        navigator(SettingItems.Wifi)
-    }
 }
 
-// 6. 블루투스 고급 화면 진입 EntryController
+// 6. 블루투스 고급 화면 진입 EntryController (기본 targetScreen = SettingItems.Bluetooth.Advanced 사용)
 class BluetoothAdvancedEntryController @Inject constructor() : ItemController(), EntryController {
     override val item: UiItem = SettingItems.Bluetooth.advancedEntry
-
-    override fun onClick(navigator: (ItemScreen) -> Unit) {
-        navigator(SettingItems.Bluetooth.Advanced)
-    }
 }
 
 // 7. 정적 인자 SubScreen(DriverSeat / PassengerSeat)을 위한 재사용 가능한 시트 토글 Controller
@@ -114,32 +103,18 @@ class PassengerSeatVentilationController @Inject constructor() :
 class BudsDeviceEntryController @Inject constructor() : ItemController(), EntryController {
     override val item: UiItem = SettingItems.Bluetooth.budsDeviceEntry
 
-    override fun onClick(navigator: (ItemScreen) -> Unit) {
-        navigator(SettingItems.Bluetooth.DeviceDetail)
-    }
-
-    override fun onNavigate(
-        screenNavigator: (ItemScreen) -> Unit,
-        routeNavigator: (String) -> Unit
-    ) {
+    override fun onClick(navigator: ItemNavigator) {
         // 런타임 동적 인자("Galaxy_Buds3_Pro")를 포함한 라우트로 이동
-        routeNavigator(SettingItems.Bluetooth.DeviceDetail.createRoute("Galaxy_Buds3_Pro"))
+        navigator(SettingItems.Bluetooth.DeviceDetail.createRoute("Galaxy_Buds3_Pro"))
     }
 }
 
 class CarKitDeviceEntryController @Inject constructor() : ItemController(), EntryController {
     override val item: UiItem = SettingItems.Bluetooth.carKitDeviceEntry
 
-    override fun onClick(navigator: (ItemScreen) -> Unit) {
-        navigator(SettingItems.Bluetooth.DeviceDetail)
-    }
-
-    override fun onNavigate(
-        screenNavigator: (ItemScreen) -> Unit,
-        routeNavigator: (String) -> Unit
-    ) {
+    override fun onClick(navigator: ItemNavigator) {
         // 런타임 동적 인자("Car_Audio_Kit")를 포함한 라우트로 이동
-        routeNavigator(SettingItems.Bluetooth.DeviceDetail.createRoute("Car_Audio_Kit"))
+        navigator(SettingItems.Bluetooth.DeviceDetail.createRoute("Car_Audio_Kit"))
     }
 }
 

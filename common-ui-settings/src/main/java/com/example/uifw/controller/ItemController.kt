@@ -37,18 +37,32 @@ interface TextController {
     fun onClick() {}
 }
 
+/**
+ * 정적 ItemScreen 이동과 동적 Route 문자열(예: createRoute("...")) 이동을 모두 지원하는 네비게이터.
+ * SAM(fun interface)이므로 테스트나 단순 호출부에서는 `{ screen -> ... }` 람다로도 즉시 생성 가능합니다.
+ */
+fun interface ItemNavigator {
+    fun navigateToScreen(screen: com.example.uifw.item.ItemScreen)
+
+    fun navigateToRoute(route: String) {}
+
+    operator fun invoke(screen: com.example.uifw.item.ItemScreen) = navigateToScreen(screen)
+    operator fun invoke(route: String) = navigateToRoute(route)
+}
+
 interface EntryController {
-    fun onClick(navigator: (com.example.uifw.item.ItemScreen) -> Unit) {}
+    val item: UiItem
 
     /**
-     * 동적 라우트 인자(예: screen.createRoute("Galaxy_Buds3_Pro"))를 포함한 경로로 이동할 때 사용.
-     * 기본 구현은 onClick(screenNavigator)으로 위임합니다.
+     * 기본 동작: EntryItem(UiSubScreenEntryItem)에 선언된 정적 targetScreen으로 자동 이동합니다.
+     * 런타임 조건에 따라 다른 화면으로 분기하거나 동적 라우트 인자(createRoute)를 넘겨야 할 때만 오버라이드합니다.
      */
-    fun onNavigate(
-        screenNavigator: (com.example.uifw.item.ItemScreen) -> Unit,
-        routeNavigator: (String) -> Unit
-    ) {
-        onClick(screenNavigator)
+    fun onClick(navigator: ItemNavigator) {
+        val target = (item as? com.example.uifw.item.UiSubScreenEntryItem)?.targetScreen
+        if (target != null) {
+            navigator(target)
+        }
     }
 }
+
 

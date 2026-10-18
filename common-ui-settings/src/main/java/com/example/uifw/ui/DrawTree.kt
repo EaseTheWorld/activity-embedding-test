@@ -22,14 +22,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.uifw.item.*
+import com.example.uifw.controller.ItemNavigator
 import com.example.uifw.controller.LocalItemControllerRegistry
 import com.example.uifw.controller.ToggleController
 
-val LocalItemNavigator = staticCompositionLocalOf<(ItemScreen) -> Unit> {
+val LocalItemNavigator = staticCompositionLocalOf<ItemNavigator> {
     error("No ItemNavigator provided")
 }
-
-val LocalRouteNavigator = staticCompositionLocalOf<((String) -> Unit)?> { null }
 
 val LocalHighlightKey = staticCompositionLocalOf<String?> { null }
 
@@ -229,7 +228,6 @@ private fun DrawItem(
 
             is UiSubScreenEntryItem -> {
                 val navigator = LocalItemNavigator.current
-                val routeNavigator = LocalRouteNavigator.current
                 val isHighlighted = LocalHighlightKey.current == item.key
                 val controller = LocalItemControllerRegistry.current.getOrNull<com.example.uifw.controller.EntryController>(item)
                 val bringIntoViewRequester = remember { BringIntoViewRequester() }
@@ -262,14 +260,7 @@ private fun DrawItem(
                             .fillMaxWidth()
                             .clickable {
                                 if (controller != null) {
-                                    if (routeNavigator != null) {
-                                        controller.onNavigate(
-                                            screenNavigator = navigator,
-                                            routeNavigator = routeNavigator
-                                        )
-                                    } else {
-                                        controller.onClick(navigator)
-                                    }
+                                    controller.onClick(navigator)
                                 } else if (item.targetScreen != null) {
                                     navigator(item.targetScreen)
                                 }

@@ -17,6 +17,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.example.uifw.controller.ItemNavigator
 import com.example.uifw.controller.LocalItemControllerRegistry
 import com.example.uifw.controller.ScreenHostViewModel
 import com.example.uifw.item.ItemScreen
@@ -25,7 +26,6 @@ import com.example.uifw.search.SearchIndexEntry
 import com.example.uifw.ui.DrawTree
 import com.example.uifw.ui.LocalHighlightKey
 import com.example.uifw.ui.LocalItemNavigator
-import com.example.uifw.ui.LocalRouteNavigator
 
 @Composable
 fun SampleSettingsScreen(
@@ -56,20 +56,27 @@ fun SampleSettingsScreen(
         }
     }
 
+    val itemNavigator = remember(navController) {
+        object : ItemNavigator {
+            override fun navigateToScreen(screen: ItemScreen) {
+                val route = if (screen.routeArg != null) {
+                    screen.createRoute("default_device")
+                } else {
+                    screen.route
+                }
+                navController.navigate(route)
+            }
+
+            override fun navigateToRoute(route: String) {
+                navController.navigate(route)
+            }
+        }
+    }
+
     CompositionLocalProvider(
         LocalItemControllerRegistry provides hostViewModel.itemRegistry,
         LocalHighlightKey provides activeHighlightKey,
-        LocalItemNavigator provides { targetScreen ->
-            val route = if (targetScreen.routeArg != null) {
-                targetScreen.createRoute("default_device")
-            } else {
-                targetScreen.route
-            }
-            navController.navigate(route)
-        },
-        LocalRouteNavigator provides { targetRoute ->
-            navController.navigate(targetRoute)
-        }
+        LocalItemNavigator provides itemNavigator
     ) {
         Surface(
             modifier = Modifier.fillMaxSize(),

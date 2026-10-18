@@ -623,21 +623,24 @@ class ItemTreeArchitectureTest {
             deviceDetail.createRoute("Car_Audio_Kit")
         )
 
-        // 3. EntryControllers navigate with runtime arguments
+        // 3. EntryControllers navigate with runtime arguments via unified onClick(ItemNavigator)
         val budsController = com.example.sample.BudsDeviceEntryController()
         val carKitController = com.example.sample.CarKitDeviceEntryController()
 
         var navigatedRoute: String? = null
-        budsController.onNavigate(
-            screenNavigator = {},
-            routeNavigator = { navigatedRoute = it }
-        )
+        val routeCapturingNavigator = object : com.example.uifw.controller.ItemNavigator {
+            override fun navigateToScreen(screen: ItemScreen) {
+                navigatedRoute = screen.route
+            }
+            override fun navigateToRoute(route: String) {
+                navigatedRoute = route
+            }
+        }
+
+        budsController.onClick(routeCapturingNavigator)
         assertEquals("SettingItems/Bluetooth/DeviceDetail/Galaxy_Buds3_Pro", navigatedRoute)
 
-        carKitController.onNavigate(
-            screenNavigator = {},
-            routeNavigator = { navigatedRoute = it }
-        )
+        carKitController.onClick(routeCapturingNavigator)
         assertEquals("SettingItems/Bluetooth/DeviceDetail/Car_Audio_Kit", navigatedRoute)
 
         // 4. Search Indexer still indexes internal items with full hierarchy breadcrumb
@@ -651,13 +654,28 @@ class ItemTreeArchitectureTest {
     }
 
     @Test
-    fun testEntryControllerRuntimeNavigation() {
+    fun testEntryControllerDefaultTargetScreenAndCustomOverrideNavigation() {
+        // 1. Default behavior: BluetoothEntryController does not override onClick,
+        // so it automatically navigates to item.targetScreen (SettingItems.Bluetooth)
         val btEntryController = com.example.sample.BluetoothEntryController()
         var navigatedScreen: ItemScreen? = null
         btEntryController.onClick { target ->
             navigatedScreen = target
         }
         assertSame(SettingItems.Bluetooth, navigatedScreen)
+
+        // 2. WifiEntryController and BluetoothAdvancedEntryController also use default targetScreen
+        val wifiEntryController = com.example.sample.WifiEntryController()
+        wifiEntryController.onClick { target ->
+            navigatedScreen = target
+        }
+        assertSame(SettingItems.Wifi, navigatedScreen)
+
+        val advEntryController = com.example.sample.BluetoothAdvancedEntryController()
+        advEntryController.onClick { target ->
+            navigatedScreen = target
+        }
+        assertSame(SettingItems.Bluetooth.Advanced, navigatedScreen)
     }
 
     @Test

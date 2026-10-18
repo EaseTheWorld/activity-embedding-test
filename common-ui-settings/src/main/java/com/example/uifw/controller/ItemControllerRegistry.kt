@@ -77,7 +77,8 @@ class ItemControllerRegistry @Inject constructor(
 
 @HiltViewModel
 class ScreenHostViewModel @Inject constructor(
-    val itemRegistry: ItemControllerRegistry
+    val itemRegistry: ItemControllerRegistry,
+    val rendererRegistry: com.example.uifw.ui.ItemRendererRegistry = com.example.uifw.ui.ItemRendererRegistry()
 ) : ViewModel() {
     override fun onCleared() {
         super.onCleared()

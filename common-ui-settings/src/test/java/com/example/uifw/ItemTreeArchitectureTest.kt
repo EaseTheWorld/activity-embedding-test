@@ -759,6 +759,48 @@ class ItemTreeArchitectureTest {
     }
 
     @Test
+    fun testUnifiedItemRendererRegistryForCommonAndCustomItems() {
+        val customRenderer = com.example.sample.AudioLatencyVisualizerRenderer()
+        val registry = com.example.uifw.ui.ItemRendererRegistry(setOf(customRenderer))
+
+        // 1. Built-in Common Item Renderers are registered by default
+        assertTrue(registry.hasRenderer(UiSectionItem::class))
+        assertTrue(registry.hasRenderer(UiLinearItem::class))
+        assertTrue(registry.hasRenderer(UiToggleItem::class))
+        assertTrue(registry.hasRenderer(UiTextItem::class))
+        assertTrue(registry.hasRenderer(UiSubScreenEntryItem::class))
+
+        assertSame(
+            com.example.uifw.ui.ToggleItemRenderer,
+            registry.get(SettingItems.Bluetooth.masterToggle)
+        )
+        assertSame(
+            com.example.uifw.ui.SubScreenEntryItemRenderer,
+            registry.get(SettingItems.bluetoothEntry)
+        )
+
+        // 2. Custom Item Renderer is resolved through the exact same registry & pipeline
+        assertTrue(registry.hasRenderer(com.example.sample.UiAudioLatencyVisualizerItem::class))
+        assertSame(
+            customRenderer,
+            registry.get(SettingItems.Bluetooth.Advanced.latencyVisualizer)
+        )
+
+        // 3. Duplicate Custom Item Renderer for the same KClass throws IllegalArgumentException
+        try {
+            com.example.uifw.ui.ItemRendererRegistry(
+                setOf(
+                    com.example.sample.AudioLatencyVisualizerRenderer(),
+                    com.example.sample.AudioLatencyVisualizerRenderer()
+                )
+            )
+            fail("Expected IllegalArgumentException for duplicate ItemRenderer registration")
+        } catch (e: IllegalArgumentException) {
+            assertTrue(e.message!!.contains("Duplicate ItemRenderer registered"))
+        }
+    }
+
+    @Test
     fun testVerifyNoCircularParentReferencesInScreens() {
         val allScreens = SettingItems.allScreens() + listOf(
             ExplicitKeyTestScreen,

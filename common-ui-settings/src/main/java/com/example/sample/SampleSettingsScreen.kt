@@ -25,9 +25,14 @@ import com.example.uifw.controller.ScreenHostViewModel
 import com.example.uifw.item.ItemScreen
 import com.example.uifw.search.ItemSearchIndexer
 import com.example.uifw.search.SearchIndexEntry
+import com.example.uifw.ui.DeepLinkTargetBadge
 import com.example.uifw.ui.DrawTree
+import com.example.uifw.ui.ItemRenderer
 import com.example.uifw.ui.LocalHighlightKey
 import com.example.uifw.ui.LocalItemNavigator
+import com.example.uifw.ui.LocalItemRendererRegistry
+import com.example.uifw.ui.deepLinkHighlightBox
+import javax.inject.Inject
 
 @Composable
 fun SampleSettingsScreen(
@@ -81,6 +86,7 @@ fun SampleSettingsScreen(
 
     CompositionLocalProvider(
         LocalItemControllerRegistry provides hostViewModel.itemRegistry,
+        LocalItemRendererRegistry provides hostViewModel.rendererRegistry,
         LocalItemNavigator provides itemNavigator
     ) {
         Surface(
@@ -348,21 +354,45 @@ private fun ItemScreenScaffold(
                 }
             }
             HorizontalDivider()
-            DrawTree(tree = screen.tree) { customItem ->
-                when (customItem) {
-                    is UiAudioLatencyVisualizerItem -> {
-                        AudioLatencyVisualizerCard(item = customItem)
-                    }
-                    else -> {
-                        Text(
-                            text = "Unsupported custom item: ${customItem.key}",
-                            modifier = Modifier.padding(16.dp)
-                        )
-                    }
-                }
-            }
+            DrawTree(tree = screen.tree)
             Spacer(modifier = Modifier.height(24.dp))
         }
+    }
+}
+
+/**
+ * Custom Item(UiAudioLatencyVisualizerItem)도 Common Item과 완전히 동일한 ItemRenderer<T> 구조로 구현하여
+ * Hilt @IntoSet으로 ItemRendererRegistry에 자동 등록됩니다.
+ */
+class AudioLatencyVisualizerRenderer @Inject constructor() :
+    ItemRenderer<UiAudioLatencyVisualizerItem>(UiAudioLatencyVisualizerItem::class) {
+
+    @Composable
+    override fun Render(
+        item: UiAudioLatencyVisualizerItem,
+        isHighlighted: Boolean,
+        modifier: Modifier
+    ) {
+        Box(
+            modifier = modifier
+                .fillMaxWidth()
+                .deepLinkHighlightBox(isHighlighted)
+        ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                if (isHighlighted) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 16.dp, end = 16.dp, top = 8.dp),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        DeepLinkTargetBadge()
+                    }
+                }
+                AudioLatencyVisualizerCard(item = item)
+            }
+        }
+        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
     }
 }
 
@@ -390,7 +420,7 @@ private fun AudioLatencyVisualizerCard(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = "⚡ " + (item.title ?: "Custom Item"),
+                        text = "⚡ ${item.title}",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )

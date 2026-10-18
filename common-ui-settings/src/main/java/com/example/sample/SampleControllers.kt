@@ -212,5 +212,11 @@ abstract class SampleItemControllerModule {
     abstract fun bindDeviceMediaAudioToggle(
         controller: DeviceMediaAudioToggleController
     ): ItemController
+
+    @Binds
+    @IntoSet
+    abstract fun bindAudioLatencyVisualizerRenderer(
+        renderer: AudioLatencyVisualizerRenderer
+    ): com.example.uifw.ui.ItemRenderer<*>
 }
 

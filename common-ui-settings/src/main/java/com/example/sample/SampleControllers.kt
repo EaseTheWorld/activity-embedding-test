@@ -140,6 +140,9 @@ class AudioLatencyVisualizerController @Inject constructor() :
 @InstallIn(SingletonComponent::class)
 abstract class SampleItemControllerModule {
 
+    @dagger.multibindings.Multibinds
+    abstract fun multibindItemRenderers(): Set<com.example.uifw.ui.ItemRenderer<*, *>>
+
     @Binds
     @IntoSet
     abstract fun bindBluetoothMasterToggle(

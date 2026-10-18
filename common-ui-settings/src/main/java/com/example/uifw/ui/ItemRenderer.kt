@@ -54,8 +54,10 @@ abstract class ItemRenderer<S : ItemUiState, V>(
  * ItemUiState의 KClass 기준으로 통합 관리하는 레지스트리.
  */
 class ItemRendererRegistry @Inject constructor(
-    customRenderers: Set<@JvmSuppressWildcards ItemRenderer<*, *>> = emptySet()
+    customRenderers: Set<@JvmSuppressWildcards ItemRenderer<*, *>>
 ) {
+    constructor() : this(emptySet())
+
     private val rendererMap: Map<KClass<out ItemUiState>, ItemRenderer<*, *>> = buildMap {
         // 1. 프레임워크 기본 Common UiState Renderers 등록
         for (defaultRenderer in DefaultItemRenderers.all) {

@@ -46,6 +46,7 @@ fun SampleSettingsScreen(
 
     // Helper: 특정 DeepLink 아이템/섹션 키로 이동할 때 그 화면의 "?anchor={key}" 경로 계산
     fun resolveAnchorNavigationRoute(targetKey: String): String {
+        if (targetKey.contains('?')) return targetKey
         val matchingEntry = searchIndex.find { it.targetKey == targetKey }
         val baseRoute = matchingEntry?.screenRoute ?: targetKey.substringBeforeLast('/')
         val targetScreen = SettingItems.findScreen(baseRoute)

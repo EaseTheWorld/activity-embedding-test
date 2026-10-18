@@ -69,45 +69,45 @@ private fun DrawItem(
         }
 
         // 1. 공통 가시성(isVisible) 제어: false이면 하위 트리 및 자신을 렌더링하지 않음
-        if (!uiState.isVisible) return@key
-
-        // 2. 공통 DeepLink 하이라이트 및 자동 스크롤(Anchoring)
-        val isHighlighted = LocalHighlightKey.current == item.key
-        val bringIntoViewRequester = remember { BringIntoViewRequester() }
-        LaunchedEffect(isHighlighted) {
-            if (isHighlighted) {
-                bringIntoViewRequester.bringIntoView()
+        if (uiState.isVisible) {
+            // 2. 공통 DeepLink 하이라이트 및 자동 스크롤(Anchoring)
+            val isHighlighted = LocalHighlightKey.current == item.key
+            val bringIntoViewRequester = remember { BringIntoViewRequester() }
+            LaunchedEffect(isHighlighted) {
+                if (isHighlighted) {
+                    bringIntoViewRequester.bringIntoView()
+                }
             }
-        }
 
-        val anchoredModifier = modifier.bringIntoViewRequester(bringIntoViewRequester)
+            val anchoredModifier = modifier.bringIntoViewRequester(bringIntoViewRequester)
 
-        // 3. UiState 타입 기준으로 ItemRenderer 조회 및 controller::onValueChanged 바인딩
-        val renderer = rendererRegistry.getOrNull(uiState)
-        val onValueChanged: (Any?) -> Unit = remember(controller) {
-            if (controller != null) {
-                val callback: (Any?) -> Unit = controller::onValueChanged
-                callback
+            // 3. UiState 타입 기준으로 ItemRenderer 조회 및 controller::onValueChanged 바인딩
+            val renderer = rendererRegistry.getOrNull(uiState)
+            val onValueChanged: (Any?) -> Unit = remember(controller) {
+                if (controller != null) {
+                    val callback: (Any?) -> Unit = controller::onValueChanged
+                    callback
+                } else {
+                    NoOpValueChanged
+                }
+            }
+
+            if (renderer != null) {
+                renderer.Render(
+                    state = uiState,
+                    onValueChanged = onValueChanged,
+                    isHighlighted = isHighlighted,
+                    modifier = anchoredModifier,
+                    renderChild = { child -> DrawItem(item = child) }
+                )
             } else {
-                NoOpValueChanged
+                Text(
+                    text = "No ItemRenderer registered for UiState ${uiState::class.simpleName} (key: ${item.key})",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = anchoredModifier.padding(16.dp)
+                )
             }
-        }
-
-        if (renderer != null) {
-            renderer.Render(
-                state = uiState,
-                onValueChanged = onValueChanged,
-                isHighlighted = isHighlighted,
-                modifier = anchoredModifier,
-                renderChild = { child -> DrawItem(item = child) }
-            )
-        } else {
-            Text(
-                text = "No ItemRenderer registered for UiState ${uiState::class.simpleName} (key: ${item.key})",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
-                modifier = anchoredModifier.padding(16.dp)
-            )
         }
     }
 }

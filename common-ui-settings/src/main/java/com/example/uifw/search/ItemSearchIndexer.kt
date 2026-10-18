@@ -127,10 +127,12 @@ object ItemSearchIndexer {
     }
 
     /**
-     * rootScreen과 그 하위 모든 SubScreen들을 재귀 순회하여 전체 트리를 색인합니다.
+     * rootScreen과 그 하위 모든 SubScreen들을 중간 리스트 생성 없이 재귀 순회(`traverseScreens`)하여 전체 트리를 색인합니다.
      */
-    fun indexTree(rootScreen: ItemScreen): List<SearchIndexEntry> {
-        return indexScreens(rootScreen.allScreens())
+    fun indexTree(rootScreen: ItemScreen): List<SearchIndexEntry> = buildList {
+        rootScreen.traverseScreens { screen ->
+            addAll(indexScreen(screen))
+        }
     }
 
     /**

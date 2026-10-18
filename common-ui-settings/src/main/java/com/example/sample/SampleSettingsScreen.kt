@@ -48,7 +48,7 @@ fun SampleSettingsScreen(
     fun resolveAnchorNavigationRoute(targetKey: String): String {
         val matchingEntry = searchIndex.find { it.targetKey == targetKey }
         val baseRoute = matchingEntry?.screenRoute ?: targetKey.substringBeforeLast('/')
-        val targetScreen = SettingItems.allScreens().find { it.route == baseRoute }
+        val targetScreen = SettingItems.findScreen(baseRoute)
         return if (targetScreen != null) {
             val defaultArg = if (targetScreen.routeArg != null) "default_device" else null
             targetScreen.createAnchorRoute(targetKey, defaultArg)
@@ -156,17 +156,14 @@ fun SampleSettingsScreen(
                         }
                     }
                 } else {
-                    // Screen NavHost:
-                    // 1) screen.anchorRoutePattern ("routePattern?anchor={anchor}"):
-                    //    화면 자체 이동("screen_route") 및 Query 앵커("screen_route?anchor={key}") 처리
-                    // 2) screen.pathAnchorRoutePattern ("routePattern/{anchor}"):
-                    //    기존 Path 앵커("screen_route/{key}", 즉 item.key / section.key 그대로 이동) 처리
+                    // Screen NavHost: 중간 리스트(allScreens) 생성 없이 traverseScreens 재귀 방문으로
+                    // 각 화면을 방문할 때마다 즉시 NavGraph에 등록
                     NavHost(
                         navController = navController,
                         startDestination = SettingItems.route,
                         modifier = Modifier.weight(1f)
                     ) {
-                        SettingItems.allScreens().forEach { screen ->
+                        SettingItems.traverseScreens { screen ->
                             // 1. 기본 화면 진입 + "?anchor={key}" 쿼리 앵커 진입
                             composable(
                                 route = screen.anchorRoutePattern,

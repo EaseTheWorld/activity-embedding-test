@@ -32,7 +32,7 @@ As setting interfaces expand to multi-depth hierarchies (e.g., `Settings -> Blue
 - Together with `ItemSearchIndexer`, this produces complete multi-depth breadcrumbs across arbitrary nesting levels (e.g., `환경 설정 > 주요 설정 > 블루투스 설정 > 기본 연결 > 블루투스 고급 설정 > 오디오 고급 설정 > 듀얼 오디오`).
 
 ### 3. Automatic `NavHost` Registration & Dual Anchor Routes (`?anchor={key}` & `route/{key}`)
-- `rootScreen.allScreens()` recursively collects all descendant screens so `NavHost` registers every screen automatically in a single loop.
+- **Zero-Allocation Recursive Screen Traversal (`traverseScreens`)**: Rather than allocating an intermediate flat `List<ItemScreen>`, `rootScreen.traverseScreens { screen -> ... }` executes a DFS recursive visitor directly. This is used by `NavHost` screen registration, `ItemSearchIndexer.indexTree`, and `buildGlobalKeyMap`. Direct route resolution uses `findScreen(route)` with early return. `allScreens()` is preserved as a convenience delegating to `buildList { traverseScreens(::add) }`.
 - Each screen supports two anchor route formats simultaneously for DeepLink scrolling (`BringIntoViewRequester`) and visual highlighting:
   1. **Query Anchor (`anchorRoutePattern = "$routePattern?anchor={anchor}"`)**: Handles both normal screen entry (`anchor = null`) and query-based item/section anchoring (`SettingItems/Bluetooth?anchor=masterToggle` or `?anchor=connectionSection`).
   2. **Path Anchor (`pathAnchorRoutePattern = "$routePattern/{anchor}"`)**: Supports legacy direct key navigation (`SettingItems/Bluetooth/masterToggle`, matching `item.key` / `section.key` directly).

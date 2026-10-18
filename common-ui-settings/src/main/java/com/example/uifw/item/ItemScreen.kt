@@ -148,19 +148,20 @@ abstract class ItemScreen(
     }
 
     /**
-     * 현재 화면을 포함하여 하위 모든 SubScreen들을 재귀적으로 수집한 전체 화면 목록.
-     * NavGraph 자동 등록 및 전체 트리 검색 인덱싱에 사용됩니다.
+     * 현재 화면을 시작으로 하위 모든 SubScreen들을 깊이 우선(DFS) 재귀 순회하며
+     * 방문할 때마다 `onVisit(screen)` 람다를 즉시 실행합니다.
+     * 중간 `List<ItemScreen>`을 생성하지 않고 NavGraph 등록이나 인덱싱을 직접 수행할 수 있습니다.
      */
-    fun allScreens(): List<ItemScreen> = buildList {
+    fun traverseScreens(onVisit: (ItemScreen) -> Unit) {
         val visited = mutableSetOf<String>()
-        fun collect(s: ItemScreen) {
+        fun visit(s: ItemScreen) {
             if (!visited.add(s.route)) return
-            add(s)
-            s.subScreens.forEach(::collect)
+            onVisit(s)
+            s.subScreens.forEach(::visit)
             fun scanContainer(c: UiContainerItem) {
                 c.children.forEach { ch ->
                     if (ch is UiSubScreenEntryItem && ch.targetScreen != null) {
-                        collect(ch.targetScreen)
+                        visit(ch.targetScreen)
                     } else if (ch is UiContainerItem) {
                         scanContainer(ch)
                     }
@@ -168,7 +169,43 @@ abstract class ItemScreen(
             }
             scanContainer(s.tree.root)
         }
-        collect(this@ItemScreen)
+        visit(this)
+    }
+
+    /**
+     * 현재 화면 및 하위 SubScreen들을 재귀 탐색하여 targetRoute와 일치하는 화면을 찾는 즉시 반환합니다 (Early Return).
+     */
+    fun findScreen(targetRoute: String): ItemScreen? {
+        val visited = mutableSetOf<String>()
+        fun search(s: ItemScreen): ItemScreen? {
+            if (!visited.add(s.route)) return null
+            if (s.route == targetRoute) return s
+            for (child in s.subScreens) {
+                val found = search(child)
+                if (found != null) return found
+            }
+            fun scanContainer(c: UiContainerItem): ItemScreen? {
+                for (ch in c.children) {
+                    if (ch is UiSubScreenEntryItem && ch.targetScreen != null) {
+                        val found = search(ch.targetScreen)
+                        if (found != null) return found
+                    } else if (ch is UiContainerItem) {
+                        val found = scanContainer(ch)
+                        if (found != null) return found
+                    }
+                }
+                return null
+            }
+            return scanContainer(s.tree.root)
+        }
+        return search(this)
+    }
+
+    /**
+     * 전체 화면 리스트가 필요한 경우 `traverseScreens`를 통해 수집합니다.
+     */
+    fun allScreens(): List<ItemScreen> = buildList {
+        traverseScreens(::add)
     }
 
     /**
@@ -217,10 +254,16 @@ abstract class ItemScreen(
     fun findItem(key: String): UiItem? = tree.findItem(key)
 
     /**
-     * 현재 화면 및 모든 하위 SubScreen을 재귀 순회하여 key와 일치하는 UiItem을 검색합니다.
+     * 현재 화면 및 모든 하위 SubScreen을 재귀 순회하여 key와 일치하는 UiItem을 찾는 즉시 반환합니다.
      */
     fun findItemRecursively(key: String): UiItem? {
-        return allScreens().findItem(key)
+        var foundItem: UiItem? = null
+        traverseScreens { screen ->
+            if (foundItem == null) {
+                foundItem = screen.findItem(key)
+            }
+        }
+        return foundItem
     }
 
     /**
@@ -229,9 +272,13 @@ abstract class ItemScreen(
     fun buildKeyMap(): Map<String, UiItem> = tree.toKeyMap()
 
     /**
-     * 현재 화면 및 모든 하위 SubScreen의 노드를 key -> UiItem Map으로 구성합니다.
+     * 현재 화면 및 모든 하위 SubScreen의 노드를 중간 리스트 생성 없이 재귀 순회하여 key -> UiItem Map으로 구성합니다.
      */
-    fun buildGlobalKeyMap(): Map<String, UiItem> = allScreens().buildGlobalKeyMap()
+    fun buildGlobalKeyMap(): Map<String, UiItem> = buildMap {
+        traverseScreens { screen ->
+            putAll(screen.tree.toKeyMap())
+        }
+    }
 }
 
 private fun findEnclosingSectionTitles(

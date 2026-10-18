@@ -13,6 +13,7 @@ import com.example.uifw.search.ItemSearchIndexer
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
@@ -538,19 +539,28 @@ class ItemTreeArchitectureTest {
         assertTrue(SettingItems.Bluetooth.subScreens.contains(SettingItems.Bluetooth.DeviceDetail))
 
         val all = SettingItems.allScreens()
-        assertEquals(
-            listOf(
-                SettingItems,
-                SettingItems.Bluetooth,
-                SettingItems.Bluetooth.Advanced,
-                SettingItems.Bluetooth.DeviceDetail,
-                SettingItems.Wifi,
-                SettingItems.DriverSeat,
-                SettingItems.PassengerSeat
-            ),
-            all
+        val expectedScreens = listOf(
+            SettingItems,
+            SettingItems.Bluetooth,
+            SettingItems.Bluetooth.Advanced,
+            SettingItems.Bluetooth.DeviceDetail,
+            SettingItems.Wifi,
+            SettingItems.DriverSeat,
+            SettingItems.PassengerSeat
         )
+        assertEquals(expectedScreens, all)
+
+        // 3. traverseScreens direct recursive visitor
+        val visitedScreens = mutableListOf<ItemScreen>()
+        SettingItems.traverseScreens { visitedScreens.add(it) }
+        assertEquals("traverseScreens must visit screens in identical DFS order without intermediate list", expectedScreens, visitedScreens)
+
+        // 4. findScreen recursive early return lookup
+        assertEquals(SettingItems.Bluetooth.Advanced, SettingItems.findScreen("SettingItems/Bluetooth/Advanced"))
+        assertEquals(SettingItems.DriverSeat, SettingItems.findScreen("SettingItems/DriverSeat"))
+        assertNull(SettingItems.findScreen("Invalid/NonExistent/Route"))
     }
+
 
     @Test
     fun testStaticArgumentSubScreenReuseAndDistinctKeysAndBreadcrumbs() {

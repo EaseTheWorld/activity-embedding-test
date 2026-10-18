@@ -33,7 +33,7 @@ fun SampleSettingsScreen(
     hostViewModel: ScreenHostViewModel = hiltViewModel()
 ) {
     val navController = rememberNavController()
-    val searchIndex = remember { ItemSearchIndexer.indexScreens(SettingScreens.all) }
+    val searchIndex = remember { ItemSearchIndexer.indexTree(SettingItems) }
     var searchQuery by remember { mutableStateOf(initialSearchQuery ?: "") }
     var activeHighlightKey by remember { mutableStateOf<String?>(initialDeepLinkKey) }
 
@@ -159,20 +159,13 @@ fun SampleSettingsScreen(
                         }
                     }
 
-                    // Screen NavHost
+                    // Screen NavHost (루트 트리에서 모든 하위 화면을 자동 수집하여 등록)
                     NavHost(
                         navController = navController,
                         startDestination = SettingItems.route,
                         modifier = Modifier.weight(1f)
                     ) {
-                        val screens = listOf(
-                            SettingItems,
-                            SettingItems.Bluetooth,
-                            SettingItems.Bluetooth.Advanced,
-                            SettingItems.Wifi
-                        )
-
-                        screens.forEach { screen ->
+                        SettingItems.allScreens().forEach { screen ->
                             composable(route = screen.route) {
                                 ItemScreenScaffold(
                                     screen = screen,

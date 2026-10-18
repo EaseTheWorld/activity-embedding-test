@@ -53,6 +53,20 @@ class TreeBuilderScope(val screenRoute: String) {
     }
 
     /**
+     * 하위 ItemScreen을 트리 내에 직접 배치 (+subScreen).
+     * 자동으로 해당 화면으로 이동하는 UiSubScreenEntryItem을 생성하여 추가합니다.
+     */
+    operator fun ItemScreen.unaryPlus(): UiSubScreenEntryItem {
+        val entryItem = UiSubScreenEntryItem(
+            key = "$screenRoute/${this.name}",
+            title = this.title,
+            targetScreen = this
+        )
+        +entryItem
+        return entryItem
+    }
+
+    /**
      * 외부에 val로 선언된 SectionDefinition을 DSL에서 호출하여
      * Section 고유 Key와 Title을 유지하면서 자식 아이템들을 조립.
      */

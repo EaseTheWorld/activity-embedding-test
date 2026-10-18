@@ -14,22 +14,30 @@ data class UiAudioLatencyVisualizerItem(
 ) : UiCustomItem
 
 /**
- * 한 파일 안에 중첩 object로 화면 계층을 구성하여
- * 컴파일 타임에 SubScreen 이름 및 프로퍼티(Key) 중복을 100% 방지합니다.
+ * 루트 화면(SettingItems)만 object로 선언하고, 하위 SubScreen들은 class로 정의하여
+ * 부모 화면 내부에서 `by subScreen(...)` 프로퍼티 위임으로 단일 인스턴스를 생성합니다.
  *
- * Section과 Item 모두 val 프로퍼티로 선언하여 고유 Key(DeepLink)를 자동 부여받고,
- * 계층 구조(Hierarchy)는 DSL에서 조립합니다.
+ * - 부모 -> 자식 단방향 생성자 주입이므로 클래스로더 순환 참조(Deadlock/null)가 원천 차단됩니다.
+ * - Section과 Item, SubScreen 모두 `by` 위임 프로퍼티로 일관성 있게 선언됩니다.
+ * - 트리(buildTree) 내 Section 안에 Entry(또는 SubScreen)를 배치하는 것만으로
+ *   별도의 parentSection 지정이나 수동 subScreens 리스트 없이 전체 Breadcrumb과 화면 목록이 자동 구성됩니다.
  */
-object SettingItems : ItemScreen(title = "환경 설정", parent = null) {
+object SettingItems : ItemScreen(title = "환경 설정") {
     // Route: "SettingItems"
 
     // Key: "SettingItems/mainSection"
     val mainSection by section(title = "주요 설정")
 
+    // SubScreens (단일 인스턴스로 생성 및 부모의 subScreens에 자동 등록)
+    // Route: "SettingItems/Bluetooth"
+    val Bluetooth by subScreen(::BluetoothScreen)
+    // Route: "SettingItems/Wifi"
+    val Wifi by subScreen(::WifiScreen)
+
     // Key: "SettingItems/bluetoothEntry"
-    val bluetoothEntry by entry(title = "블루투스 설정")
+    val bluetoothEntry by subScreenEntry(target = Bluetooth)
     // Key: "SettingItems/wifiEntry"
-    val wifiEntry by entry(title = "Wi-Fi 설정")
+    val wifiEntry by subScreenEntry(target = Wifi)
 
     override val tree = buildTree {
         mainSection {
@@ -39,10 +47,14 @@ object SettingItems : ItemScreen(title = "환경 설정", parent = null) {
         }
     }
 
-    // ── SubScreen 1: Bluetooth ───────────────────────────────────
-    object Bluetooth : ItemScreen(
+    // ── SubScreen 1: Bluetooth (class) ───────────────────────────
+    class BluetoothScreen(
+        parent: ItemScreen,
+        name: String? = null
+    ) : ItemScreen(
         title = "블루투스 설정",
-        parentSection = SettingItems.mainSection
+        parent = parent,
+        explicitName = name
     ) {
         // Route: "SettingItems/Bluetooth"
 
@@ -51,8 +63,13 @@ object SettingItems : ItemScreen(title = "환경 설정", parent = null) {
 
         // Key: "SettingItems/Bluetooth/masterToggle"
         val masterToggle by toggle(title = "블루투스 사용")
+
+        // SubScreen 1-1: Bluetooth Advanced (Depth 2)
+        // Route: "SettingItems/Bluetooth/Advanced"
+        val Advanced by subScreen(::AdvancedScreen)
+
         // Key: "SettingItems/Bluetooth/advancedEntry"
-        val advancedEntry by entry(title = "블루투스 고급 설정")
+        val advancedEntry by subScreenEntry(target = Advanced)
 
         override val tree = buildTree {
             connectionSection {
@@ -61,10 +78,14 @@ object SettingItems : ItemScreen(title = "환경 설정", parent = null) {
             }
         }
 
-        // ── SubScreen 1-1: Bluetooth Advanced (Depth 2) ──────────
-        object Advanced : ItemScreen(
+        // ── SubScreen 1-1: Bluetooth Advanced (Depth 2, class) ───
+        class AdvancedScreen(
+            parent: ItemScreen,
+            name: String? = null
+        ) : ItemScreen(
             title = "블루투스 고급 설정",
-            parentSection = Bluetooth.connectionSection
+            parent = parent,
+            explicitName = name
         ) {
             // Route: "SettingItems/Bluetooth/Advanced"
 
@@ -89,10 +110,14 @@ object SettingItems : ItemScreen(title = "환경 설정", parent = null) {
         }
     }
 
-    // ── SubScreen 2: Wi-Fi ───────────────────────────────────────
-    object Wifi : ItemScreen(
+    // ── SubScreen 2: Wi-Fi (class) ───────────────────────────────
+    class WifiScreen(
+        parent: ItemScreen,
+        name: String? = null
+    ) : ItemScreen(
         title = "Wi-Fi 설정",
-        parentSection = SettingItems.mainSection
+        parent = parent,
+        explicitName = name
     ) {
         // Route: "SettingItems/Wifi"
 
@@ -110,17 +135,3 @@ object SettingItems : ItemScreen(title = "환경 설정", parent = null) {
     }
 }
 
-/**
- * 앱 전체 설정 화면 컬렉션.
- * 각 화면은 부모(또는 parentSection)만 참조하고 자식은 모르는 순수 단방향 DAG이므로,
- * 전체 화면 인덱싱 및 딥링크 맵 구성을 위해 화면 모음(Registry)을 제공합니다.
- * (Hilt 사용 시 @IntoSet Set<ItemScreen>으로 멀티바인딩도 가능)
- */
-object SettingScreens {
-    val all: List<ItemScreen> = listOf(
-        SettingItems,
-        SettingItems.Bluetooth,
-        SettingItems.Bluetooth.Advanced,
-        SettingItems.Wifi
-    )
-}

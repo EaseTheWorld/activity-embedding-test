@@ -126,8 +126,11 @@ object ItemSearchIndexer {
         return indexScreens(screens.toList())
     }
 
-    fun indexTree(screen: ItemScreen): List<SearchIndexEntry> {
-        return indexScreen(screen)
+    /**
+     * rootScreen과 그 하위 모든 SubScreen들을 재귀 순회하여 전체 트리를 색인합니다.
+     */
+    fun indexTree(rootScreen: ItemScreen): List<SearchIndexEntry> {
+        return indexScreens(rootScreen.allScreens())
     }
 
     /**

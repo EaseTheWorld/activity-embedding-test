@@ -3,7 +3,6 @@ package com.example.uifw
 import com.example.sample.BluetoothMasterToggleController
 import com.example.sample.DualAudioToggleController
 import com.example.sample.SettingItems
-import com.example.sample.SettingScreens
 import com.example.sample.WifiMasterToggleController
 import com.example.uifw.controller.ItemController
 import com.example.uifw.controller.ItemControllerRegistry
@@ -134,7 +133,7 @@ class ItemTreeArchitectureTest {
 
     @Test
     fun testSearchIndexerBreadcrumbsAndHierarchy() {
-        val index = ItemSearchIndexer.indexScreens(SettingScreens.all)
+        val index = ItemSearchIndexer.indexTree(SettingItems)
         assertTrue("Index should contain multiple entries across screens and sections", index.size >= 8)
 
         // 1. Verify Section Entry and Breadcrumb: Screen > Section > Screen > Section
@@ -185,7 +184,7 @@ class ItemTreeArchitectureTest {
 
     @Test
     fun testSearchFilteringBySectionAndItemTitle() {
-        val index = ItemSearchIndexer.indexScreens(SettingScreens.all)
+        val index = ItemSearchIndexer.indexTree(SettingItems)
 
         // Search by Section Title: "기본 연결"
         val sectionResults = ItemSearchIndexer.search(index, "기본 연결")
@@ -369,25 +368,25 @@ class ItemTreeArchitectureTest {
         val notInLocalTree = SettingItems.tree.findItem("SettingItems/Bluetooth/masterToggle")
         assertEquals(null, notInLocalTree)
 
-        // 2. Collection Screen search finds items across screens without downwards subScreens coupling
-        val rootSection = SettingScreens.all.findItem("SettingItems/mainSection")
+        // 2. Recursive Screen search from root finds items at any depth
+        val rootSection = SettingItems.findItemRecursively("SettingItems/mainSection")
         assertNotNull(rootSection)
         assertTrue(rootSection is UiSectionItem)
 
-        val depth1Item = SettingScreens.all.findItem("SettingItems/Bluetooth/masterToggle")
+        val depth1Item = SettingItems.findItemRecursively("SettingItems/Bluetooth/masterToggle")
         assertNotNull(depth1Item)
         assertSame(SettingItems.Bluetooth.masterToggle, depth1Item)
 
-        val depth2Item = SettingScreens.all.findItem("SettingItems/Bluetooth/Advanced/dualAudio")
+        val depth2Item = SettingItems.findItemRecursively("SettingItems/Bluetooth/Advanced/dualAudio")
         assertNotNull(depth2Item)
         assertSame(SettingItems.Bluetooth.Advanced.dualAudio, depth2Item)
 
-        val depth2Section = SettingScreens.all.findItem("SettingItems/Bluetooth/Advanced/audioSection")
+        val depth2Section = SettingItems.findItemRecursively("SettingItems/Bluetooth/Advanced/audioSection")
         assertNotNull(depth2Section)
         assertEquals("오디오 고급 설정", (depth2Section as UiSectionItem).title)
 
         // 3. Global Key Map
-        val globalMap = SettingScreens.all.buildGlobalKeyMap()
+        val globalMap = SettingItems.buildGlobalKeyMap()
         assertTrue("Global map should index all items across screens", globalMap.size >= 8)
         assertSame(SettingItems.Bluetooth.masterToggle, globalMap["SettingItems/Bluetooth/masterToggle"])
         assertSame(SettingItems.Bluetooth.Advanced.dualAudio, globalMap["SettingItems/Bluetooth/Advanced/dualAudio"])
@@ -401,13 +400,13 @@ class ItemTreeArchitectureTest {
         assertEquals("SettingItems/Bluetooth/Advanced/latencyVisualizer", latencyItem.key)
         assertEquals("오디오 레이턴시 시각화", latencyItem.title)
 
-        // Screen collection lookup
-        val found = SettingScreens.all.findItem("SettingItems/Bluetooth/Advanced/latencyVisualizer")
+        // Recursive tree lookup
+        val found = SettingItems.findItemRecursively("SettingItems/Bluetooth/Advanced/latencyVisualizer")
         assertNotNull(found)
         assertSame(latencyItem, found)
 
         // Search Indexer includes custom item with full breadcrumb
-        val index = ItemSearchIndexer.indexScreens(SettingScreens.all)
+        val index = ItemSearchIndexer.indexTree(SettingItems)
         val customEntry = index.find { it.targetKey == latencyItem.key }
         assertNotNull("Custom item should be indexed", customEntry)
         assertEquals("오디오 레이턴시 시각화", customEntry!!.title)
@@ -494,7 +493,7 @@ class ItemTreeArchitectureTest {
     @Test
     fun testMultiLevelScreenSectionScreenSectionScreenSectionItemBreadcrumb() {
         // Deeply nested Screen > Section > Screen > Section > Screen > Section > Item
-        val index = ItemSearchIndexer.indexScreens(SettingScreens.all)
+        val index = ItemSearchIndexer.indexTree(SettingItems)
         val dualAudioEntry = index.find { it.targetKey == SettingItems.Bluetooth.Advanced.dualAudio.key }
         assertNotNull(dualAudioEntry)
 
@@ -508,15 +507,43 @@ class ItemTreeArchitectureTest {
         // Level 7: Item    ("듀얼 오디오")
         val expectedBreadcrumb = listOf(
             "환경 설정",       // Screen 1
-            "주요 설정",       // Section 1 (parentSection of Screen 2)
+            "주요 설정",       // Section 1 (enclosing section in Screen 1)
             "블루투스 설정",     // Screen 2
-            "기본 연결",       // Section 2 (parentSection of Screen 3)
+            "기본 연결",       // Section 2 (enclosing section in Screen 2)
             "블루투스 고급 설정",  // Screen 3
             "오디오 고급 설정",   // Section 3 (local Section in Screen 3)
             "듀얼 오디오"       // Item
         )
         assertEquals(expectedBreadcrumb, dualAudioEntry!!.breadcrumb)
         assertEquals(expectedBreadcrumb.joinToString(" > "), dualAudioEntry.formattedBreadcrumb)
+    }
+
+    @Test
+    fun testClassSubScreenSingletonAndAutoRegistration() {
+        // 1. Single instance guarantee (by subScreen caches the single instance)
+        val bt1 = SettingItems.Bluetooth
+        val bt2 = SettingItems.Bluetooth
+        assertSame("Bluetooth SubScreen must be a single cached instance", bt1, bt2)
+
+        val adv1 = SettingItems.Bluetooth.Advanced
+        val adv2 = SettingItems.Bluetooth.Advanced
+        assertSame("Advanced SubScreen must be a single cached instance", adv1, adv2)
+
+        // 2. Automatic registration in parent.subScreens and root.allScreens()
+        assertTrue(SettingItems.subScreens.contains(SettingItems.Bluetooth))
+        assertTrue(SettingItems.subScreens.contains(SettingItems.Wifi))
+        assertTrue(SettingItems.Bluetooth.subScreens.contains(SettingItems.Bluetooth.Advanced))
+
+        val all = SettingItems.allScreens()
+        assertEquals(
+            listOf(
+                SettingItems,
+                SettingItems.Bluetooth,
+                SettingItems.Bluetooth.Advanced,
+                SettingItems.Wifi
+            ),
+            all
+        )
     }
 
     @Test
@@ -531,11 +558,7 @@ class ItemTreeArchitectureTest {
 
     @Test
     fun testVerifyNoCircularParentReferencesInScreens() {
-        val allScreens = listOf(
-            SettingItems,
-            SettingItems.Bluetooth,
-            SettingItems.Bluetooth.Advanced,
-            SettingItems.Wifi,
+        val allScreens = SettingItems.allScreens() + listOf(
             ExplicitKeyTestScreen,
             CustomRouteScreen
         )
@@ -545,8 +568,8 @@ class ItemTreeArchitectureTest {
             var current: ItemScreen? = screen
 
             while (current != null) {
-                val isNew = visited.add(current.name)
-                assertTrue("Circular reference detected in screen ${screen.name}!", isNew)
+                val isNew = visited.add(current.route)
+                assertTrue("Circular reference detected in screen ${screen.route}!", isNew)
                 current = current.parent
             }
         }

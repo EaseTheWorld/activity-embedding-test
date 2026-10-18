@@ -21,8 +21,6 @@ data class UiAudioLatencyVisualizerItem(
  * 계층 구조(Hierarchy)는 DSL에서 조립합니다.
  */
 object SettingItems : ItemScreen(title = "환경 설정", parent = null) {
-    override val subScreens by lazy { listOf(Bluetooth, Wifi) }
-
     // Route: "SettingItems"
 
     // Key: "SettingItems/mainSection"
@@ -42,9 +40,10 @@ object SettingItems : ItemScreen(title = "환경 설정", parent = null) {
     }
 
     // ── SubScreen 1: Bluetooth ───────────────────────────────────
-    object Bluetooth : ItemScreen(title = "블루투스 설정", parent = SettingItems) {
-        override val subScreens by lazy { listOf(Advanced) }
-
+    object Bluetooth : ItemScreen(
+        title = "블루투스 설정",
+        parentSection = SettingItems.mainSection
+    ) {
         // Route: "SettingItems/Bluetooth"
 
         // Key: "SettingItems/Bluetooth/connectionSection"
@@ -63,7 +62,10 @@ object SettingItems : ItemScreen(title = "환경 설정", parent = null) {
         }
 
         // ── SubScreen 1-1: Bluetooth Advanced (Depth 2) ──────────
-        object Advanced : ItemScreen(title = "블루투스 고급 설정", parent = Bluetooth) {
+        object Advanced : ItemScreen(
+            title = "블루투스 고급 설정",
+            parentSection = Bluetooth.connectionSection
+        ) {
             // Route: "SettingItems/Bluetooth/Advanced"
 
             // Key: "SettingItems/Bluetooth/Advanced/audioSection"
@@ -88,7 +90,10 @@ object SettingItems : ItemScreen(title = "환경 설정", parent = null) {
     }
 
     // ── SubScreen 2: Wi-Fi ───────────────────────────────────────
-    object Wifi : ItemScreen(title = "Wi-Fi 설정", parent = SettingItems) {
+    object Wifi : ItemScreen(
+        title = "Wi-Fi 설정",
+        parentSection = SettingItems.mainSection
+    ) {
         // Route: "SettingItems/Wifi"
 
         // Key: "SettingItems/Wifi/wifiSection"
@@ -103,4 +108,19 @@ object SettingItems : ItemScreen(title = "환경 설정", parent = null) {
             }
         }
     }
+}
+
+/**
+ * 앱 전체 설정 화면 컬렉션.
+ * 각 화면은 부모(또는 parentSection)만 참조하고 자식은 모르는 순수 단방향 DAG이므로,
+ * 전체 화면 인덱싱 및 딥링크 맵 구성을 위해 화면 모음(Registry)을 제공합니다.
+ * (Hilt 사용 시 @IntoSet Set<ItemScreen>으로 멀티바인딩도 가능)
+ */
+object SettingScreens {
+    val all: List<ItemScreen> = listOf(
+        SettingItems,
+        SettingItems.Bluetooth,
+        SettingItems.Bluetooth.Advanced,
+        SettingItems.Wifi
+    )
 }

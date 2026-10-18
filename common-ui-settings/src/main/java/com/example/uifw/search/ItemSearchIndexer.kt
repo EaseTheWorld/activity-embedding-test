@@ -111,29 +111,23 @@ object ItemSearchIndexer {
         return screens.flatMap { indexScreen(it) }
     }
 
+    fun indexScreens(vararg screens: ItemScreen): List<SearchIndexEntry> {
+        return indexScreens(screens.toList())
+    }
+
     /**
-     * rootScreen과 그 하위 subScreens(또는 targetScreen)를 재귀 순회하여 전체 트리를 색인합니다.
+     * 화면(들)을 전달받아 트리를 색인합니다.
      */
-    fun indexTree(rootScreen: ItemScreen): List<SearchIndexEntry> {
-        val allScreens = mutableListOf<ItemScreen>()
-        val visited = mutableSetOf<String>()
-        fun collect(s: ItemScreen) {
-            if (!visited.add(s.route)) return
-            allScreens.add(s)
-            s.subScreens.forEach(::collect)
-            fun scanContainer(c: UiContainerItem) {
-                c.children.forEach { ch ->
-                    if (ch is UiSubScreenEntryItem && ch.targetScreen != null) {
-                        collect(ch.targetScreen)
-                    } else if (ch is UiContainerItem) {
-                        scanContainer(ch)
-                    }
-                }
-            }
-            scanContainer(s.tree.root)
-        }
-        collect(rootScreen)
-        return indexScreens(allScreens)
+    fun indexTree(screens: Collection<ItemScreen>): List<SearchIndexEntry> {
+        return indexScreens(screens)
+    }
+
+    fun indexTree(vararg screens: ItemScreen): List<SearchIndexEntry> {
+        return indexScreens(screens.toList())
+    }
+
+    fun indexTree(screen: ItemScreen): List<SearchIndexEntry> {
+        return indexScreen(screen)
     }
 
     /**

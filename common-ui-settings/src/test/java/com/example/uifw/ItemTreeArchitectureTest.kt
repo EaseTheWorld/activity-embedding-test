@@ -3,6 +3,7 @@ package com.example.uifw
 import com.example.sample.BluetoothMasterToggleController
 import com.example.sample.DualAudioToggleController
 import com.example.sample.SettingItems
+import com.example.sample.SettingScreens
 import com.example.sample.WifiMasterToggleController
 import com.example.uifw.controller.ItemController
 import com.example.uifw.controller.ItemControllerRegistry
@@ -133,45 +134,58 @@ class ItemTreeArchitectureTest {
 
     @Test
     fun testSearchIndexerBreadcrumbsAndHierarchy() {
-        val index = ItemSearchIndexer.indexTree(SettingItems)
+        val index = ItemSearchIndexer.indexScreens(SettingScreens.all)
         assertTrue("Index should contain multiple entries across screens and sections", index.size >= 8)
 
-        // 1. Verify Section Entry and Breadcrumb
+        // 1. Verify Section Entry and Breadcrumb: Screen > Section > Screen > Section
         val connSectionEntry = index.find { it.targetKey == "SettingItems/Bluetooth/connectionSection" }
         assertNotNull(connSectionEntry)
         assertTrue(connSectionEntry!!.isSection)
         assertEquals("기본 연결", connSectionEntry.title)
         assertEquals("SettingItems/Bluetooth", connSectionEntry.screenRoute)
         assertEquals(
-            "환경 설정 > 블루투스 설정 > 기본 연결",
+            "환경 설정 > 주요 설정 > 블루투스 설정 > 기본 연결",
             connSectionEntry.formattedBreadcrumb
         )
 
-        // 2. Verify Item Entry and Breadcrumb: Screen > Subscreen > Section > Item
+        // 2. Verify Item Entry and Breadcrumb: Screen > Section > Screen > Section > Item
         val btToggleEntry = index.find { it.targetKey == "SettingItems/Bluetooth/masterToggle" }
         assertNotNull(btToggleEntry)
         assertEquals(false, btToggleEntry!!.isSection)
         assertEquals("블루투스 사용", btToggleEntry.title)
         assertEquals("SettingItems/Bluetooth", btToggleEntry.screenRoute)
         assertEquals(
-            "환경 설정 > 블루투스 설정 > 기본 연결 > 블루투스 사용",
+            "환경 설정 > 주요 설정 > 블루투스 설정 > 기본 연결 > 블루투스 사용",
             btToggleEntry.formattedBreadcrumb
         )
 
-        // 3. Verify Subscreen-Subscreen Item: Screen > Subscreen > Subscreen > Section > Item
+        // 3. Verify Complex Multi-Level Breadcrumb:
+        // Screen(환경 설정) > Section(주요 설정) > Screen(블루투스 설정) > Section(기본 연결) > Screen(블루투스 고급 설정) > Section(오디오 고급 설정) > Item(듀얼 오디오)
         val dualAudioEntry = index.find { it.targetKey == "SettingItems/Bluetooth/Advanced/dualAudio" }
         assertNotNull(dualAudioEntry)
         assertEquals("듀얼 오디오", dualAudioEntry!!.title)
         assertEquals("SettingItems/Bluetooth/Advanced", dualAudioEntry.screenRoute)
         assertEquals(
-            "환경 설정 > 블루투스 설정 > 블루투스 고급 설정 > 오디오 고급 설정 > 듀얼 오디오",
+            "환경 설정 > 주요 설정 > 블루투스 설정 > 기본 연결 > 블루투스 고급 설정 > 오디오 고급 설정 > 듀얼 오디오",
             dualAudioEntry.formattedBreadcrumb
+        )
+        assertEquals(
+            listOf(
+                "환경 설정",
+                "주요 설정",
+                "블루투스 설정",
+                "기본 연결",
+                "블루투스 고급 설정",
+                "오디오 고급 설정",
+                "듀얼 오디오"
+            ),
+            dualAudioEntry.breadcrumb
         )
     }
 
     @Test
     fun testSearchFilteringBySectionAndItemTitle() {
-        val index = ItemSearchIndexer.indexTree(SettingItems)
+        val index = ItemSearchIndexer.indexScreens(SettingScreens.all)
 
         // Search by Section Title: "기본 연결"
         val sectionResults = ItemSearchIndexer.search(index, "기본 연결")
@@ -179,6 +193,10 @@ class ItemTreeArchitectureTest {
         assertEquals("기본 연결", sectionResults[0].title)
         assertTrue(sectionResults[0].isSection)
         assertEquals("SettingItems/Bluetooth/connectionSection", sectionResults[0].targetKey)
+        assertEquals(
+            "환경 설정 > 주요 설정 > 블루투스 설정 > 기본 연결",
+            sectionResults[0].formattedBreadcrumb
+        )
 
         // Search by Item Title: "듀얼 오디오"
         val itemResults = ItemSearchIndexer.search(index, "듀얼 오디오")
@@ -187,7 +205,7 @@ class ItemTreeArchitectureTest {
         assertEquals(false, itemResults[0].isSection)
         assertEquals("SettingItems/Bluetooth/Advanced/dualAudio", itemResults[0].targetKey)
         assertEquals(
-            "환경 설정 > 블루투스 설정 > 블루투스 고급 설정 > 오디오 고급 설정 > 듀얼 오디오",
+            "환경 설정 > 주요 설정 > 블루투스 설정 > 기본 연결 > 블루투스 고급 설정 > 오디오 고급 설정 > 듀얼 오디오",
             itemResults[0].formattedBreadcrumb
         )
 
@@ -351,25 +369,25 @@ class ItemTreeArchitectureTest {
         val notInLocalTree = SettingItems.tree.findItem("SettingItems/Bluetooth/masterToggle")
         assertEquals(null, notInLocalTree)
 
-        // 2. Recursive Screen search finds items at any depth
-        val rootSection = SettingItems.findItemRecursively("SettingItems/mainSection")
+        // 2. Collection Screen search finds items across screens without downwards subScreens coupling
+        val rootSection = SettingScreens.all.findItem("SettingItems/mainSection")
         assertNotNull(rootSection)
         assertTrue(rootSection is UiSectionItem)
 
-        val depth1Item = SettingItems.findItemRecursively("SettingItems/Bluetooth/masterToggle")
+        val depth1Item = SettingScreens.all.findItem("SettingItems/Bluetooth/masterToggle")
         assertNotNull(depth1Item)
         assertSame(SettingItems.Bluetooth.masterToggle, depth1Item)
 
-        val depth2Item = SettingItems.findItemRecursively("SettingItems/Bluetooth/Advanced/dualAudio")
+        val depth2Item = SettingScreens.all.findItem("SettingItems/Bluetooth/Advanced/dualAudio")
         assertNotNull(depth2Item)
         assertSame(SettingItems.Bluetooth.Advanced.dualAudio, depth2Item)
 
-        val depth2Section = SettingItems.findItemRecursively("SettingItems/Bluetooth/Advanced/audioSection")
+        val depth2Section = SettingScreens.all.findItem("SettingItems/Bluetooth/Advanced/audioSection")
         assertNotNull(depth2Section)
         assertEquals("오디오 고급 설정", (depth2Section as UiSectionItem).title)
 
         // 3. Global Key Map
-        val globalMap = SettingItems.buildGlobalKeyMap()
+        val globalMap = SettingScreens.all.buildGlobalKeyMap()
         assertTrue("Global map should index all items across screens", globalMap.size >= 8)
         assertSame(SettingItems.Bluetooth.masterToggle, globalMap["SettingItems/Bluetooth/masterToggle"])
         assertSame(SettingItems.Bluetooth.Advanced.dualAudio, globalMap["SettingItems/Bluetooth/Advanced/dualAudio"])
@@ -383,18 +401,18 @@ class ItemTreeArchitectureTest {
         assertEquals("SettingItems/Bluetooth/Advanced/latencyVisualizer", latencyItem.key)
         assertEquals("오디오 레이턴시 시각화", latencyItem.title)
 
-        // Recursive tree lookup
-        val found = SettingItems.findItemRecursively("SettingItems/Bluetooth/Advanced/latencyVisualizer")
+        // Screen collection lookup
+        val found = SettingScreens.all.findItem("SettingItems/Bluetooth/Advanced/latencyVisualizer")
         assertNotNull(found)
         assertSame(latencyItem, found)
 
         // Search Indexer includes custom item with full breadcrumb
-        val index = ItemSearchIndexer.indexTree(SettingItems)
+        val index = ItemSearchIndexer.indexScreens(SettingScreens.all)
         val customEntry = index.find { it.targetKey == latencyItem.key }
         assertNotNull("Custom item should be indexed", customEntry)
         assertEquals("오디오 레이턴시 시각화", customEntry!!.title)
         assertEquals(
-            "환경 설정 > 블루투스 설정 > 블루투스 고급 설정 > 오디오 고급 설정 > 오디오 레이턴시 시각화",
+            "환경 설정 > 주요 설정 > 블루투스 설정 > 기본 연결 > 블루투스 고급 설정 > 오디오 고급 설정 > 오디오 레이턴시 시각화",
             customEntry.formattedBreadcrumb
         )
 
@@ -465,9 +483,40 @@ class ItemTreeArchitectureTest {
     @Test
     fun testScreenBreadcrumbHierarchyFromParent() {
         assertEquals(listOf("환경 설정"), SettingItems.screenBreadcrumb)
-        assertEquals(listOf("환경 설정", "블루투스 설정"), SettingItems.Bluetooth.screenBreadcrumb)
-        assertEquals(listOf("환경 설정", "블루투스 설정", "블루투스 고급 설정"), SettingItems.Bluetooth.Advanced.screenBreadcrumb)
-        assertEquals(listOf("환경 설정", "Wi-Fi 설정"), SettingItems.Wifi.screenBreadcrumb)
+        assertEquals(listOf("환경 설정", "주요 설정", "블루투스 설정"), SettingItems.Bluetooth.screenBreadcrumb)
+        assertEquals(
+            listOf("환경 설정", "주요 설정", "블루투스 설정", "기본 연결", "블루투스 고급 설정"),
+            SettingItems.Bluetooth.Advanced.screenBreadcrumb
+        )
+        assertEquals(listOf("환경 설정", "주요 설정", "Wi-Fi 설정"), SettingItems.Wifi.screenBreadcrumb)
+    }
+
+    @Test
+    fun testMultiLevelScreenSectionScreenSectionScreenSectionItemBreadcrumb() {
+        // Deeply nested Screen > Section > Screen > Section > Screen > Section > Item
+        val index = ItemSearchIndexer.indexScreens(SettingScreens.all)
+        val dualAudioEntry = index.find { it.targetKey == SettingItems.Bluetooth.Advanced.dualAudio.key }
+        assertNotNull(dualAudioEntry)
+
+        // 7 levels total:
+        // Level 1: Screen  ("환경 설정")
+        // Level 2: Section ("주요 설정")
+        // Level 3: Screen  ("블루투스 설정")
+        // Level 4: Section ("기본 연결")
+        // Level 5: Screen  ("블루투스 고급 설정")
+        // Level 6: Section ("오디오 고급 설정")
+        // Level 7: Item    ("듀얼 오디오")
+        val expectedBreadcrumb = listOf(
+            "환경 설정",       // Screen 1
+            "주요 설정",       // Section 1 (parentSection of Screen 2)
+            "블루투스 설정",     // Screen 2
+            "기본 연결",       // Section 2 (parentSection of Screen 3)
+            "블루투스 고급 설정",  // Screen 3
+            "오디오 고급 설정",   // Section 3 (local Section in Screen 3)
+            "듀얼 오디오"       // Item
+        )
+        assertEquals(expectedBreadcrumb, dualAudioEntry!!.breadcrumb)
+        assertEquals(expectedBreadcrumb.joinToString(" > "), dualAudioEntry.formattedBreadcrumb)
     }
 
     @Test

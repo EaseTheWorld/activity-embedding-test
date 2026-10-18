@@ -5,10 +5,17 @@ import kotlin.properties.ReadOnlyProperty
 
 abstract class ItemScreen(
     val title: String,
-    val parent: ItemScreen? = null,
+    parent: ItemScreen? = null,
+    val parentSection: SectionDefinition? = null,
     explicitName: String? = null,
     explicitRoute: String? = null
 ) {
+    /**
+     * parentSection이 지정된 경우 해당 섹션의 소속 화면을 parent로 자동 추론,
+     * 명시적 parent가 전달된 경우 우선 사용.
+     */
+    val parent: ItemScreen? = parent ?: parentSection?.screen
+
     /**
      * 화면 식별자 이름. explicitName이 제공되면 우선 사용, 없으면 JVM 단순 클래스명 사용.
      */
@@ -22,27 +29,23 @@ abstract class ItemScreen(
      * - parent가 있으면 "${parent.route}/$name"
      * - parent가 없으면 "$name"
      */
-    val route: String = explicitRoute ?: if (parent != null) "${parent.route}/$name" else name
+    val route: String = explicitRoute ?: if (this.parent != null) "${this.parent.route}/$name" else name
 
     /**
-     * 부모 체인을 따라 루트부터 현재 화면까지의 화면 레벨 Breadcrumb 목록
-     * 예: ["환경 설정", "블루투스 설정", "블루투스 고급 설정"]
+     * 부모 체인을 따라 루트부터 현재 화면까지의 화면 및 섹션 레벨 Breadcrumb 목록.
+     * 부모 화면으로 진입하게 된 parentSection이 존재하면 Section 타이틀도 함께 포함합니다.
+     * 예: ["환경 설정", "주요 설정", "블루투스 설정", "기본 연결", "블루투스 고급 설정"]
      */
     val screenBreadcrumb: List<String> by lazy {
-        buildList {
-            var cur: ItemScreen? = this@ItemScreen
-            while (cur != null) {
-                add(0, cur.title)
-                cur = cur.parent
-            }
+        val list = mutableListOf<String>()
+        fun collect(screen: ItemScreen) {
+            screen.parent?.let(::collect)
+            screen.parentSection?.let { list.add(it.title) }
+            list.add(screen.title)
         }
+        collect(this)
+        list
     }
-
-    /**
-     * 인덱싱 및 전체 키 맵 생성을 위한 하위 스크린 목록.
-     * 클래스 초기화 순환을 방지하기 위해 'by lazy'로 오버라이드할 수 있습니다.
-     */
-    open val subScreens: List<ItemScreen> get() = emptyList()
 
     abstract val tree: ItemTree
 
@@ -63,27 +66,25 @@ abstract class ItemScreen(
     fun findItem(key: String): UiItem? = tree.findItem(key)
 
     /**
-     * 현재 화면 및 subScreens를 재귀 순회하여 key와 일치하는 UiItem을 검색합니다.
+     * 현재 화면의 모든 노드를 key -> UiItem Map으로 구성합니다.
      */
-    fun findItemRecursively(key: String): UiItem? {
-        val direct = tree.findItem(key)
-        if (direct != null) return direct
+    fun buildKeyMap(): Map<String, UiItem> = tree.toKeyMap()
+}
 
-        for (sub in subScreens) {
-            val found = sub.findItemRecursively(key)
-            if (found != null) return found
-        }
-        return null
+/**
+ * Screen 컬렉션에 대한 전체 검색 및 키 맵 확장 함수
+ */
+fun Collection<ItemScreen>.findItem(key: String): UiItem? {
+    for (screen in this) {
+        val item = screen.findItem(key)
+        if (item != null) return item
     }
+    return null
+}
 
-    /**
-     * 현재 화면 및 모든 하위 subScreens를 순회하여 전체 노드를 key -> UiItem Map으로 구성합니다.
-     */
-    fun buildGlobalKeyMap(): Map<String, UiItem> = buildMap {
-        putAll(tree.toKeyMap())
-        for (sub in subScreens) {
-            putAll(sub.buildGlobalKeyMap())
-        }
+fun Collection<ItemScreen>.buildGlobalKeyMap(): Map<String, UiItem> = buildMap {
+    for (screen in this@buildGlobalKeyMap) {
+        putAll(screen.tree.toKeyMap())
     }
 }
 
@@ -119,23 +120,25 @@ inline fun <T : UiItem> screenItem(
 
 /**
  * Definition of a Section declared via val on ItemScreen.
- * Encapsulates the section's unique deep link key and localized title.
+ * Encapsulates the section's unique deep link key, localized title, and owner screen.
  */
 class SectionDefinition(
     val key: String,
-    val title: String
+    val title: String,
+    val screen: ItemScreen? = null
 )
 
 /**
  * Delegate for declaring a Section as a val property on an ItemScreen.
- * Automatically derives the unique key: "${screen.route}/${property.name}" (or uses explicitKey).
+ * Automatically derives the unique key: "${screen.route}/${property.name}" (or uses explicitKey),
+ * and records the enclosing screen reference.
  */
 fun ItemScreen.section(
     title: String,
     explicitKey: String? = null
 ) = PropertyDelegateProvider<ItemScreen, ReadOnlyProperty<ItemScreen, SectionDefinition>> { screen, property ->
     val fullKey = resolveItemKey(screen.route, explicitKey, property.name)
-    val def = SectionDefinition(key = fullKey, title = title)
+    val def = SectionDefinition(key = fullKey, title = title, screen = screen)
     ReadOnlyProperty { _, _ -> def }
 }
 

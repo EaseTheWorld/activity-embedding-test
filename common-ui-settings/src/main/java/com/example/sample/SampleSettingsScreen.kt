@@ -33,7 +33,7 @@ fun SampleSettingsScreen(
     hostViewModel: ScreenHostViewModel = hiltViewModel()
 ) {
     val navController = rememberNavController()
-    val searchIndex = remember { ItemSearchIndexer.indexTree(SettingItems) }
+    val searchIndex = remember { ItemSearchIndexer.indexScreens(SettingScreens.all) }
     var searchQuery by remember { mutableStateOf(initialSearchQuery ?: "") }
     var activeHighlightKey by remember { mutableStateOf<String?>(initialDeepLinkKey) }
 

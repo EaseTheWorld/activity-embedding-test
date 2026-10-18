@@ -403,6 +403,64 @@ class ItemTreeArchitectureTest {
         assertEquals(1, searchResults.size)
         assertEquals(latencyItem.key, searchResults[0].targetKey)
     }
+
+    // ── Class-level test screens for explicitKey / explicitRoute ──
+    object ExplicitKeyTestScreen : ItemScreen(title = "테스트 화면") {
+        // 1. explicitKey 미지정 -> 프로퍼티명 사용
+        val defaultToggle by toggle(title = "기본 토글")
+
+        // 2. 상대 explicitKey -> "${screen.route}/$explicitKey"
+        val renamedToggle by toggle(title = "이름 변경 토글", explicitKey = "original_toggle_key")
+
+        // 3. 슬래시 포함 절대 explicitKey -> 지정된 전체 경로 그대로 사용
+        val legacyItem by text("레거시 아이템", explicitKey = "legacy/system/old_item")
+
+        // 4. 선행 슬래시 포함 -> 슬래시 제거 후 절대 경로로 사용
+        val slashItem by text("슬래시 아이템", explicitKey = "/absolute/custom_key")
+
+        // 5. Section with explicitKey
+        val customSection by section(title = "커스텀 섹션", explicitKey = "my_section")
+
+        // 6. subScreenEntry with explicitKey
+        val customEntry by subScreenEntry(target = SettingItems.Bluetooth, explicitKey = "bt_entry")
+
+        override val tree = buildTree {
+            customSection {
+                +defaultToggle
+                +renamedToggle
+                +legacyItem
+                +slashItem
+                +customEntry
+            }
+        }
+    }
+
+    object CustomRouteScreen : ItemScreen(title = "커스텀 라우트 화면", explicitRoute = "Settings/Custom") {
+        val masterSwitch by toggle(title = "스위치", explicitKey = "master")
+        val defaultItem by text("텍스트")
+
+        override val tree = buildTree {
+            +masterSwitch
+            +defaultItem
+        }
+    }
+
+    @Test
+    fun testExplicitKeyRelativeAndAbsoluteResolution() {
+        assertEquals("ItemTreeArchitectureTest/ExplicitKeyTestScreen/defaultToggle", ExplicitKeyTestScreen.defaultToggle.key)
+        assertEquals("ItemTreeArchitectureTest/ExplicitKeyTestScreen/original_toggle_key", ExplicitKeyTestScreen.renamedToggle.key)
+        assertEquals("legacy/system/old_item", ExplicitKeyTestScreen.legacyItem.key)
+        assertEquals("absolute/custom_key", ExplicitKeyTestScreen.slashItem.key)
+        assertEquals("ItemTreeArchitectureTest/ExplicitKeyTestScreen/my_section", ExplicitKeyTestScreen.customSection.key)
+        assertEquals("ItemTreeArchitectureTest/ExplicitKeyTestScreen/bt_entry", ExplicitKeyTestScreen.customEntry.key)
+    }
+
+    @Test
+    fun testExplicitRouteOnItemScreen() {
+        assertEquals("Settings/Custom", CustomRouteScreen.route)
+        assertEquals("Settings/Custom/master", CustomRouteScreen.masterSwitch.key)
+        assertEquals("Settings/Custom/defaultItem", CustomRouteScreen.defaultItem.key)
+    }
 }
 
 

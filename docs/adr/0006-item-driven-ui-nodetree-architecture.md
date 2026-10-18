@@ -20,9 +20,10 @@ All items implement immutable sealed interfaces:
 - `UiContainerItem`: Container contract with immutable `children: List<UiItem>`.
 - Leaf items (`UiToggleItem`, `UiTextItem`, `UiSubScreenEntryItem`) and containers (`UiLinearItem`) are immutable data classes. Compose compiler marks them as `Skippable`.
 
-### 2. Zero-Reflection Route and DeepLink Key Guarantee
-- **Screen Route**: Automatically derived from JVM binary class name via `this.javaClass.name.substringAfterLast('.').replace('$', '/')`. Nested Kotlin `object` hierarchies (`SettingItems.Bluetooth.Advanced`) yield compile-time route hierarchies without reflection.
-- **Item Key (DeepLink)**: Property delegation (`by screenItem { ... }`) guarantees canonical paths in the format `"${screen.route}/${property.name}"`.
+### 2. Zero-Reflection Route and DeepLink Key Guarantee (with `explicitKey` / `explicitRoute` override)
+- **Screen Route**: Automatically derived from JVM binary class name via `this.javaClass.name.substringAfterLast('.').replace('$', '/')`. Alternatively, an `explicitRoute: String?` can be provided to fix or customize the screen route. Nested Kotlin `object` hierarchies (`SettingItems.Bluetooth.Advanced`) yield compile-time route hierarchies without reflection.
+- **Item Key (DeepLink)**: Property delegation (`by screenItem { ... }`, `by toggle(...)`, `by section(...)`, etc.) derives canonical paths as `"${screen.route}/${property.name}"` by default.
+- **Refactoring Resilience via `explicitKey`**: To protect public deeplinks from variable renames or migrations, callers can pass `explicitKey: String?`. If `explicitKey` contains a `/`, it is treated as an absolute canonical key (e.g. legacy deeplinks); otherwise, it is relative to the screen route (`"${screen.route}/$explicitKey"`).
 
 ### 3. Separation of Declaration (`val`) and Composition (`DSL`)
 - Observable setting items are declared as immutable `val` properties on screen objects.

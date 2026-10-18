@@ -3,12 +3,16 @@ package com.example.uifw.item
 import kotlin.properties.PropertyDelegateProvider
 import kotlin.properties.ReadOnlyProperty
 
-abstract class ItemScreen(val title: String) {
+abstract class ItemScreen(
+    val title: String,
+    explicitRoute: String? = null
+) {
     /**
-     * kotlin-reflect 없이 순수 JVM 클래스명을 사용하여 계층형 Route 자동 생성
+     * kotlin-reflect 없이 순수 JVM 클래스명을 사용하여 계층형 Route 자동 생성.
+     * explicitRoute가 전달된 경우 해당 route를 우선 사용.
      * 예: "com.example.SettingItems$Bluetooth$Advanced" -> "SettingItems/Bluetooth/Advanced"
      */
-    val route: String = this.javaClass.name
+    val route: String = explicitRoute ?: this.javaClass.name
         .substringAfterLast('.')
         .replace('$', '/')
 
@@ -81,13 +85,31 @@ abstract class ItemScreen(val title: String) {
 }
 
 /**
+ * 아이템이나 섹션의 Canonical DeepLink Key를 결정합니다.
+ * 1. explicitKey가 지정되지 않은 경우(null): "${screenRoute}/${propertyName}"
+ * 2. explicitKey에 '/'가 포함되거나 '/'로 시작하는 경우: 전체(절대) 딥링크 경로로 간주
+ * 3. explicitKey가 단순 문자열인 경우: 화면 경로 하위의 상대 키 "${screenRoute}/$explicitKey"로 결합
+ */
+fun resolveItemKey(screenRoute: String, explicitKey: String?, propertyName: String): String {
+    if (explicitKey == null) return "$screenRoute/$propertyName"
+    return if (explicitKey.startsWith("/")) {
+        explicitKey.removePrefix("/")
+    } else if (explicitKey.contains('/')) {
+        explicitKey
+    } else {
+        "$screenRoute/$explicitKey"
+    }
+}
+
+/**
  * ItemScreen 내부 프로퍼티 전용 Delegate.
- * 중간 Container와 무관하게 "${screen.route}/${property.name}"으로 고유 Key(DeepLink)를 생성.
+ * explicitKey가 제공되면 해당 키를 사용하고, 생략 시 "${screen.route}/${property.name}"으로 고유 Key(DeepLink)를 생성.
  */
 inline fun <T : UiItem> screenItem(
+    explicitKey: String? = null,
     crossinline creator: (fullKey: String) -> T
 ) = PropertyDelegateProvider<ItemScreen, ReadOnlyProperty<ItemScreen, T>> { screen, property ->
-    val fullKey = "${screen.route}/${property.name}"
+    val fullKey = resolveItemKey(screen.route, explicitKey, property.name)
     val item = creator(fullKey) // 최초 1회 생성 후 캐싱
     ReadOnlyProperty { _, _ -> item }
 }
@@ -103,26 +125,35 @@ class SectionDefinition(
 
 /**
  * Delegate for declaring a Section as a val property on an ItemScreen.
- * Automatically derives the unique key: "${screen.route}/${property.name}".
+ * Automatically derives the unique key: "${screen.route}/${property.name}" (or uses explicitKey).
  */
-fun ItemScreen.section(title: String) =
-    PropertyDelegateProvider<ItemScreen, ReadOnlyProperty<ItemScreen, SectionDefinition>> { screen, property ->
-        val fullKey = "${screen.route}/${property.name}"
-        val def = SectionDefinition(key = fullKey, title = title)
-        ReadOnlyProperty { _, _ -> def }
-    }
+fun ItemScreen.section(
+    title: String,
+    explicitKey: String? = null
+) = PropertyDelegateProvider<ItemScreen, ReadOnlyProperty<ItemScreen, SectionDefinition>> { screen, property ->
+    val fullKey = resolveItemKey(screen.route, explicitKey, property.name)
+    val def = SectionDefinition(key = fullKey, title = title)
+    ReadOnlyProperty { _, _ -> def }
+}
 
-fun ItemScreen.toggle(title: String) = screenItem { key ->
+fun ItemScreen.toggle(
+    title: String,
+    explicitKey: String? = null
+) = screenItem(explicitKey) { key ->
     UiToggleItem(key = key, title = title)
 }
 
-fun ItemScreen.text(initialText: String) = screenItem { key ->
+fun ItemScreen.text(
+    initialText: String,
+    explicitKey: String? = null
+) = screenItem(explicitKey) { key ->
     UiTextItem(key = key, text = initialText)
 }
 
 fun ItemScreen.subScreenEntry(
     target: ItemScreen,
-    title: String = target.title
-) = screenItem { key ->
+    title: String = target.title,
+    explicitKey: String? = null
+) = screenItem(explicitKey) { key ->
     UiSubScreenEntryItem(key = key, title = title, targetScreen = target)
 }

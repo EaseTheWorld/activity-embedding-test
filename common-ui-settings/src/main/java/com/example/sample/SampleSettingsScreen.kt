@@ -14,9 +14,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.example.uifw.controller.ItemNavigator
 import com.example.uifw.controller.LocalItemControllerRegistry
 import com.example.uifw.controller.ScreenHostViewModel
@@ -37,23 +39,23 @@ fun SampleSettingsScreen(
     val searchIndex = remember { ItemSearchIndexer.indexTree(SettingItems) }
     var searchQuery by remember { mutableStateOf(initialSearchQuery ?: "") }
 
-    // Helper: 특정 DeepLink 아이템/섹션 키로 이동할 때 그 화면의 Route 2 ("screen_route/{itemKey}") 경로 계산
-    fun resolveItemNavigationRoute(targetKey: String): String {
+    // Helper: 특정 DeepLink 아이템/섹션 키로 이동할 때 그 화면의 "?anchor={key}" 경로 계산
+    fun resolveAnchorNavigationRoute(targetKey: String): String {
         val matchingEntry = searchIndex.find { it.targetKey == targetKey }
         val baseRoute = matchingEntry?.screenRoute ?: targetKey.substringBeforeLast('/')
         val targetScreen = SettingItems.allScreens().find { it.route == baseRoute }
         return if (targetScreen != null) {
             val defaultArg = if (targetScreen.routeArg != null) "default_device" else null
-            targetScreen.createItemRoute(targetKey, defaultArg)
+            targetScreen.createAnchorRoute(targetKey, defaultArg)
         } else {
             targetKey
         }
     }
 
-    // Initial Deeplink navigation: Route 2 ("screen_route/{itemKey}")로 직접 이동하여 앵커링 & 하이라이트
+    // Initial Deeplink navigation: "screen_route?anchor={key}"로 이동하여 앵커링 & 하이라이트
     LaunchedEffect(initialDeepLinkKey) {
         if (!initialDeepLinkKey.isNullOrBlank()) {
-            val targetRoute = resolveItemNavigationRoute(initialDeepLinkKey)
+            val targetRoute = resolveAnchorNavigationRoute(initialDeepLinkKey)
             navController.navigate(targetRoute) {
                 launchSingleTop = true
             }
@@ -137,8 +139,8 @@ fun SampleSettingsScreen(
                                 SearchResultCard(
                                     entry = entry,
                                     onClick = {
-                                        val itemRoute = resolveItemNavigationRoute(entry.targetKey)
-                                        navController.navigate(itemRoute) {
+                                        val anchorRoute = resolveAnchorNavigationRoute(entry.targetKey)
+                                        navController.navigate(anchorRoute) {
                                             launchSingleTop = true
                                         }
                                         searchQuery = ""
@@ -148,36 +150,30 @@ fun SampleSettingsScreen(
                         }
                     }
                 } else {
-                    // Screen NavHost: 각 Screen마다 2개의 Route를 자동 등록
-                    // 1) screen.routePattern: 화면 자체로 이동하는 용도
-                    // 2) screen.itemRoutePattern ("${screen.routePattern}/{itemKey}"): 화면 내 특정 아이템 앵커링 & 하이라이트 용도
+                    // Screen NavHost: 각 Screen마다 "routePattern?anchor={anchor}" 단일 등록으로
+                    // 1) 화면 자체 이동("screen_route") 및
+                    // 2) 화면 내 특정 Item/Section 앵커링 & 하이라이트("screen_route?anchor={key}") 모두 처리
                     NavHost(
                         navController = navController,
                         startDestination = SettingItems.route,
                         modifier = Modifier.weight(1f)
                     ) {
                         SettingItems.allScreens().forEach { screen ->
-                            // Route 1: 화면 자체 진입
-                            composable(route = screen.routePattern) { backStackEntry ->
-                                val dynamicArgValue = screen.routeArg?.let { argName ->
-                                    backStackEntry.arguments?.getString(argName)
-                                }
-                                ItemScreenScaffold(
-                                    screen = screen,
-                                    dynamicArgValue = dynamicArgValue,
-                                    initialHighlightKey = null,
-                                    canNavigateBack = navController.previousBackStackEntry != null,
-                                    onNavigateBack = { navController.popBackStack() }
+                            composable(
+                                route = screen.anchorRoutePattern,
+                                arguments = listOf(
+                                    navArgument(ItemScreen.ANCHOR_ARG) {
+                                        type = NavType.StringType
+                                        nullable = true
+                                        defaultValue = null
+                                    }
                                 )
-                            }
-
-                            // Route 2: 화면 내 특정 아이템 앵커링 & 하이라이트 진입 ("screen_route/{itemKey}")
-                            composable(route = screen.itemRoutePattern) { backStackEntry ->
+                            ) { backStackEntry ->
                                 val dynamicArgValue = screen.routeArg?.let { argName ->
                                     backStackEntry.arguments?.getString(argName)
                                 }
-                                val itemKeyArg = backStackEntry.arguments?.getString(ItemScreen.ITEM_KEY_ARG)
-                                val resolvedHighlightKey = screen.resolveHighlightKey(itemKeyArg)
+                                val anchorArg = backStackEntry.arguments?.getString(ItemScreen.ANCHOR_ARG)
+                                val resolvedHighlightKey = screen.resolveAnchorKey(anchorArg)
                                 ItemScreenScaffold(
                                     screen = screen,
                                     dynamicArgValue = dynamicArgValue,

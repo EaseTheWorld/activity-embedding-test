@@ -249,3 +249,37 @@ interface EntryController {
         }
     }
 }
+
+/**
+ * EntryUiState를 직접 emit하고 onValueChange(navigator)에서 화면 이동을 수행하는 표준 EntryItemController.
+ * ToggleItemController와 완전히 동일한 StatefulItemController<S, V> 구조를 따릅니다.
+ */
+open class EntryItemController(
+    override val item: UiSubScreenEntryItem,
+    initialVisible: Boolean = true,
+    initialEnabled: Boolean = true
+) : StatefulItemController<EntryUiState, ItemNavigator>(), EntryController {
+
+    private val _uiState = MutableStateFlow(
+        EntryUiState(
+            item = item,
+            title = item.title,
+            targetScreen = item.targetScreen,
+            isVisible = initialVisible,
+            isEnabled = initialEnabled
+        )
+    )
+    override val uiState: StateFlow<EntryUiState> = _uiState.asStateFlow()
+
+    override fun onValueChange(value: ItemNavigator) {
+        onClick(value)
+    }
+
+    fun setVisible(visible: Boolean) {
+        _uiState.value = _uiState.value.copy(isVisible = visible)
+    }
+
+    fun setEnabled(enabled: Boolean) {
+        _uiState.value = _uiState.value.copy(isEnabled = enabled)
+    }
+}

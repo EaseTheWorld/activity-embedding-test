@@ -31,6 +31,8 @@ val LocalItemNavigator = staticCompositionLocalOf<ItemNavigator> {
 
 val LocalHighlightKey = compositionLocalOf<String?> { null }
 
+private val NoOpValueChanged: (Any?) -> Unit = {}
+
 /**
  * 모든 UiItem에 대해:
  * 1) Controller에서 동적 ItemUiState(value, isVisible, isEnabled)를 구독 (없는 정적 노드는 기본 UiState 생성)
@@ -82,17 +84,12 @@ private fun DrawItem(
 
         // 3. UiState 타입 기준으로 ItemRenderer 조회 및 controller::onValueChanged 바인딩
         val renderer = rendererRegistry.getOrNull(uiState)
-        val onValueChanged: (Any?) -> Unit = remember(controller, item) {
+        val onValueChanged: (Any?) -> Unit = remember(controller) {
             if (controller != null) {
                 val callback: (Any?) -> Unit = controller::onValueChanged
                 callback
             } else {
-                val fallback: (Any?) -> Unit = { value ->
-                    if (value is ItemNavigator && item is UiSubScreenEntryItem && item.targetScreen != null) {
-                        value(item.targetScreen)
-                    }
-                }
-                fallback
+                NoOpValueChanged
             }
         }
 

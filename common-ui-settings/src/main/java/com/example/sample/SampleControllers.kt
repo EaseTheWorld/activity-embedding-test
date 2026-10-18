@@ -1,13 +1,12 @@
 package com.example.sample
 
 import androidx.compose.runtime.Immutable
-import com.example.uifw.controller.EntryController
+import com.example.uifw.controller.EntryItemController
 import com.example.uifw.controller.ItemController
 import com.example.uifw.controller.ItemNavigator
 import com.example.uifw.controller.ItemUiState
 import com.example.uifw.controller.StatefulItemController
 import com.example.uifw.controller.ToggleItemController
-import com.example.uifw.item.UiItem
 import com.example.uifw.item.UiToggleItem
 import dagger.Binds
 import dagger.Module
@@ -37,23 +36,31 @@ class DualAudioToggleController @Inject constructor() : ToggleItemController(
     initialChecked = false
 )
 
-// 4. 블루투스 화면 진입 EntryController
-// onClick을 오버라이드하지 않으면 EntryItem(SettingItems.bluetoothEntry)에 선언된 targetScreen(SettingItems.Bluetooth)으로 자동 이동합니다.
-class BluetoothEntryController @Inject constructor() : ItemController(), EntryController {
-    override val item: UiItem = SettingItems.bluetoothEntry
-}
+// 4. 블루투스 화면 진입 EntryController (EntryUiState 방출, onValueChanged에서 targetScreen으로 자동 navigate)
+class BluetoothEntryController @Inject constructor() : EntryItemController(
+    item = SettingItems.bluetoothEntry
+)
 
 // 5. Wi-Fi 화면 진입 EntryController (기본 targetScreen = SettingItems.Wifi 사용)
-class WifiEntryController @Inject constructor() : ItemController(), EntryController {
-    override val item: UiItem = SettingItems.wifiEntry
-}
+class WifiEntryController @Inject constructor() : EntryItemController(
+    item = SettingItems.wifiEntry
+)
 
 // 6. 블루투스 고급 화면 진입 EntryController (기본 targetScreen = SettingItems.Bluetooth.Advanced 사용)
-class BluetoothAdvancedEntryController @Inject constructor() : ItemController(), EntryController {
-    override val item: UiItem = SettingItems.Bluetooth.advancedEntry
-}
+class BluetoothAdvancedEntryController @Inject constructor() : EntryItemController(
+    item = SettingItems.Bluetooth.advancedEntry
+)
 
-// 7. 정적 인자 SubScreen(DriverSeat / PassengerSeat)을 위한 재사용 가능한 시트 토글 Controller
+// 7. 운전석 / 동승석 시트 설정 화면 진입 EntryController
+class DriverSeatEntryController @Inject constructor() : EntryItemController(
+    item = SettingItems.driverSeatEntry
+)
+
+class PassengerSeatEntryController @Inject constructor() : EntryItemController(
+    item = SettingItems.passengerSeatEntry
+)
+
+// 8. 정적 인자 SubScreen(DriverSeat / PassengerSeat)을 위한 재사용 가능한 시트 토글 Controller
 abstract class BaseSeatToggleController(
     item: UiToggleItem,
     initialChecked: Boolean = false
@@ -71,19 +78,19 @@ class PassengerSeatHeaterController @Inject constructor() :
 class PassengerSeatVentilationController @Inject constructor() :
     BaseSeatToggleController(SettingItems.PassengerSeat.ventilationToggle, initialChecked = false)
 
-// 8. 동적 인자(deviceId)를 전달하여 DeviceDetail SubScreen으로 이동하는 EntryController
-class BudsDeviceEntryController @Inject constructor() : ItemController(), EntryController {
-    override val item: UiItem = SettingItems.Bluetooth.budsDeviceEntry
-
+// 9. 동적 인자(deviceId)를 전달하여 DeviceDetail SubScreen으로 이동하는 EntryController
+class BudsDeviceEntryController @Inject constructor() : EntryItemController(
+    item = SettingItems.Bluetooth.budsDeviceEntry
+) {
     override fun onClick(navigator: ItemNavigator) {
         // 런타임 동적 인자("Galaxy_Buds3_Pro")를 포함한 라우트로 이동
         navigator(SettingItems.Bluetooth.DeviceDetail.createRoute("Galaxy_Buds3_Pro"))
     }
 }
 
-class CarKitDeviceEntryController @Inject constructor() : ItemController(), EntryController {
-    override val item: UiItem = SettingItems.Bluetooth.carKitDeviceEntry
-
+class CarKitDeviceEntryController @Inject constructor() : EntryItemController(
+    item = SettingItems.Bluetooth.carKitDeviceEntry
+) {
     override fun onClick(navigator: ItemNavigator) {
         // 런타임 동적 인자("Car_Audio_Kit")를 포함한 라우트로 이동
         navigator(SettingItems.Bluetooth.DeviceDetail.createRoute("Car_Audio_Kit"))
@@ -96,7 +103,7 @@ class DeviceCallAudioToggleController @Inject constructor() :
 class DeviceMediaAudioToggleController @Inject constructor() :
     BaseSeatToggleController(SettingItems.Bluetooth.DeviceDetail.mediaAudioToggle, initialChecked = true)
 
-// 9. 커스텀 아이템(UiAudioLatencyVisualizerItem)을 위한 순수 불변 UiState 및 Controller
+// 10. 커스텀 아이템(UiAudioLatencyVisualizerItem)을 위한 순수 불변 UiState 및 Controller
 @Immutable
 data class AudioLatencyUiState(
     override val item: UiAudioLatencyVisualizerItem,
@@ -128,7 +135,7 @@ class AudioLatencyVisualizerController @Inject constructor() :
     }
 }
 
-// 10. Hilt Multi-binding 모듈 (ItemController & ItemRenderer IntoSet)
+// 11. Hilt Multi-binding 모듈 (ItemController & ItemRenderer IntoSet)
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class SampleItemControllerModule {
@@ -167,6 +174,18 @@ abstract class SampleItemControllerModule {
     @IntoSet
     abstract fun bindBluetoothAdvancedEntry(
         controller: BluetoothAdvancedEntryController
+    ): ItemController
+
+    @Binds
+    @IntoSet
+    abstract fun bindDriverSeatEntry(
+        controller: DriverSeatEntryController
+    ): ItemController
+
+    @Binds
+    @IntoSet
+    abstract fun bindPassengerSeatEntry(
+        controller: PassengerSeatEntryController
     ): ItemController
 
     @Binds

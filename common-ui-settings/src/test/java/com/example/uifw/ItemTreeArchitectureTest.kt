@@ -791,6 +791,20 @@ class ItemTreeArchitectureTest {
         val customValueChanged: (Any?) -> Unit = latencyController::onValueChanged
         customValueChanged(20)
         assertEquals(20, latencyController.uiState.value.latencyMs)
+
+        // 3. EntryItemController emits EntryUiState and navigates via controller::onValueChanged
+        val btEntryController = com.example.sample.BluetoothEntryController()
+        var navigatedScreen: ItemScreen? = null
+        val entryValueChanged: (Any?) -> Unit = btEntryController::onValueChanged
+        entryValueChanged(com.example.uifw.controller.ItemNavigator { screen ->
+            navigatedScreen = screen
+        })
+        assertSame(SettingItems.Bluetooth, navigatedScreen)
+
+        btEntryController.setEnabled(false)
+        btEntryController.setVisible(false)
+        assertEquals(false, btEntryController.uiState.value.isEnabled)
+        assertEquals(false, btEntryController.uiState.value.isVisible)
     }
 
     @Test

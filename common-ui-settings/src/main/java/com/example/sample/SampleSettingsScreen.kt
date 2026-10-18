@@ -150,15 +150,18 @@ fun SampleSettingsScreen(
                         }
                     }
                 } else {
-                    // Screen NavHost: 각 Screen마다 "routePattern?anchor={anchor}" 단일 등록으로
-                    // 1) 화면 자체 이동("screen_route") 및
-                    // 2) 화면 내 특정 Item/Section 앵커링 & 하이라이트("screen_route?anchor={key}") 모두 처리
+                    // Screen NavHost:
+                    // 1) screen.anchorRoutePattern ("routePattern?anchor={anchor}"):
+                    //    화면 자체 이동("screen_route") 및 Query 앵커("screen_route?anchor={key}") 처리
+                    // 2) screen.pathAnchorRoutePattern ("routePattern/{anchor}"):
+                    //    기존 Path 앵커("screen_route/{key}", 즉 item.key / section.key 그대로 이동) 처리
                     NavHost(
                         navController = navController,
                         startDestination = SettingItems.route,
                         modifier = Modifier.weight(1f)
                     ) {
                         SettingItems.allScreens().forEach { screen ->
+                            // 1. 기본 화면 진입 + "?anchor={key}" 쿼리 앵커 진입
                             composable(
                                 route = screen.anchorRoutePattern,
                                 arguments = listOf(
@@ -166,6 +169,29 @@ fun SampleSettingsScreen(
                                         type = NavType.StringType
                                         nullable = true
                                         defaultValue = null
+                                    }
+                                )
+                            ) { backStackEntry ->
+                                val dynamicArgValue = screen.routeArg?.let { argName ->
+                                    backStackEntry.arguments?.getString(argName)
+                                }
+                                val anchorArg = backStackEntry.arguments?.getString(ItemScreen.ANCHOR_ARG)
+                                val resolvedHighlightKey = screen.resolveAnchorKey(anchorArg)
+                                ItemScreenScaffold(
+                                    screen = screen,
+                                    dynamicArgValue = dynamicArgValue,
+                                    initialHighlightKey = resolvedHighlightKey,
+                                    canNavigateBack = navController.previousBackStackEntry != null,
+                                    onNavigateBack = { navController.popBackStack() }
+                                )
+                            }
+
+                            // 2. 기존 "route/{key}" Path 형태 앵커 진입 지원
+                            composable(
+                                route = screen.pathAnchorRoutePattern,
+                                arguments = listOf(
+                                    navArgument(ItemScreen.ANCHOR_ARG) {
+                                        type = NavType.StringType
                                     }
                                 )
                             ) { backStackEntry ->

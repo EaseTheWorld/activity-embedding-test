@@ -40,12 +40,19 @@ abstract class ItemScreen(
     val routePattern: String = if (routeArg != null) "$route/{$routeArg}" else route
 
     /**
-     * NavGraph 단일 등록용 Route 패턴 (선택적 쿼리 파라미터 `?anchor={anchor}` 포함).
+     * NavGraph 등록용 Query 기반 앵커 Route 패턴 (`?anchor={anchor}`).
      * Compose Navigation에서 `?anchor={anchor}`는 optional(nullable, defaultValue = null)이므로
-     * 이 패턴 하나로 화면 일반 진입(`routePattern`)과 특정 Item/Section 앵커링 진입을 모두 처리합니다.
+     * 화면 일반 진입(`routePattern`)과 Query 기반 Item/Section 앵커링 진입을 모두 처리합니다.
      * 예: "SettingItems/Bluetooth?anchor={anchor}" 또는 "SettingItems/Bluetooth/DeviceDetail/{deviceId}?anchor={anchor}"
      */
     val anchorRoutePattern: String = "$routePattern?$ANCHOR_ARG={$ANCHOR_ARG}"
+
+    /**
+     * NavGraph 등록용 Path 기반 앵커 Route 패턴 (`/{anchor}`).
+     * 기존처럼 `item.key` / `section.key` ("route/{key}") 형태 그대로 navigate할 때 매칭됩니다.
+     * 예: "SettingItems/Bluetooth/{anchor}" 또는 "SettingItems/Bluetooth/DeviceDetail/{deviceId}/{anchor}"
+     */
+    val pathAnchorRoutePattern: String = "$routePattern/{$ANCHOR_ARG}"
 
     /**
      * 동적 인자(routeArg)가 있는 화면에 대해 실제 런타임 인자 값을 바인딩한 이동 경로를 생성합니다.
@@ -59,7 +66,7 @@ abstract class ItemScreen(
     }
 
     /**
-     * 화면 내 특정 아이템(Item) 또는 섹션(Section)으로 앵커링 & 하이라이트하기 위한 이동 경로(`?anchor={key}`)를 생성합니다.
+     * 화면 내 특정 아이템(Item) 또는 섹션(Section)으로 이동하기 위한 Query 형태(`?anchor={key}`) 경로를 생성합니다.
      * - 정적 화면: "SettingItems/Bluetooth?anchor=masterToggle"
      * - 동적 인자 화면: "SettingItems/Bluetooth/DeviceDetail/Galaxy_Buds3_Pro?anchor=callAudioToggle"
      */
@@ -83,7 +90,31 @@ abstract class ItemScreen(
         createAnchorRoute(section.key, argValue)
 
     /**
-     * `?anchor={anchor}` 쿼리 인자 값(상대 이름 또는 전체 키)으로부터
+     * 화면 내 특정 아이템(Item) 또는 섹션(Section)으로 이동하기 위한 Path 형태(`route/{key}`) 경로를 생성합니다.
+     * - 정적 화면: "SettingItems/Bluetooth/masterToggle" (기본 item.key / section.key와 동일)
+     * - 동적 인자 화면: "SettingItems/Bluetooth/DeviceDetail/Galaxy_Buds3_Pro/callAudioToggle"
+     */
+    fun createPathAnchorRoute(targetKey: String, argValue: String? = null): String {
+        val relativeKey = targetKey.removePrefix("$route/").substringAfterLast('/')
+        val base = if (routeArg != null) {
+            val resolvedArg = requireNotNull(argValue) {
+                "Screen '$route' requires argValue for routeArg '$routeArg' when creating a path anchor route."
+            }
+            createRoute(resolvedArg)
+        } else {
+            route
+        }
+        return "$base/$relativeKey"
+    }
+
+    fun createPathAnchorRoute(item: UiItem, argValue: String? = null): String =
+        createPathAnchorRoute(item.key, argValue)
+
+    fun createPathAnchorRoute(section: SectionDefinition, argValue: String? = null): String =
+        createPathAnchorRoute(section.key, argValue)
+
+    /**
+     * `?anchor={anchor}`(Query) 또는 `/{anchor}`(Path)로 전달된 인자 값으로부터
      * 트리 내 실제 아이템/섹션의 전체 DeepLink Key를 복원합니다.
      */
     fun resolveAnchorKey(anchorArg: String?): String? {

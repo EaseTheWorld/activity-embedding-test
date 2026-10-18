@@ -679,62 +679,78 @@ class ItemTreeArchitectureTest {
     }
 
     @Test
-    fun testAnchorQueryRoutePatternForItemsAndSections() {
-        // 1. Static screen: routePattern and anchorRoutePattern ("?anchor={anchor}")
+    fun testBothQueryAndPathAnchorRoutePatternsForItemsAndSections() {
+        // 1. Static screen: supports both "?anchor={anchor}" (Query) and "/{anchor}" (Path)
         val btScreen = SettingItems.Bluetooth
         assertEquals("SettingItems/Bluetooth", btScreen.routePattern)
         assertEquals("SettingItems/Bluetooth?anchor={anchor}", btScreen.anchorRoutePattern)
+        assertEquals("SettingItems/Bluetooth/{anchor}", btScreen.pathAnchorRoutePattern)
 
-        // Item anchor route: "SettingItems/Bluetooth?anchor=masterToggle"
-        val btToggleAnchorRoute = btScreen.createAnchorRoute(btScreen.masterToggle)
-        assertEquals("SettingItems/Bluetooth?anchor=masterToggle", btToggleAnchorRoute)
+        // (A) Query anchor route: "SettingItems/Bluetooth?anchor=masterToggle"
+        val btToggleQueryRoute = btScreen.createAnchorRoute(btScreen.masterToggle)
+        assertEquals("SettingItems/Bluetooth?anchor=masterToggle", btToggleQueryRoute)
+
+        // (B) Path anchor route (legacy "route/{key}"): "SettingItems/Bluetooth/masterToggle" (matches item.key!)
+        val btTogglePathRoute = btScreen.createPathAnchorRoute(btScreen.masterToggle)
+        assertEquals("SettingItems/Bluetooth/masterToggle", btTogglePathRoute)
+        assertEquals(btScreen.masterToggle.key, btTogglePathRoute)
+
+        // Both resolve "{anchor}" ("masterToggle") to full item key
         assertEquals(
             "SettingItems/Bluetooth/masterToggle",
             btScreen.resolveAnchorKey("masterToggle")
         )
 
-        // Section anchor route: "SettingItems/Bluetooth?anchor=connectionSection"
-        val btSectionAnchorRoute = btScreen.createAnchorRoute(btScreen.connectionSection)
-        assertEquals("SettingItems/Bluetooth?anchor=connectionSection", btSectionAnchorRoute)
+        // Section anchor routes (both Query and Path)
+        assertEquals(
+            "SettingItems/Bluetooth?anchor=connectionSection",
+            btScreen.createAnchorRoute(btScreen.connectionSection)
+        )
+        assertEquals(
+            "SettingItems/Bluetooth/connectionSection",
+            btScreen.createPathAnchorRoute(btScreen.connectionSection)
+        )
         assertEquals(
             "SettingItems/Bluetooth/connectionSection",
             btScreen.resolveAnchorKey("connectionSection")
         )
-
-        // Passing full key into resolveAnchorKey also works seamlessly
         assertEquals(
             "SettingItems/Bluetooth/connectionSection",
             btScreen.resolveAnchorKey("SettingItems/Bluetooth/connectionSection")
         )
 
-        // 2. Dynamic argument screen: ".../{deviceId}?anchor={anchor}"
+        // 2. Dynamic argument screen: supports both ".../{deviceId}?anchor={anchor}" and ".../{deviceId}/{anchor}"
         val deviceDetail = SettingItems.Bluetooth.DeviceDetail
         assertEquals("SettingItems/Bluetooth/DeviceDetail/{deviceId}", deviceDetail.routePattern)
         assertEquals(
             "SettingItems/Bluetooth/DeviceDetail/{deviceId}?anchor={anchor}",
             deviceDetail.anchorRoutePattern
         )
-
-        val callAudioAnchorRoute = deviceDetail.createAnchorRoute(
-            item = deviceDetail.callAudioToggle,
-            argValue = "Galaxy_Buds3_Pro"
+        assertEquals(
+            "SettingItems/Bluetooth/DeviceDetail/{deviceId}/{anchor}",
+            deviceDetail.pathAnchorRoutePattern
         )
+
         assertEquals(
             "SettingItems/Bluetooth/DeviceDetail/Galaxy_Buds3_Pro?anchor=callAudioToggle",
-            callAudioAnchorRoute
+            deviceDetail.createAnchorRoute(deviceDetail.callAudioToggle, "Galaxy_Buds3_Pro")
+        )
+        assertEquals(
+            "SettingItems/Bluetooth/DeviceDetail/Galaxy_Buds3_Pro/callAudioToggle",
+            deviceDetail.createPathAnchorRoute(deviceDetail.callAudioToggle, "Galaxy_Buds3_Pro")
         )
         assertEquals(
             "SettingItems/Bluetooth/DeviceDetail/callAudioToggle",
             deviceDetail.resolveAnchorKey("callAudioToggle")
         )
 
-        val profileSectionAnchorRoute = deviceDetail.createAnchorRoute(
-            section = deviceDetail.profileSection,
-            argValue = "Galaxy_Buds3_Pro"
-        )
         assertEquals(
             "SettingItems/Bluetooth/DeviceDetail/Galaxy_Buds3_Pro?anchor=profileSection",
-            profileSectionAnchorRoute
+            deviceDetail.createAnchorRoute(deviceDetail.profileSection, "Galaxy_Buds3_Pro")
+        )
+        assertEquals(
+            "SettingItems/Bluetooth/DeviceDetail/Galaxy_Buds3_Pro/profileSection",
+            deviceDetail.createPathAnchorRoute(deviceDetail.profileSection, "Galaxy_Buds3_Pro")
         )
         assertEquals(
             "SettingItems/Bluetooth/DeviceDetail/profileSection",

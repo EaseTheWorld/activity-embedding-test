@@ -51,7 +51,7 @@ object HomeNavigationBridge {
     private val categoryDismissListeners = CopyOnWriteArraySet<() -> Unit>()
     private var taskRootLaunchListener: ((Intent) -> Unit)? = null
 
-    private val mainHandler = Handler(Looper.getMainLooper())
+    private val mainHandler by lazy { Handler(Looper.getMainLooper()) }
     private val clearLaunchingRunnable = Runnable { isLaunchingCategory = false }
 
     @Volatile

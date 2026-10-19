@@ -37,7 +37,7 @@
             android:name=".CategoryHostActivity"
             android:exported="false"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density"
-            android:theme="@style/Theme.AppCompat.DayNight.NoActionBar" />
+            android:theme="@style/Theme.CategoryHost.Translucent" />
     </application>
 
 </manifest>

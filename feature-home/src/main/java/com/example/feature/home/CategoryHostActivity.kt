@@ -73,11 +73,7 @@ class CategoryHostActivity : ComponentActivity() {
             }
 
             if (targetIntent != null) {
-                window.decorView.post {
-                    if (!isFinishing && !isDestroyed) {
-                        launchChildCategory(targetIntent)
-                    }
-                }
+                launchChildCategory(targetIntent)
             } else {
                 Log.w(TAG, "[CategoryHostActivity] No target category intent found, finishing")
                 finish()

@@ -62,6 +62,12 @@ abstract class BaseCategoryMenuActivity : BaseLoggingActivity() {
         const val COLUMN_CATEGORY_TITLE_RES_ID = "category_title_res_id"
         const val COLUMN_CATEGORY_SUBTITLE_RES_ID = "category_subtitle_res_id"
         const val COLUMN_CATEGORY_ICON_RES_ID = "category_icon_res_id"
+
+        private var activeMenuRef: java.lang.ref.WeakReference<BaseCategoryMenuActivity>? = null
+
+        fun getActiveMenuActivity(): BaseCategoryMenuActivity? {
+            return activeMenuRef?.get()?.takeIf { !it.isFinishing && !it.isDestroyed }
+        }
     }
 
     protected lateinit var tvDiscoveryStatus: TextView
@@ -69,6 +75,15 @@ abstract class BaseCategoryMenuActivity : BaseLoggingActivity() {
     protected var categories: MutableList<SettingCategory> = mutableListOf()
     protected var categoryAdapter: CategoryAdapter? = null
     private val observedAuthorities = mutableSetOf<String>()
+
+    val currentSelectedPosition: Int
+        get() = categoryAdapter?.selectedPosition ?: -1
+
+    val currentSelectedCategoryId: String?
+        get() {
+            val pos = categoryAdapter?.selectedPosition ?: return null
+            return categories.getOrNull(pos)?.id
+        }
 
     /**
      * Optional hook invoked right before launching a category (e.g., [PrimaryOverlayActivity] collapses the drawer).
@@ -113,6 +128,7 @@ abstract class BaseCategoryMenuActivity : BaseLoggingActivity() {
     }
 
     protected fun initCategoryMenuViews() {
+        activeMenuRef = java.lang.ref.WeakReference(this)
         tvDiscoveryStatus = findViewById(R.id.tvDiscoveryStatus)
         listViewCategories = findViewById(R.id.listViewCategories)
 
@@ -137,6 +153,9 @@ abstract class BaseCategoryMenuActivity : BaseLoggingActivity() {
     override fun onDestroy() {
         super.onDestroy()
         HomeNavigationBridge.unregisterHomeRevealedListener(homeRevealedListener)
+        if (activeMenuRef?.get() === this) {
+            activeMenuRef = null
+        }
         HomeNavigationBridge.unregisterCategorySelectedListener(categorySelectedListener)
         try {
             contentResolver.unregisterContentObserver(categoryObserver)
@@ -302,7 +321,7 @@ abstract class BaseCategoryMenuActivity : BaseLoggingActivity() {
         }
     }
 
-    protected fun handleIntent(intent: Intent?) {
+    fun handleIntent(intent: Intent?) {
         if (intent == null) return
         val action = intent.action
         val dataUri = intent.data

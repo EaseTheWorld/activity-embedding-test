@@ -1,13 +1,14 @@
 package com.example.lifecycleapp
 
+import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import android.view.View
-import android.view.WindowManager
 import androidx.activity.OnBackPressedCallback
 import androidx.window.embedding.OverlayAttributes
 import androidx.window.embedding.OverlayController
 import com.example.core.item.AppConfig
+import com.example.feature.home.HomeActivity
 
 /**
  * Narrow Mode Pinned Overlay Menu Activity (`Theme.LifecycleApp.Translucent` - Translucent).
@@ -17,10 +18,8 @@ import com.example.core.item.AppConfig
  *    (`setOverlayCreateParams` + `shouldAssociateWithLaunchingActivity = false`).
  * 2. Toggles between a collapsed `80dp × 80dp` floating `MENU` button and an expanded `35%` drawer
  *    via `OverlayController.updateOverlayAttributes`.
- * 3. Uses [WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL] so touches outside the overlay bounds
- *    pass 100% through to Secondary while keeping valid window focus (`mCurrentFocus != null`, zero ANR)
- *    and routing Back key events to the active Secondary stack (`HomeActivity`, `GenericSettingsActivity`,
- *    `SubSettingActivity`, or `CategoryHostActivity` for external app categories).
+ * 3. Uses `WindowContainerTransaction.requestFocusOnTaskFragment` to shift WindowManager focus
+ *    between the overlay drawer (when expanded) and the Secondary container (when collapsed).
  */
 class PrimaryOverlayActivity : BaseCategoryMenuActivity() {
 
@@ -35,10 +34,6 @@ class PrimaryOverlayActivity : BaseCategoryMenuActivity() {
 
         isDrawerExpanded = false
         SplitInitializer.isOverlayDrawerExpanded = false
-
-        // Allow pointer events outside [0, 48][160, 208] to pass through to Secondary
-        // while keeping this window focusable (preventing mCurrentFocus = null ANRs).
-        window.addFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL)
 
         setContentView(R.layout.activity_primary_overlay)
 
@@ -57,7 +52,7 @@ class PrimaryOverlayActivity : BaseCategoryMenuActivity() {
             setDrawerExpanded(false, "CollapseButtonClicked")
         }
 
-        updateOverlayViews(animate = false)
+        updateOverlayViews()
         initCategoryMenuViews()
 
         if (intent?.data != null || intent?.action == "com.example.lifecycleapp.open") {
@@ -88,7 +83,11 @@ class PrimaryOverlayActivity : BaseCategoryMenuActivity() {
     private lateinit var backCallback: OnBackPressedCallback
 
     private fun applyOverlayBounds(expanded: Boolean) {
-        window.addFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL)
+        if (expanded) {
+            window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE)
+        } else {
+            window.addFlags(android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE)
+        }
         val updated = OverlayBoundsHelper.updateOverlayBounds(
             this,
             AppConfig.TAG_PRIMARY_OVERLAY,
@@ -105,6 +104,21 @@ class PrimaryOverlayActivity : BaseCategoryMenuActivity() {
             } catch (e: Exception) {
                 Log.e(tag, "[$activityName] Failed to update overlay attributes: $e", e)
             }
+        }
+        if (expanded && !isFinishing) {
+            OverlayBoundsHelper.requestFocusOnOverlay(this)
+            window.decorView.postDelayed({
+                if (isDrawerExpanded && !isFinishing) {
+                    OverlayBoundsHelper.requestFocusOnOverlay(this)
+                }
+            }, 50L)
+        } else if (!expanded && !isFinishing) {
+            OverlayBoundsHelper.requestFocusOnSecondary(this)
+            window.decorView.postDelayed({
+                if (!isDrawerExpanded && !isFinishing) {
+                    OverlayBoundsHelper.requestFocusOnSecondary(this)
+                }
+            }, 50L)
         }
     }
 
@@ -198,6 +212,31 @@ class PrimaryOverlayActivity : BaseCategoryMenuActivity() {
         }
     }
 
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus && !isDrawerExpanded && !isFinishing) {
+            window.decorView.postDelayed({
+                if (hasWindowFocus() && !isDrawerExpanded && !isFinishing) {
+                    OverlayBoundsHelper.requestFocusOnSecondary(this)
+                }
+            }, 150L)
+        }
+    }
+
+    override fun dispatchTouchEvent(ev: android.view.MotionEvent?): Boolean {
+        val handled = super.dispatchTouchEvent(ev)
+        if (ev != null && (ev.actionMasked == android.view.MotionEvent.ACTION_UP || ev.actionMasked == android.view.MotionEvent.ACTION_CANCEL)) {
+            if (!isDrawerExpanded && !isFinishing) {
+                window.decorView.postDelayed({
+                    if (!isDrawerExpanded && !isFinishing) {
+                        OverlayBoundsHelper.requestFocusOnSecondary(this)
+                    }
+                }, 50L)
+            }
+        }
+        return handled
+    }
+
     override fun onResume() {
         super.onResume()
         applyOverlayBounds(isDrawerExpanded)
@@ -210,12 +249,23 @@ class PrimaryOverlayActivity : BaseCategoryMenuActivity() {
 
     override fun onHomeRevealed() {
         super.onHomeRevealed()
-        if (isDrawerExpanded) {
-            setDrawerExpanded(false, "HomeRevealed", animate = false)
-        }
+        applyOverlayBounds(false)
     }
 
     override fun onBeforeCategoryLaunch() {
-        setDrawerExpanded(false, "CategoryLaunch", animate = true)
+        if (isDrawerExpanded) {
+            setDrawerExpanded(false, "CategoryLaunch", animate = true)
+        } else {
+            window.decorView.postDelayed({
+                if (!isDrawerExpanded && !isFinishing) {
+                    OverlayBoundsHelper.requestFocusOnSecondary(this)
+                }
+            }, 150L)
+            window.decorView.postDelayed({
+                if (!isDrawerExpanded && !isFinishing) {
+                    OverlayBoundsHelper.requestFocusOnSecondary(this)
+                }
+            }, 400L)
+        }
     }
 }

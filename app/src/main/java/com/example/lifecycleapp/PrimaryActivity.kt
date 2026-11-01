@@ -3,6 +3,7 @@ package com.example.lifecycleapp
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
+import android.view.MotionEvent
 import androidx.activity.OnBackPressedCallback
 import com.example.core.item.AppConfig
 import com.example.feature.home.HomeActivity
@@ -16,14 +17,38 @@ import com.example.feature.home.HomeActivity
  *      (which in turn spawns [PrimaryOverlayActivity] as a Pinned Overlay) and finishes.
  * 2. In Wide Mode (`AppConfig.isOverlayMode == false`), acts as the permanently visible left 35%
  *    pane of `SplitPairRule` and launches `HomeActivity` + categories into the right 65% `SecondaryTaskFragment`.
- * 3. Forwards any Back key press received while `PrimaryActivity` has focus to the active Secondary
- *    activity (`HomeActivity`, `GenericSettingsActivity`, `SubSettingActivity`, or `CategoryHostActivity`
- *    when an external app activity is on top of Secondary).
+ * 3. Uses `FLAG_NOT_FOCUSABLE` and `ensureSecondaryFocus()` via `OverlayBoundsHelper.requestFocusOnSecondary(this)`
+ *    so WindowManager focus remains strictly on the Secondary container (including external apps).
  */
 class PrimaryActivity : BaseCategoryMenuActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        val isDeepLink = intent?.data != null || intent?.action == "com.example.lifecycleapp.open"
+        val existingMenu = getActiveMenuActivity()?.takeIf { it !== this }
+        if (existingMenu != null || (!isTaskRoot && !isDeepLink)) {
+            if (isDeepLink && existingMenu != null) {
+                Log.i(tag, "[$activityName] Warm-start DeepLink -> delegating to active menu (${existingMenu.javaClass.simpleName}) and finishing transient router")
+                val forwardedIntent = Intent(intent)
+                existingMenu.window.decorView.post {
+                    if (!existingMenu.isFinishing && !existingMenu.isDestroyed) {
+                        existingMenu.handleIntent(forwardedIntent)
+                    }
+                }
+            } else {
+                Log.i(tag, "[$activityName] Warm-start MAIN/LAUNCHER -> bringing existing task to front without resetting state")
+                existingMenu?.window?.decorView?.postDelayed({
+                    if (!existingMenu.isFinishing && !existingMenu.isDestroyed) {
+                        OverlayBoundsHelper.requestFocusOnSecondary(existingMenu)
+                    }
+                }, 100L)
+            }
+            @Suppress("DEPRECATION")
+            overridePendingTransition(0, 0)
+            finish()
+            return
+        }
 
         // In Narrow Mode, delegate to HomeActivity (which launches PrimaryOverlayActivity) and exit
         if (AppConfig.isOverlayMode(this)) {
@@ -48,6 +73,9 @@ class PrimaryActivity : BaseCategoryMenuActivity() {
         }
 
         // Wide Mode: Static opaque sidebar layout (no overlay toggle buttons)
+        // Prevent PrimaryActivity from stealing window focus while keeping touch input active,
+        // paired with requestFocusOnSecondary() so mFocusedApp always points to Secondary.
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE)
         setContentView(R.layout.activity_primary)
         initCategoryMenuViews()
 
@@ -78,5 +106,49 @@ class PrimaryActivity : BaseCategoryMenuActivity() {
                 }
             }
         })
+    }
+
+    private fun ensureSecondaryFocus() {
+        if (isFinishing) return
+        OverlayBoundsHelper.requestFocusOnSecondary(this)
+        window.decorView.postDelayed({
+            if (!isFinishing) {
+                OverlayBoundsHelper.requestFocusOnSecondary(this)
+            }
+        }, 50L)
+        window.decorView.postDelayed({
+            if (!isFinishing) {
+                OverlayBoundsHelper.requestFocusOnSecondary(this)
+            }
+        }, 300L)
+    }
+
+    override fun onBeforeCategoryLaunch() {
+        ensureSecondaryFocus()
+    }
+
+    override fun onHomeRevealed() {
+        super.onHomeRevealed()
+        ensureSecondaryFocus()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        ensureSecondaryFocus()
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus && !isFinishing) {
+            ensureSecondaryFocus()
+        }
+    }
+
+    override fun dispatchTouchEvent(ev: MotionEvent?): Boolean {
+        val handled = super.dispatchTouchEvent(ev)
+        if (ev != null && (ev.actionMasked == MotionEvent.ACTION_UP || ev.actionMasked == MotionEvent.ACTION_CANCEL)) {
+            ensureSecondaryFocus()
+        }
+        return handled
     }
 }

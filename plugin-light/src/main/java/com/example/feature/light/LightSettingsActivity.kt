@@ -5,8 +5,10 @@ import android.content.res.Configuration
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
+import android.view.View
 import android.widget.Button
 import android.widget.TextView
+import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.window.layout.WindowMetricsCalculator
 import com.google.android.material.materialswitch.MaterialSwitch
@@ -41,6 +43,23 @@ class LightSettingsActivity : AppCompatActivity() {
         val btnPark = findViewById<Button>(R.id.btnHeadlightParking)
         val btnOn = findViewById<Button>(R.id.btnHeadlightOn)
         val btnAuto = findViewById<Button>(R.id.btnHeadlightAuto)
+        val btnOpenLightDetail = findViewById<Button>(R.id.btnOpenLightDetail)
+        val layoutLightDetail = findViewById<View>(R.id.layoutLightDetail)
+
+        val detailBackCallback = object : OnBackPressedCallback(false) {
+            override fun handleOnBackPressed() {
+                Log.d(tag, "[$activityName] Popping internal light detail back stack")
+                layoutLightDetail.visibility = View.GONE
+                isEnabled = false
+            }
+        }
+        onBackPressedDispatcher.addCallback(this, detailBackCallback)
+
+        btnOpenLightDetail.setOnClickListener {
+            Log.d(tag, "[$activityName] Pushing internal light detail back stack")
+            layoutLightDetail.visibility = View.VISIBLE
+            detailBackCallback.isEnabled = true
+        }
 
         // Initial state sync
         syncUiFromProvider()

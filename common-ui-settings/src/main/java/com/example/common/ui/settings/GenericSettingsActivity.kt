@@ -115,17 +115,36 @@ open class GenericSettingsActivity : AppCompatActivity() {
 
             // 2. Direct navigation with clean URI (routes are pure destination identifiers)
             val cleanUri = if (uri.query != null) uri.buildUpon().clearQuery().build() else uri
+            val categoryId = segments.getOrNull(0)
+            val isDashboard = categoryId.isNullOrEmpty() || categoryId.equals("dashboard", ignoreCase = true)
             try {
-                navController.navigate(cleanUri, navOptions {
-                    launchSingleTop = true
-                })
+                if (!isDashboard && itemId == "seat_lumbar") {
+                    // Ensure the category root ("navigate/seat") is the root of this category's back stack
+                    // (replacing the default "dashboard" startDestination) before pushing the 2-depth detail screen.
+                    navController.navigate(SettingsNavigation.categoryRoute(categoryId!!), navOptions {
+                        popUpTo(SettingsNavigation.ROUTE_DASHBOARD) { inclusive = true }
+                        launchSingleTop = true
+                    })
+                    navController.navigate(cleanUri, navOptions {
+                        launchSingleTop = true
+                    })
+                } else {
+                    navController.navigate(cleanUri, navOptions {
+                        if (!isDashboard) {
+                            popUpTo(SettingsNavigation.ROUTE_DASHBOARD) { inclusive = true }
+                        }
+                        launchSingleTop = true
+                    })
+                }
                 return
             } catch (e: Exception) {
                 Log.w(tag, "Direct navigation with uri $cleanUri failed, attempting category fallback: $e")
-                val categoryId = segments.getOrNull(0)
-                if (!categoryId.isNullOrEmpty() && !categoryId.equals("dashboard", ignoreCase = true)) {
+                if (!categoryId.isNullOrEmpty() && !isDashboard) {
                     try {
-                        navController.navigate(SettingsNavigation.categoryRoute(categoryId))
+                        navController.navigate(SettingsNavigation.categoryRoute(categoryId), navOptions {
+                            popUpTo(SettingsNavigation.ROUTE_DASHBOARD) { inclusive = true }
+                            launchSingleTop = true
+                        })
                         return
                     } catch (e3: Exception) {
                         Log.e(tag, "Fallback navigation to category route failed: $e3")
@@ -147,11 +166,17 @@ open class GenericSettingsActivity : AppCompatActivity() {
 
         if (categoryId != null) {
             if (categoryId.equals("dashboard", ignoreCase = true)) {
-                navController.navigate(SettingsNavigation.ROUTE_DASHBOARD)
+                navController.navigate(SettingsNavigation.ROUTE_DASHBOARD, navOptions {
+                    popUpTo(SettingsNavigation.ROUTE_DASHBOARD) { inclusive = true }
+                    launchSingleTop = true
+                })
             } else if (categoryId.equals("light", ignoreCase = true)) {
                 launchExternalCategory(categoryId)
             } else {
-                navController.navigate(SettingsNavigation.categoryRoute(categoryId))
+                navController.navigate(SettingsNavigation.categoryRoute(categoryId), navOptions {
+                    popUpTo(SettingsNavigation.ROUTE_DASHBOARD) { inclusive = true }
+                    launchSingleTop = true
+                })
             }
         }
     }

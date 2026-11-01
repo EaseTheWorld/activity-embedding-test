@@ -27,7 +27,35 @@
             android:text="Exterior illumination, interior ambiance, and compartment lighting"
             android:textSize="14sp"
             android:textColor="#49454F"
-            android:layout_marginBottom="24dp" />
+            android:layout_marginBottom="12dp" />
+
+        <Button
+            android:id="@+id/btnOpenLightDetail"
+            style="@style/Widget.Material3.Button.TonalButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Open Light Detail (Internal BackStack)"
+            android:layout_marginBottom="16dp" />
+
+        <LinearLayout
+            android:id="@+id/layoutLightDetail"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="20dp"
+            android:background="#EDE7F6"
+            android:visibility="gone"
+            android:layout_marginBottom="16dp">
+
+            <TextView
+                android:id="@+id/tvLightDetailTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Light Detail Sub-Screen (Depth 2)"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:textColor="#6750A4" />
+        </LinearLayout>
 
         <!-- Headlights Card -->
         <androidx.cardview.widget.CardView

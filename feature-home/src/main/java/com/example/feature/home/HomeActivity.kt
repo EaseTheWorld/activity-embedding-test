@@ -116,6 +116,8 @@ class HomeActivity : ComponentActivity() {
 
     override fun onPause() {
         super.onPause()
+        val imm = getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as? android.view.inputmethod.InputMethodManager
+        imm?.hideSoftInputFromWindow(window.decorView.windowToken, 0)
         Log.d(tag, "HomeActivity onPause()")
     }
 

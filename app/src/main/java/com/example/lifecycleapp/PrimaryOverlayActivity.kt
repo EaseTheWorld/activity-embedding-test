@@ -55,10 +55,17 @@ class PrimaryOverlayActivity : BaseCategoryMenuActivity() {
         updateOverlayViews()
         initCategoryMenuViews()
 
-        if (intent?.data != null || intent?.action == "com.example.lifecycleapp.open") {
-            window.decorView.post {
-                handleIntent(intent)
+        val initialCategoryId = intent?.getStringExtra(HomeActivity.EXTRA_INITIAL_CATEGORY_ID)
+        if (!initialCategoryId.isNullOrEmpty()) {
+            val matchedIndex = categories.indexOfFirst { it.id.equals(initialCategoryId, ignoreCase = true) }
+            if (matchedIndex >= 0) {
+                categoryAdapter?.selectedPosition = matchedIndex
+                categoryAdapter?.notifyDataSetChanged()
+                listViewCategories.smoothScrollToPosition(matchedIndex)
             }
+            onBeforeCategoryLaunch()
+        } else if (intent?.data != null || intent?.action == "com.example.lifecycleapp.open") {
+            handleIntent(intent)
         }
 
         backCallback = object : OnBackPressedCallback(true) {

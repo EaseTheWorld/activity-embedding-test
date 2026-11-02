@@ -282,9 +282,7 @@ abstract class BaseCategoryMenuActivity : BaseLoggingActivity() {
 
         if (category.id == "home") {
             Log.d(tag, "[$activityName] Navigating to HomeActivity -> HomeNavigationBridge.notifyDismissCategoryStacks()")
-            window.decorView.post {
-                HomeNavigationBridge.notifyDismissCategoryStacks()
-            }
+            HomeNavigationBridge.notifyDismissCategoryStacks()
             return
         }
 
@@ -313,9 +311,7 @@ abstract class BaseCategoryMenuActivity : BaseLoggingActivity() {
             targetIntent.data = uriToPass
 
             Log.d(tag, "[$activityName] Launching category ${category.title} via HomeNavigationBridge.launchCategory()")
-            window.decorView.post {
-                HomeNavigationBridge.launchCategory(this, targetIntent)
-            }
+            HomeNavigationBridge.launchCategory(this, targetIntent)
         } else {
             Log.w(tag, "[$activityName] No target intent for category ${category.title}")
         }
@@ -387,9 +383,7 @@ abstract class BaseCategoryMenuActivity : BaseLoggingActivity() {
                 if (extras != null) putExtras(extras)
             }
         }
-        window.decorView.post {
-            HomeNavigationBridge.launchCategory(this, fallbackIntent)
-        }
+        HomeNavigationBridge.launchCategory(this, fallbackIntent)
     }
 }
 

@@ -19,6 +19,7 @@ class HomeActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_TARGET_INTENT = "extra_target_intent"
+        const val EXTRA_INITIAL_CATEGORY_ID = "extra_initial_category_id"
         const val EXTRA_INITIAL_DEEPLINK_URI = "extra_initial_deeplink_uri"
         const val EXTRA_INITIAL_DEEPLINK_ACTION = "extra_initial_deeplink_action"
         const val EXTRA_INITIAL_DEEPLINK_EXTRAS = "extra_initial_deeplink_extras"
@@ -56,6 +57,14 @@ class HomeActivity : ComponentActivity() {
 
         if (isNarrowOverlayMode && savedInstanceState == null) {
             launchPrimaryPinnedOverlay(intent)
+            if (intent?.hasExtra(EXTRA_TARGET_INTENT) == true) {
+                window.decorView.post {
+                    if (!isFinishing && !isDestroyed) {
+                        handleTargetLaunch(intent)
+                    }
+                }
+                return
+            }
         }
 
         handleTargetLaunch(intent)
@@ -87,6 +96,9 @@ class HomeActivity : ComponentActivity() {
 
             val overlayIntent = Intent().apply {
                 component = ComponentName(packageName, "com.example.lifecycleapp.PrimaryOverlayActivity")
+                hostIntent?.getStringExtra(EXTRA_INITIAL_CATEGORY_ID)?.let {
+                    putExtra(EXTRA_INITIAL_CATEGORY_ID, it)
+                }
                 hostIntent?.getStringExtra(EXTRA_INITIAL_DEEPLINK_ACTION)?.let { action = it }
                 hostIntent?.getStringExtra(EXTRA_INITIAL_DEEPLINK_URI)?.let { data = Uri.parse(it) }
                 hostIntent?.getBundleExtra(EXTRA_INITIAL_DEEPLINK_EXTRAS)?.let { putExtras(it) }
@@ -123,6 +135,8 @@ class HomeActivity : ComponentActivity() {
 
     override fun onStop() {
         super.onStop()
+        val imm = getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as? android.view.inputmethod.InputMethodManager
+        imm?.hideSoftInputFromWindow(window.decorView.windowToken, 0)
         Log.d(tag, "HomeActivity onStop()")
     }
 

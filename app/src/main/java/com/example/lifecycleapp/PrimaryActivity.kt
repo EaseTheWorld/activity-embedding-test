@@ -12,11 +12,9 @@ import com.example.feature.home.HomeActivity
  * Wide Mode Split Primary Activity (`Theme.LifecycleApp` - Opaque, static sidebar layout).
  *
  * Responsibilities:
- * 1. Serves as the MAIN/LAUNCHER and Deeplink entry point.
- *    - If in Narrow Mode (`AppConfig.isOverlayMode == true`), immediately redirects to `HomeActivity`
- *      (which in turn spawns [PrimaryOverlayActivity] as a Pinned Overlay) and finishes.
- * 2. In Wide Mode (`AppConfig.isOverlayMode == false`), acts as the permanently visible left 35%
- *    pane of `SplitPairRule` and launches `HomeActivity` + categories into the right 65% `SecondaryTaskFragment`.
+ * 1. Exclusively launched by [EntryRouterActivity] in Wide Mode (`AppConfig.isOverlayMode == false`).
+ * 2. Acts as the permanently visible left 35% pane of `SplitPairRule` and launches `HomeActivity`
+ *    + categories into the right 65% `SecondaryTaskFragment`.
  * 3. Uses `FLAG_NOT_FOCUSABLE` and `ensureSecondaryFocus()` via `OverlayBoundsHelper.requestFocusOnSecondary(this)`
  *    so WindowManager focus remains strictly on the Secondary container (including external apps).
  */
@@ -24,53 +22,7 @@ class PrimaryActivity : BaseCategoryMenuActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        val isDeepLink = intent?.data != null || intent?.action == "com.example.lifecycleapp.open"
-        val existingMenu = getActiveMenuActivity()?.takeIf { it !== this }
-        if (existingMenu != null || (!isTaskRoot && !isDeepLink)) {
-            if (isDeepLink && existingMenu != null) {
-                Log.i(tag, "[$activityName] Warm-start DeepLink -> delegating to active menu (${existingMenu.javaClass.simpleName}) and finishing transient router")
-                val forwardedIntent = Intent(intent)
-                existingMenu.window.decorView.post {
-                    if (!existingMenu.isFinishing && !existingMenu.isDestroyed) {
-                        existingMenu.handleIntent(forwardedIntent)
-                    }
-                }
-            } else {
-                Log.i(tag, "[$activityName] Warm-start MAIN/LAUNCHER -> bringing existing task to front without resetting state")
-                existingMenu?.window?.decorView?.postDelayed({
-                    if (!existingMenu.isFinishing && !existingMenu.isDestroyed) {
-                        OverlayBoundsHelper.requestFocusOnSecondary(existingMenu)
-                    }
-                }, 100L)
-            }
-            @Suppress("DEPRECATION")
-            overridePendingTransition(0, 0)
-            finish()
-            return
-        }
-
-        // In Narrow Mode, delegate to HomeActivity (which launches PrimaryOverlayActivity) and exit
-        if (AppConfig.isOverlayMode(this)) {
-            Log.i(tag, "[$activityName] Narrow Mode entry -> bootstrapping HomeActivity (which spawns PrimaryOverlayActivity)")
-            val homeIntent = Intent(this, HomeActivity::class.java).apply {
-                action = ACTION_SETTINGS_EMBED
-                if (intent?.data != null) {
-                    putExtra(HomeActivity.EXTRA_INITIAL_DEEPLINK_URI, intent.data.toString())
-                }
-                if (intent?.action != null && intent?.action != Intent.ACTION_MAIN) {
-                    putExtra(HomeActivity.EXTRA_INITIAL_DEEPLINK_ACTION, intent.action)
-                }
-                if (intent?.extras != null) {
-                    putExtra(HomeActivity.EXTRA_INITIAL_DEEPLINK_EXTRAS, intent.extras)
-                }
-            }
-            startActivity(homeIntent)
-            @Suppress("DEPRECATION")
-            overridePendingTransition(0, 0)
-            finish()
-            return
-        }
+        SplitInitializer.ensureInitialized(this)
 
         // Wide Mode: Static opaque sidebar layout (no overlay toggle buttons)
         // Prevent PrimaryActivity from stealing window focus while keeping touch input active,
@@ -89,9 +41,7 @@ class PrimaryActivity : BaseCategoryMenuActivity() {
         }
 
         if (intent?.data != null || intent?.action == "com.example.lifecycleapp.open") {
-            window.decorView.post {
-                handleIntent(intent)
-            }
+            handleIntent(intent)
         }
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {

@@ -93,7 +93,6 @@ class LaunchAndDeepLinkUiAutomatorTest {
         Thread.sleep(1000)
 
         AppConfig.IS_OVERLAY_MODE = isOverlayMode
-        SplitInitializer().create(instrumentation.targetContext)
     }
 
     /**
@@ -320,5 +319,125 @@ class LaunchAndDeepLinkUiAutomatorTest {
         )
         val btnMore = device.wait(Until.findObject(By.res(pkg, "btnMore")), timeout)
         assertNotNull("Narrow Mode: Collapsed floating MENU button must remain visible after DeepLink warm start", btnMore)
+    }
+
+    private data class StartupMetric(
+        val label: String,
+        val elapsedMs: Long,
+        val createdActivities: List<String>
+    )
+
+    private fun measureColdStart(
+        label: String,
+        isOverlayMode: Boolean,
+        intent: Intent,
+        waitCondition: () -> Unit
+    ): StartupMetric {
+        prepareColdStart(isOverlayMode)
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val app = instrumentation.targetContext.applicationContext as Application
+        val created = java.util.concurrent.CopyOnWriteArrayList<String>()
+
+        val callback = object : Application.ActivityLifecycleCallbacks {
+            override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {
+                created.add(activity.javaClass.simpleName)
+            }
+            override fun onActivityStarted(activity: Activity) {}
+            override fun onActivityResumed(activity: Activity) {}
+            override fun onActivityPaused(activity: Activity) {}
+            override fun onActivityStopped(activity: Activity) {}
+            override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {}
+            override fun onActivityDestroyed(activity: Activity) {}
+        }
+
+        app.registerActivityLifecycleCallbacks(callback)
+        try {
+            val startMs = android.os.SystemClock.elapsedRealtime()
+            instrumentation.targetContext.startActivity(intent)
+            waitCondition()
+            val elapsedMs = android.os.SystemClock.elapsedRealtime() - startMs
+            device.waitForIdle()
+            Thread.sleep(400)
+            val metric = StartupMetric(label, elapsedMs, created.toList())
+            android.util.Log.i(
+                "StartupBenchmark",
+                "[StartupMetric] ${metric.label}: elapsedMs=${metric.elapsedMs}ms, activities=${metric.createdActivities}"
+            )
+            return metric
+        } finally {
+            app.unregisterActivityLifecycleCallbacks(callback)
+        }
+    }
+
+    @Test
+    fun scenario7_VerifyMinimalActivityChain_And_StartupLatency() {
+        val wideLauncher = measureColdStart(
+            label = "Wide_ColdStart_Launcher",
+            isOverlayMode = false,
+            intent = createLauncherIntent()
+        ) {
+            val homeText = device.wait(Until.findObject(By.textContains("Quick Access")), timeout)
+            assertNotNull("Wide Launcher cold start should display Home Quick Access", homeText)
+        }
+
+        val wideDeepLink = measureColdStart(
+            label = "Wide_ColdStart_DeepLink_SeatLumbar",
+            isOverlayMode = false,
+            intent = createDeepLinkIntent("myapp://navigate/seat/seat_lumbar")
+        ) {
+            assertLumbarDetailVisible("Wide DeepLink cold start should display Lumbar Support detail")
+        }
+
+        val narrowLauncher = measureColdStart(
+            label = "NarrowOverlay_ColdStart_Launcher",
+            isOverlayMode = true,
+            intent = createLauncherIntent()
+        ) {
+            val homeText = device.wait(Until.findObject(By.textContains("Quick Access")), timeout)
+            val btnMore = device.wait(Until.findObject(By.res(pkg, "btnMore")), timeout)
+            assertNotNull("Narrow Launcher cold start should display Home Quick Access", homeText)
+            assertNotNull("Narrow Launcher cold start should display floating MENU button", btnMore)
+        }
+
+        val narrowDeepLink = measureColdStart(
+            label = "NarrowOverlay_ColdStart_DeepLink_SeatLumbar",
+            isOverlayMode = true,
+            intent = createDeepLinkIntent("myapp://navigate/seat/seat_lumbar")
+        ) {
+            assertLumbarDetailVisible("Narrow DeepLink cold start should display Lumbar Support detail")
+            val btnMore = device.wait(Until.findObject(By.res(pkg, "btnMore")), timeout)
+            assertNotNull("Narrow DeepLink cold start should display floating MENU button", btnMore)
+        }
+
+        android.util.Log.i(
+            "StartupBenchmark",
+            "=== SUMMARY ===\n" +
+                "1) $wideLauncher\n" +
+                "2) $wideDeepLink\n" +
+                "3) $narrowLauncher\n" +
+                "4) $narrowDeepLink"
+        )
+
+        // Verify Narrow Overlay Mode Cold Start NEVER creates PrimaryActivity (ListActivity)
+        org.junit.Assert.assertFalse(
+            "Narrow Overlay Launcher Cold Start must NOT create PrimaryActivity! Created: ${narrowLauncher.createdActivities}",
+            narrowLauncher.createdActivities.contains("PrimaryActivity")
+        )
+        org.junit.Assert.assertEquals(
+            "Narrow Overlay Launcher Cold Start should only create [EntryRouterActivity, HomeActivity, PrimaryOverlayActivity]",
+            listOf("EntryRouterActivity", "HomeActivity", "PrimaryOverlayActivity"),
+            narrowLauncher.createdActivities
+        )
+
+        org.junit.Assert.assertFalse(
+            "Narrow Overlay DeepLink Cold Start must NOT create PrimaryActivity! Created: ${narrowDeepLink.createdActivities}",
+            narrowDeepLink.createdActivities.contains("PrimaryActivity")
+        )
+        org.junit.Assert.assertTrue(
+            "Narrow Overlay DeepLink Cold Start must contain HomeActivity, PrimaryOverlayActivity, CategoryHostActivity, GenericSettingsActivity",
+            narrowDeepLink.createdActivities.containsAll(
+                listOf("EntryRouterActivity", "HomeActivity", "PrimaryOverlayActivity", "CategoryHostActivity", "GenericSettingsActivity")
+            )
+        )
     }
 }

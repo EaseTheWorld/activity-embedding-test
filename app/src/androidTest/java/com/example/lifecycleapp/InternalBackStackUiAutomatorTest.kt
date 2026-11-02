@@ -50,11 +50,20 @@ class InternalBackStackUiAutomatorTest {
     }
 
     private fun launchApp(isOverlayMode: Boolean) {
-        AppConfig.IS_OVERLAY_MODE = isOverlayMode
-        val context = InstrumentationRegistry.getInstrumentation().targetContext
-        SplitInitializer().create(context)
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        instrumentation.runOnMainSync {
+            BaseCategoryMenuActivity.getActiveMenuActivity()?.finishAffinity()
+            LifecycleApp.getTopSecondaryActivity()?.finishAffinity()
+        }
+        device.waitForIdle()
+        Thread.sleep(600)
 
-        val intent = Intent(context, PrimaryActivity::class.java).apply {
+        AppConfig.IS_OVERLAY_MODE = isOverlayMode
+        val context = instrumentation.targetContext
+
+        val intent = Intent(context, EntryRouterActivity::class.java).apply {
+            action = Intent.ACTION_MAIN
+            addCategory(Intent.CATEGORY_LAUNCHER)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
         }
         context.startActivity(intent)
@@ -74,10 +83,17 @@ class InternalBackStackUiAutomatorTest {
     }
 
     private fun scrollAndClickLumbarDetail() {
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            val topSec = LifecycleApp.getTopSecondaryActivity()
+            if (topSec != null) {
+                val imm = topSec.getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as? android.view.inputmethod.InputMethodManager
+                imm?.hideSoftInputFromWindow(topSec.window.decorView.windowToken, 0)
+            }
+        }
         var lumbarDetailBtn = device.findObject(By.descContains("View details for seat_lumbar"))
         var attempts = 0
         while (lumbarDetailBtn == null && attempts < 5) {
-            device.swipe(1800, 1300, 1800, 300, 15)
+            device.swipe(1800, 900, 1800, 250, 15)
             device.waitForIdle()
             Thread.sleep(500)
             lumbarDetailBtn = device.findObject(By.descContains("View details for seat_lumbar"))

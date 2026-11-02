@@ -34,6 +34,21 @@ class SplitInitializer : Initializer<RuleController> {
     companion object {
         var isOverlayDrawerExpanded: Boolean = false
 
+        @Volatile
+        private var lastInitializedOverlayMode: Boolean? = null
+
+        /**
+         * Ensures WindowManager embedding rules are initialized ONLY for the currently active mode
+         * (`Wide Split` vs `Narrow Overlay`) and skips redundant re-initialization if the mode has not changed.
+         */
+        fun ensureInitialized(context: Context) {
+            val currentMode = AppConfig.isOverlayMode(context)
+            if (lastInitializedOverlayMode == currentMode) {
+                return
+            }
+            SplitInitializer().create(context.applicationContext)
+        }
+
         fun computeOverlayBounds(context: Context, isExpanded: Boolean): EmbeddingBounds {
             return if (isExpanded) {
                 EmbeddingBounds(
@@ -55,6 +70,7 @@ class SplitInitializer : Initializer<RuleController> {
     override fun create(context: Context): RuleController {
         val ruleController = RuleController.getInstance(context)
         val isNarrowOverlayMode = AppConfig.isOverlayMode(context)
+        lastInitializedOverlayMode = isNarrowOverlayMode
 
         if (isNarrowOverlayMode) {
             // Narrow Mode:

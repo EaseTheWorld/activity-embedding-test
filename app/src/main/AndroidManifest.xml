@@ -34,16 +34,14 @@
             tools:node="merge">
             <meta-data
                 android:name="com.example.lifecycleapp.SplitInitializer"
-                android:value="androidx.startup" />
+                android:value="androidx.startup"
+                tools:node="remove" />
         </provider>
 
         <activity
-            android:name=".PrimaryActivity"
+            android:name=".EntryRouterActivity"
             android:exported="true"
-            android:theme="@style/Theme.LifecycleApp"
-            android:launchMode="singleTop"
-            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density"
-            android:label="@string/title_primary">
+            android:theme="@style/Theme.LifecycleApp.Translucent">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -61,6 +59,14 @@
                     android:host="navigate" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".PrimaryActivity"
+            android:exported="false"
+            android:theme="@style/Theme.LifecycleApp"
+            android:launchMode="singleTop"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density"
+            android:label="@string/title_primary" />
 
         <activity
             android:name=".PrimaryOverlayActivity"

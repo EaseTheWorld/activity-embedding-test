@@ -78,19 +78,36 @@ class SplitInitializer : Initializer<RuleController> {
 
         if (isNarrowOverlayMode) {
             // Narrow Mode:
-            // - HomeActivity -> ExpandedTaskFragment #0
-            // - Categories (ACTION_SETTINGS_EMBED) -> ExpandedTaskFragment #1 (hosts Generic/Light + sub-activities)
-            val expandFilters = setOf(
-                ActivityFilter(ComponentName(context, com.example.feature.home.HomeActivity::class.java), null),
-                ActivityFilter(ComponentName("*", "*"), ACTION_SETTINGS_EMBED)
-            )
-            val expandRule = ActivityRule.Builder(expandFilters)
+            // 1. HomeActivity -> Expanded Task root (alwaysExpand = true)
+            val homeFilter = ActivityFilter(ComponentName(context, com.example.feature.home.HomeActivity::class.java), null)
+            val homeExpandRule = ActivityRule.Builder(setOf(homeFilter))
                 .setAlwaysExpand(true)
                 .build()
-            ruleController.setRules(setOf(expandRule))
+
+            // 2. SplitPairRule between HomeActivity and Categories with SPLIT_TYPE_EXPAND
+            // Allows tracking and dismissing the category container via public SplitController.splitInfoList API (0% reflection)
+            val homeComponent = ComponentName(context, com.example.feature.home.HomeActivity::class.java)
+            val wildcardComponent = ComponentName("*", "*")
+            val categorySplitRule = SplitPairRule.Builder(
+                setOf(SplitPairFilter(homeComponent, wildcardComponent, ACTION_SETTINGS_EMBED))
+            )
+                .setMinWidthDp(0)
+                .setMinHeightDp(0)
+                .setMinSmallestWidthDp(0)
+                .setDefaultSplitAttributes(
+                    SplitAttributes.Builder()
+                        .setSplitType(SplitAttributes.SplitType.SPLIT_TYPE_EXPAND)
+                        .build()
+                )
+                .setFinishPrimaryWithSecondary(SplitRule.FinishBehavior.NEVER)
+                .setFinishSecondaryWithPrimary(SplitRule.FinishBehavior.ALWAYS)
+                .setClearTop(false)
+                .build()
+
+            ruleController.setRules(setOf(homeExpandRule, categorySplitRule))
 
             OverlayBoundsHelper.initCalculator(context)
-            Log.d("LifecycleLog", "[SplitInitializer] Initialized Narrow Mode (ActivityRule alwaysExpand on HomeActivity & ACTION_SETTINGS_EMBED + Pinned Overlay)")
+            Log.d("LifecycleLog", "[SplitInitializer] Initialized Narrow Mode (SplitPairRule HomeActivity <-> ACTION_SETTINGS_EMBED with SPLIT_TYPE_EXPAND + Pinned Overlay)")
         } else {
             // Wide Mode:
             // 1. PrimaryActivity <-> HomeActivity (root SecondaryTaskFragment #1, finishes together with PrimaryActivity)

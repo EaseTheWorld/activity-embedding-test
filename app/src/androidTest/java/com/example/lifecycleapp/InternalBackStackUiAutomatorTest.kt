@@ -636,6 +636,18 @@ class InternalBackStackUiAutomatorTest {
         assertNotNull("Home search results header should be visible for query '$query'", matchingHeader)
     }
 
+    private fun waitForActiveMenuActivity(): BaseCategoryMenuActivity {
+        var menu: BaseCategoryMenuActivity? = null
+        val start = System.currentTimeMillis()
+        while (menu == null && System.currentTimeMillis() - start < 5000) {
+            menu = BaseCategoryMenuActivity.getActiveMenuActivity()
+            if (menu != null) break
+            Thread.sleep(200)
+        }
+        assertNotNull("Active menu activity must exist within timeout", menu)
+        return menu!!
+    }
+
     private fun assertHomeSearchQueryPreserved(query: String, message: String) {
         val matchingHeader = device.wait(Until.findObject(By.textContains("settings found")), timeout)
         assertNotNull("$message (expected 'settings found' header for query '$query')", matchingHeader)
@@ -658,7 +670,7 @@ class InternalBackStackUiAutomatorTest {
     fun scenario10_WideMode_InternalCategory_ExhaustBackStack_RevealsHomeState_UpdatesSelection_AndExitsApp() {
         launchApp(isOverlayMode = false)
 
-        val menuInitial = BaseCategoryMenuActivity.getActiveMenuActivity()
+        val menuInitial = waitForActiveMenuActivity()
         assertNotNull("Active PrimaryActivity must exist", menuInitial)
         assertEquals("Initial selectedPosition must be 0 (Home)", 0, menuInitial!!.currentSelectedPosition)
         assertEquals("Initial selectedCategoryId must be 'home'", "home", menuInitial.currentSelectedCategoryId)
@@ -727,7 +739,7 @@ class InternalBackStackUiAutomatorTest {
     fun scenario11_WideMode_ExternalCategory_ExhaustBackStack_RevealsHomeState_UpdatesSelection_AndExitsApp() {
         launchApp(isOverlayMode = false)
 
-        val menuInitial = BaseCategoryMenuActivity.getActiveMenuActivity()
+        val menuInitial = waitForActiveMenuActivity()
         assertNotNull("Active PrimaryActivity must exist", menuInitial)
         assertEquals("Initial selectedPosition must be 0 (Home)", 0, menuInitial!!.currentSelectedPosition)
 
@@ -798,7 +810,7 @@ class InternalBackStackUiAutomatorTest {
     fun scenario12_NarrowOverlayMode_InternalAndExternal_ExhaustBackStack_RevealsHomeState_UpdatesSelection_AndExitsApp() {
         launchApp(isOverlayMode = true)
 
-        val overlayMenu = BaseCategoryMenuActivity.getActiveMenuActivity()
+        val overlayMenu = waitForActiveMenuActivity()
         assertNotNull("Active PrimaryOverlayActivity must exist", overlayMenu)
         assertEquals("Initial selectedPosition must be 0 (Home)", 0, overlayMenu!!.currentSelectedPosition)
 

@@ -13,11 +13,14 @@ import androidx.window.embedding.EmbeddingBounds
 import androidx.window.embedding.OverlayAttributes
 import androidx.window.embedding.OverlayCreateParams
 import androidx.window.embedding.setOverlayCreateParams
+import androidx.lifecycle.lifecycleScope
 import com.example.core.item.AppConfig
 
 class HomeActivity : ComponentActivity() {
 
     companion object {
+        var instance: HomeActivity? = null
+            private set
         const val EXTRA_TARGET_INTENT = "extra_target_intent"
         const val EXTRA_INITIAL_CATEGORY_ID = "extra_initial_category_id"
         const val EXTRA_INITIAL_DEEPLINK_URI = "extra_initial_deeplink_uri"
@@ -35,8 +38,12 @@ class HomeActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        instance = this
         HomeNavigationBridge.registerTaskRootLaunchListener(taskRootLaunchListener)
         val isNarrowOverlayMode = AppConfig.isOverlayMode(this)
+        if (isNarrowOverlayMode) {
+            CategoryStackManager.trackSplitInfo(lifecycleScope, this, isNarrowMode = true)
+        }
         Log.d(tag, "HomeActivity created (isNarrowOverlayMode=$isNarrowOverlayMode)")
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
@@ -139,6 +146,9 @@ class HomeActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        if (instance === this) {
+            instance = null
+        }
         HomeNavigationBridge.unregisterTaskRootLaunchListener(taskRootLaunchListener)
         Log.d(tag, "HomeActivity onDestroy()")
     }

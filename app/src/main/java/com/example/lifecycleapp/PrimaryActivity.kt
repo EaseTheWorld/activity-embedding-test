@@ -8,6 +8,8 @@ import android.util.Log
 import android.view.MotionEvent
 import androidx.activity.OnBackPressedCallback
 import com.example.core.item.AppConfig
+import androidx.lifecycle.lifecycleScope
+import com.example.feature.home.CategoryStackManager
 import com.example.feature.home.HomeActivity
 
 /**
@@ -32,6 +34,7 @@ class PrimaryActivity : BaseCategoryMenuActivity() {
         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE)
         setContentView(R.layout.activity_primary)
         initCategoryMenuViews()
+        CategoryStackManager.trackSplitInfo(lifecycleScope, this, isNarrowMode = false)
 
         if (savedInstanceState == null) {
             val homeIntent = Intent(this, HomeActivity::class.java).apply {

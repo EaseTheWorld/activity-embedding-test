@@ -1,5 +1,6 @@
 package com.example.lifecycleapp
 
+import com.example.feature.home.CategoryStackManager
 import com.example.feature.home.HomeNavigationBridge
 
 import android.app.Activity
@@ -23,6 +24,8 @@ class LifecycleApp : Application() {
     lateinit var hiltViewModelRegistry: ItemViewModelRegistry
 
     companion object {
+        lateinit var instance: LifecycleApp
+            private set
         private val secondaryActivities = ArrayDeque<WeakReference<ComponentActivity>>()
 
         fun getTopSecondaryActivity(): ComponentActivity? {
@@ -41,13 +44,14 @@ class LifecycleApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        instance = this
         Log.d("LifecycleLog", "[LifecycleApp] onCreate()")
         CategoryItemRegistry.register(DoorItemRegistry)
         CategoryItemRegistry.register(SeatItemRegistry)
         VehicleHardwareSimulator.init()
         VehicleHardwareSimulator.attachRegistry(hiltViewModelRegistry)
-        HomeNavigationBridge.registerCategoryDismissHandler { taskId ->
-            OverlayBoundsHelper.dismissCategoryContainer(taskId)
+        HomeNavigationBridge.registerCategoryDismissHandler { _ ->
+            CategoryStackManager.dismissCurrentCategory(this)
         }
         HomeNavigationBridge.registerModeTransitionHandler { activity, newConfig ->
             ModeTransitionManager.checkAndHandleTransition(activity, newConfig)

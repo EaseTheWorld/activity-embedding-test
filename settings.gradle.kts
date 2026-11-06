@@ -27,4 +27,5 @@ include(":common-ui-settings")
 include(":feature-door")
 include(":feature-seat")
 include(":feature-home")
+include(":framework-stubs")
 

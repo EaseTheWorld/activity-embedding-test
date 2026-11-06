@@ -29,8 +29,7 @@ class HomeActivity : ComponentActivity() {
 
     @Suppress("DEPRECATION")
     private val taskRootLaunchListener: (Intent) -> Unit = { targetIntent ->
-        val hostIntent = CategoryHostActivity.createIntent(this, targetIntent)
-        startActivity(hostIntent)
+        startActivity(targetIntent)
         overridePendingTransition(0, 0)
     }
 
@@ -87,12 +86,10 @@ class HomeActivity : ComponentActivity() {
                 .setOverlayAttributes(OverlayAttributes(bounds))
                 .build()
 
-            val options = ActivityOptions.makeBasic().toBundle()
-            options.setOverlayCreateParams(this, overlayParams)
-            options.putBoolean(
-                "androidx.window.extensions.embedding.shouldAssociateWithLaunchingActivity",
-                false
-            )
+            val options = ActivityOptions.makeBasic().toBundle().apply {
+                setOverlayCreateParams(this@HomeActivity, overlayParams)
+                setOverlayAssociateWithLaunchingActivity(false)
+            }
 
             val overlayIntent = Intent().apply {
                 component = ComponentName(packageName, "com.example.lifecycleapp.PrimaryOverlayActivity")
@@ -149,6 +146,7 @@ class HomeActivity : ComponentActivity() {
     override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
         super.onConfigurationChanged(newConfig)
         Log.d(tag, "HomeActivity onConfigurationChanged: $newConfig")
+        HomeNavigationBridge.handleModeTransition(this, newConfig)
     }
 
     override fun onSaveInstanceState(outState: Bundle) {

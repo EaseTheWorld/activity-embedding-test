@@ -8,7 +8,7 @@
             
             1) screenLayout:
                - 안드로이드 화면 레이아웃 등급(Screen Layout Size Bucket: xlarge, large, normal) 변경 대응.
-               - Split 폭 변화(예: 1268dp ↔ 916dp) 시 xlarge(>=960dp)와 large(640~959dp) 경계를 교차할 때
+               - Split 폭 변화(예: 1268dp <-> 916dp) 시 xlarge(>=960dp)와 large(640~959dp) 경계를 교차할 때
                  시스템이 액티비티를 강제 재생성(Destroy & Recreate)하는 것을 방지.
             
             2) screenSize:
@@ -25,7 +25,7 @@
             android:name=".HomeActivity"
             android:exported="true"
             android:launchMode="singleTop"
-            android:configChanges="screenSize|smallestScreenSize|screenLayout"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density"
             android:theme="@style/Theme.AppCompat.DayNight.NoActionBar">
             <intent-filter>
                 <action android:name="com.example.carsettings.ACTION_SETTINGS_EMBED" />
@@ -33,11 +33,6 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
-        <activity
-            android:name=".CategoryHostActivity"
-            android:exported="false"
-            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density"
-            android:theme="@style/Theme.AppCompat.DayNight.NoActionBar" />
     </application>
 
 </manifest>

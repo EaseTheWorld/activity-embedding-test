@@ -9,13 +9,26 @@ import com.example.core.item.AppConfig
 import java.util.concurrent.CopyOnWriteArraySet
 
 /**
- * Event bridge between Primary menu (`PrimaryActivity` / `PrimaryOverlayActivity`),
- * `HomeActivity`, and `CategoryHostActivity`.
+ * Event bridge between Primary menu (`PrimaryActivity` / `PrimaryOverlayActivity`)
+ * and `HomeActivity`.
  *
  * All participants register their listeners in `onCreate()` and unregister in `onDestroy()`,
  * avoiding any static `Activity` or `WeakReference<Activity>` fields.
  */
 object HomeNavigationBridge {
+    private var modeTransitionHandler: ((Activity, android.content.res.Configuration) -> Boolean)? = null
+
+    fun registerModeTransitionHandler(handler: (Activity, android.content.res.Configuration) -> Boolean) {
+        modeTransitionHandler = handler
+    }
+
+    fun unregisterModeTransitionHandler() {
+        modeTransitionHandler = null
+    }
+
+    fun handleModeTransition(activity: Activity, config: android.content.res.Configuration): Boolean {
+        return modeTransitionHandler?.invoke(activity, config) ?: false
+    }
 
     private val homeRevealedListeners = CopyOnWriteArraySet<() -> Unit>()
     private val categorySelectedListeners = CopyOnWriteArraySet<(String) -> Unit>()
@@ -49,6 +62,7 @@ object HomeNavigationBridge {
     }
 
     private val categoryDismissListeners = CopyOnWriteArraySet<() -> Unit>()
+    private var categoryDismissHandler: ((Int) -> Unit)? = null
     private var taskRootLaunchListener: ((Intent) -> Unit)? = null
 
     private val mainHandler by lazy { Handler(Looper.getMainLooper()) }
@@ -72,29 +86,38 @@ object HomeNavigationBridge {
         }
     }
 
+    fun registerCategoryDismissHandler(handler: (Int) -> Unit) {
+        categoryDismissHandler = handler
+    }
+
+    fun unregisterCategoryDismissHandler() {
+        categoryDismissHandler = null
+    }
+
     /**
-     * Called by [CategoryHostActivity] in `onCreate()` to subscribe to stack dismissal events.
+     * Optional listener for stack dismissal events.
      */
     fun registerCategoryHostDismissListener(listener: () -> Unit) {
         categoryDismissListeners.add(listener)
     }
 
     /**
-     * Called by [CategoryHostActivity] in `onDestroy()` (or upon dismissal) to unsubscribe.
+     * Unsubscribes stack dismissal listener.
      */
     fun unregisterCategoryHostDismissListener(listener: () -> Unit) {
         categoryDismissListeners.remove(listener)
     }
 
     /**
-     * Notifies all currently active [CategoryHostActivity] instances to finish their own `ActivityStack`.
+     * Notifies stack dismissal handlers to finish the active category `ActivityStack` / `TaskFragment`.
      */
-    fun notifyDismissCategoryStacks() {
+    fun notifyDismissCategoryStacks(taskId: Int = -1) {
         val snapshot = categoryDismissListeners.toList()
         categoryDismissListeners.clear()
         for (listener in snapshot) {
             listener.invoke()
         }
+        categoryDismissHandler?.invoke(taskId)
     }
 
     /**
@@ -115,7 +138,7 @@ object HomeNavigationBridge {
 
     /**
      * Dismisses any currently active Category `ActivityStack` and launches [targetIntent]
-     * inside a new [CategoryHostActivity] stack.
+     * directly into the category stack.
      */
     @Suppress("DEPRECATION")
     fun launchCategory(caller: Context, targetIntent: Intent) {
@@ -123,14 +146,14 @@ object HomeNavigationBridge {
         mainHandler.removeCallbacks(clearLaunchingRunnable)
         mainHandler.postDelayed(clearLaunchingRunnable, 400L)
 
-        notifyDismissCategoryStacks()
+        val taskId = (caller as? Activity)?.taskId ?: -1
+        notifyDismissCategoryStacks(taskId)
 
         val rootLauncher = taskRootLaunchListener
         if (AppConfig.isOverlayMode(caller) && rootLauncher != null) {
             rootLauncher.invoke(targetIntent)
         } else {
-            val hostIntent = CategoryHostActivity.createIntent(caller, targetIntent)
-            caller.startActivity(hostIntent)
+            caller.startActivity(targetIntent)
             if (caller is Activity) {
                 caller.overridePendingTransition(0, 0)
             }

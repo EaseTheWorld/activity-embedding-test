@@ -42,6 +42,8 @@ open class GenericSettingsActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         pendingIntent.value = intent
 
+        val initialDestination = resolveInitialDestination(intent)
+
         setContent {
             val navController = rememberNavController()
 
@@ -52,10 +54,32 @@ open class GenericSettingsActivity : AppCompatActivity() {
             }
 
             BackHandler {
-                if (!navController.popBackStack()) {
-                    Log.d(tag, "At root of category Composable graph -> finishing secondary activity to reveal Home")
-                    finish()
+                val currentRoute = navController.currentBackStackEntry?.destination?.route
+                val isDetailScreen = currentRoute == SettingsNavigation.ROUTE_SEAT_LUMBAR
+                    || currentRoute == SettingsNavigation.ROUTE_ITEM_DETAIL
+
+                if (navController.popBackStack()) {
+                    val newRoute = navController.currentBackStackEntry?.destination?.route
+                    if (newRoute == SettingsNavigation.ROUTE_DASHBOARD) {
+                        Log.d(tag, "Popped to base dashboard -> finishing secondary activity to reveal Home")
+                        finish()
+                    }
+                    return@BackHandler
                 }
+
+                if (isDetailScreen) {
+                    val catId = navController.currentBackStackEntry?.arguments?.getString("categoryId")
+                        ?: pendingIntent.value?.data?.pathSegments?.firstOrNull()
+                        ?: "seat"
+                    Log.d(tag, "Detail screen at root of back stack -> navigating to category root: $catId")
+                    navController.navigate(SettingsNavigation.categoryRoute(catId)) {
+                        popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                    }
+                    return@BackHandler
+                }
+
+                Log.d(tag, "At root of category Composable graph -> finishing secondary activity to reveal Home")
+                finish()
             }
 
             CompositionLocalProvider(
@@ -64,6 +88,7 @@ open class GenericSettingsActivity : AppCompatActivity() {
             ) {
                 SettingsNavHost(
                     navController = navController,
+                    startDestination = initialDestination,
                     viewModelRegistry = getViewModelRegistry(),
                     recentManager = recentManager,
                     onNavigateExternal = { categoryId ->
@@ -80,6 +105,30 @@ open class GenericSettingsActivity : AppCompatActivity() {
         Log.d(tag, "onNewIntent received: $intent, data=${intent?.data}, extras=${intent?.extras}")
         pendingIntent.value = intent
         navTrigger.value++
+    }
+
+    protected fun resolveInitialDestination(intent: Intent?): String {
+        if (intent == null) return SettingsNavigation.ROUTE_DASHBOARD
+        val uri = intent.data
+        if (uri != null && uri.scheme == SettingsNavigation.DEEP_LINK_SCHEME) {
+            val segments = uri.pathSegments
+            val categoryId = segments.firstOrNull()
+            if (!categoryId.isNullOrEmpty() && !categoryId.equals("dashboard", ignoreCase = true) && !categoryId.equals("home", ignoreCase = true)) {
+                return SettingsNavigation.categoryRoute(categoryId)
+            }
+        }
+        val extraCat = intent.getStringExtra(EXTRA_CATEGORY_ID)
+        val action = intent.action
+        val categoryId = when {
+            !extraCat.isNullOrEmpty() -> extraCat
+            action == "com.example.carsettings.door.OPEN" -> "door"
+            action == "com.example.carsettings.seat.OPEN" -> "seat"
+            else -> null
+        }
+        if (!categoryId.isNullOrEmpty() && !categoryId.equals("dashboard", ignoreCase = true) && !categoryId.equals("home", ignoreCase = true)) {
+            return SettingsNavigation.categoryRoute(categoryId)
+        }
+        return SettingsNavigation.ROUTE_DASHBOARD
     }
 
     private fun handleIntentNavigation(intent: Intent, navController: NavHostController) {
@@ -118,23 +167,24 @@ open class GenericSettingsActivity : AppCompatActivity() {
             val categoryId = segments.getOrNull(0)
             val isDashboard = categoryId.isNullOrEmpty() || categoryId.equals("dashboard", ignoreCase = true)
             try {
-                if (!isDashboard && itemId == "seat_lumbar") {
-                    // Ensure the category root ("navigate/seat") is the root of this category's back stack
-                    // (replacing the default "dashboard" startDestination) before pushing the 2-depth detail screen.
-                    navController.navigate(SettingsNavigation.categoryRoute(categoryId!!), navOptions {
-                        popUpTo(SettingsNavigation.ROUTE_DASHBOARD) { inclusive = true }
-                        launchSingleTop = true
-                    })
+                if (itemId != null) {
+                    // Item detail screen -> push on top of current/initial category root
                     navController.navigate(cleanUri, navOptions {
                         launchSingleTop = true
                     })
-                } else {
-                    navController.navigate(cleanUri, navOptions {
-                        if (!isDashboard) {
-                            popUpTo(SettingsNavigation.ROUTE_DASHBOARD) { inclusive = true }
-                        }
-                        launchSingleTop = true
-                    })
+                } else if (!isDashboard && categoryId != null) {
+                    val targetRoute = SettingsNavigation.categoryRoute(categoryId)
+                    if (navController.currentDestination?.route != targetRoute) {
+                        navController.navigate(cleanUri, navOptions {
+                            launchSingleTop = true
+                        })
+                    }
+                } else if (isDashboard) {
+                    if (navController.currentDestination?.route != SettingsNavigation.ROUTE_DASHBOARD) {
+                        navController.navigate(SettingsNavigation.ROUTE_DASHBOARD, navOptions {
+                            launchSingleTop = true
+                        })
+                    }
                 }
                 return
             } catch (e: Exception) {
@@ -142,7 +192,6 @@ open class GenericSettingsActivity : AppCompatActivity() {
                 if (!categoryId.isNullOrEmpty() && !isDashboard) {
                     try {
                         navController.navigate(SettingsNavigation.categoryRoute(categoryId), navOptions {
-                            popUpTo(SettingsNavigation.ROUTE_DASHBOARD) { inclusive = true }
                             launchSingleTop = true
                         })
                         return
@@ -166,17 +215,20 @@ open class GenericSettingsActivity : AppCompatActivity() {
 
         if (categoryId != null) {
             if (categoryId.equals("dashboard", ignoreCase = true)) {
-                navController.navigate(SettingsNavigation.ROUTE_DASHBOARD, navOptions {
-                    popUpTo(SettingsNavigation.ROUTE_DASHBOARD) { inclusive = true }
-                    launchSingleTop = true
-                })
+                if (navController.currentDestination?.route != SettingsNavigation.ROUTE_DASHBOARD) {
+                    navController.navigate(SettingsNavigation.ROUTE_DASHBOARD, navOptions {
+                        launchSingleTop = true
+                    })
+                }
             } else if (categoryId.equals("light", ignoreCase = true)) {
                 launchExternalCategory(categoryId)
             } else {
-                navController.navigate(SettingsNavigation.categoryRoute(categoryId), navOptions {
-                    popUpTo(SettingsNavigation.ROUTE_DASHBOARD) { inclusive = true }
-                    launchSingleTop = true
-                })
+                val targetRoute = SettingsNavigation.categoryRoute(categoryId)
+                if (navController.currentDestination?.route != targetRoute) {
+                    navController.navigate(targetRoute, navOptions {
+                        launchSingleTop = true
+                    })
+                }
             }
         }
     }

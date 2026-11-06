@@ -71,5 +71,6 @@ abstract class BaseLoggingActivity : AppCompatActivity() {
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
         Log.d(tag, "[$activityName] onConfigurationChanged(newConfig = $newConfig)")
+        ModeTransitionManager.checkAndHandleTransition(this, newConfig)
     }
 }

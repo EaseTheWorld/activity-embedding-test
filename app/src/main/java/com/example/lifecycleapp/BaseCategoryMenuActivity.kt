@@ -79,6 +79,8 @@ abstract class BaseCategoryMenuActivity : BaseLoggingActivity() {
     val currentSelectedPosition: Int
         get() = categoryAdapter?.selectedPosition ?: -1
 
+    fun getSettingCategoryById(id: String): SettingCategory? = categories.find { it.id.equals(id, ignoreCase = true) }
+
     val currentSelectedCategoryId: String?
         get() {
             val pos = categoryAdapter?.selectedPosition ?: return null
@@ -281,8 +283,8 @@ abstract class BaseCategoryMenuActivity : BaseLoggingActivity() {
         onBeforeCategoryLaunch()
 
         if (category.id == "home") {
-            Log.d(tag, "[$activityName] Navigating to HomeActivity -> HomeNavigationBridge.notifyDismissCategoryStacks()")
-            HomeNavigationBridge.notifyDismissCategoryStacks()
+            Log.d(tag, "[$activityName] Navigating to HomeActivity -> HomeNavigationBridge.notifyDismissCategoryStacks(taskId)")
+            HomeNavigationBridge.notifyDismissCategoryStacks(taskId)
             return
         }
 

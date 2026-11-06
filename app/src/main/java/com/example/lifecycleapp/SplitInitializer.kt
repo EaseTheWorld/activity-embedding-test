@@ -37,16 +37,18 @@ class SplitInitializer : Initializer<RuleController> {
         @Volatile
         private var lastInitializedOverlayMode: Boolean? = null
 
+        fun getLastInitializedOverlayMode(): Boolean? = lastInitializedOverlayMode
+
         /**
          * Ensures WindowManager embedding rules are initialized ONLY for the currently active mode
          * (`Wide Split` vs `Narrow Overlay`) and skips redundant re-initialization if the mode has not changed.
          */
-        fun ensureInitialized(context: Context) {
-            val currentMode = AppConfig.isOverlayMode(context)
+        fun ensureInitialized(context: Context, targetOverlayMode: Boolean? = null) {
+            val currentMode = targetOverlayMode ?: AppConfig.isOverlayMode(context)
             if (lastInitializedOverlayMode == currentMode) {
                 return
             }
-            SplitInitializer().create(context.applicationContext)
+            SplitInitializer().create(context.applicationContext, currentMode)
         }
 
         fun computeOverlayBounds(context: Context, isExpanded: Boolean): EmbeddingBounds {
@@ -67,18 +69,20 @@ class SplitInitializer : Initializer<RuleController> {
         }
     }
 
-    override fun create(context: Context): RuleController {
+    override fun create(context: Context): RuleController = create(context, null)
+
+    fun create(context: Context, forcedOverlayMode: Boolean?): RuleController {
         val ruleController = RuleController.getInstance(context)
-        val isNarrowOverlayMode = AppConfig.isOverlayMode(context)
+        val isNarrowOverlayMode = forcedOverlayMode ?: AppConfig.isOverlayMode(context)
         lastInitializedOverlayMode = isNarrowOverlayMode
 
         if (isNarrowOverlayMode) {
             // Narrow Mode:
             // - HomeActivity -> ExpandedTaskFragment #0
-            // - CategoryHostActivity -> ExpandedTaskFragment #1 (hosts Generic/Light + sub-activities)
+            // - Categories (ACTION_SETTINGS_EMBED) -> ExpandedTaskFragment #1 (hosts Generic/Light + sub-activities)
             val expandFilters = setOf(
                 ActivityFilter(ComponentName(context, com.example.feature.home.HomeActivity::class.java), null),
-                ActivityFilter(ComponentName(context, com.example.feature.home.CategoryHostActivity::class.java), null)
+                ActivityFilter(ComponentName("*", "*"), ACTION_SETTINGS_EMBED)
             )
             val expandRule = ActivityRule.Builder(expandFilters)
                 .setAlwaysExpand(true)
@@ -86,14 +90,14 @@ class SplitInitializer : Initializer<RuleController> {
             ruleController.setRules(setOf(expandRule))
 
             OverlayBoundsHelper.initCalculator(context)
-            Log.d("LifecycleLog", "[SplitInitializer] Initialized Narrow Mode (ActivityRule alwaysExpand on HomeActivity & CategoryHostActivity + Pinned Overlay)")
+            Log.d("LifecycleLog", "[SplitInitializer] Initialized Narrow Mode (ActivityRule alwaysExpand on HomeActivity & ACTION_SETTINGS_EMBED + Pinned Overlay)")
         } else {
             // Wide Mode:
             // 1. PrimaryActivity <-> HomeActivity (root SecondaryTaskFragment #1, finishes together with PrimaryActivity)
-            // 2. PrimaryActivity <-> CategoryHostActivity (category SecondaryTaskFragment #2, finishing it reveals HomeActivity)
+            // 2. PrimaryActivity <-> Category (ACTION_SETTINGS_EMBED, category SecondaryTaskFragment #2, finishing it reveals HomeActivity)
             val primaryComponent = ComponentName(context, PrimaryActivity::class.java)
             val homeComponent = ComponentName(context, com.example.feature.home.HomeActivity::class.java)
-            val categoryHostComponent = ComponentName(context, com.example.feature.home.CategoryHostActivity::class.java)
+            val wildcardComponent = ComponentName("*", "*")
 
             val animParams = EmbeddingAnimationParams.Builder()
                 .setAnimationBackground(EmbeddingAnimationBackground.DEFAULT)
@@ -121,7 +125,7 @@ class SplitInitializer : Initializer<RuleController> {
                 .build()
 
             val categorySplitRule = SplitPairRule.Builder(
-                setOf(SplitPairFilter(primaryComponent, categoryHostComponent, null))
+                setOf(SplitPairFilter(primaryComponent, wildcardComponent, ACTION_SETTINGS_EMBED))
             )
                 .setMinWidthDp(0)
                 .setMinHeightDp(0)
@@ -133,7 +137,7 @@ class SplitInitializer : Initializer<RuleController> {
                 .build()
 
             ruleController.setRules(setOf(homeSplitRule, categorySplitRule))
-            Log.d("LifecycleLog", "[SplitInitializer] Initialized Wide Mode (SplitPairRules for HomeActivity and CategoryHostActivity, ratio=${AppConfig.PRIMARY_DRAWER_RATIO})")
+            Log.d("LifecycleLog", "[SplitInitializer] Initialized Wide Mode (SplitPairRules for HomeActivity and ACTION_SETTINGS_EMBED, ratio=${AppConfig.PRIMARY_DRAWER_RATIO})")
         }
 
         return ruleController

@@ -21,11 +21,11 @@ import com.example.feature.home.HomeNavigationBridge
  *    recreating or resetting any Activity, restores Secondary focus, and finishes immediately.
  * 3. **Warm Start (`DeepLink`)**: Dispatches the DeepLink directly to the active session
  *    and finishes immediately.
- * 4. **Cold Start — Narrow Overlay Mode**: Directly launches [HomeActivity] (bypassing
+ * 4. **Cold Start ??Narrow Overlay Mode**: Directly launches [HomeActivity] (bypassing
  *    [PrimaryActivity] completely) and passes any resolved DeepLink target so [HomeActivity]
  *    can spawn both [PrimaryOverlayActivity] and [com.example.feature.home.CategoryHostActivity]
  *    immediately in parallel.
- * 5. **Cold Start — Wide Split Mode**: Directly launches [PrimaryActivity] (which pairs with
+ * 5. **Cold Start ??Wide Split Mode**: Directly launches [PrimaryActivity] (which pairs with
  *    [HomeActivity] via `SplitPairRule` and opens any initial DeepLink category).
  */
 class EntryRouterActivity : Activity() {
@@ -121,10 +121,21 @@ class EntryRouterActivity : Activity() {
         // 1. Ensure WindowManager embedding rules are initialized ONLY for the active mode
         SplitInitializer.ensureInitialized(this)
 
+                val isModeTransition = intent?.getBooleanExtra(ModeTransitionManager.EXTRA_IS_MODE_TRANSITION, false) == true
+        if (isModeTransition) {
+            ModeTransitionManager.resetTransitionState()
+        }
+        val restoreCategoryId = intent?.getStringExtra(ModeTransitionManager.EXTRA_RESTORE_CATEGORY_ID)
+        val restoreTargetIntent: Intent? = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            intent?.getParcelableExtra(ModeTransitionManager.EXTRA_RESTORE_TARGET_INTENT, Intent::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            intent?.getParcelableExtra(ModeTransitionManager.EXTRA_RESTORE_TARGET_INTENT)
+        }
         val isDeepLink = isDeepLinkIntent(intent)
         val activeMenu = BaseCategoryMenuActivity.getActiveMenuActivity()
         val topSecondary = LifecycleApp.getTopSecondaryActivity()
-        val isWarmStart = activeMenu != null || topSecondary != null
+        val isWarmStart = !isModeTransition && (activeMenu != null || topSecondary != null)
 
         // 2. Warm Start handling (Task already alive in foreground or background)
         if (isWarmStart) {
@@ -164,31 +175,41 @@ class EntryRouterActivity : Activity() {
 
         // 3. Cold Start handling by Mode
         if (AppConfig.isOverlayMode(this)) {
-            val resolved = if (isDeepLink) resolveDeepLink(this, intent) else null
+                        val resolved = if (isDeepLink) resolveDeepLink(this, intent) else null
+            val categoryIdToUse = restoreCategoryId ?: resolved?.categoryId
+            val targetIntentToUse = restoreTargetIntent ?: resolved?.targetIntent
             Log.i(
                 TAG,
-                "[EntryRouterActivity] Cold-start Narrow Overlay Mode -> launching HomeActivity directly (deepLink=${resolved?.categoryId})"
+                "[EntryRouterActivity] Cold-start/Transition Narrow Overlay Mode -> launching HomeActivity directly (category=$categoryIdToUse)"
             )
             val homeIntent = Intent(this, HomeActivity::class.java).apply {
                 action = ACTION_SETTINGS_EMBED
-                if (resolved != null) {
-                    putExtra(HomeActivity.EXTRA_INITIAL_CATEGORY_ID, resolved.categoryId)
-                    if (resolved.targetIntent != null) {
-                        putExtra(HomeActivity.EXTRA_TARGET_INTENT, resolved.targetIntent)
-                    }
+                if (categoryIdToUse != null) {
+                    putExtra(HomeActivity.EXTRA_INITIAL_CATEGORY_ID, categoryIdToUse)
+                }
+                if (targetIntentToUse != null) {
+                    putExtra(HomeActivity.EXTRA_TARGET_INTENT, targetIntentToUse)
                 }
             }
             startActivity(homeIntent)
         } else {
+                        val resolved = if (isDeepLink) resolveDeepLink(this, intent) else null
+            val categoryIdToUse = restoreCategoryId ?: resolved?.categoryId
+            val targetIntentToUse = restoreTargetIntent ?: resolved?.targetIntent
             Log.i(
                 TAG,
-                "[EntryRouterActivity] Cold-start Wide Split Mode -> launching PrimaryActivity (isDeepLink=$isDeepLink)"
+                "[EntryRouterActivity] Cold-start/Transition Wide Split Mode -> launching PrimaryActivity (category=$categoryIdToUse, isDeepLink=$isDeepLink)"
             )
             val primaryIntent = Intent(this, PrimaryActivity::class.java).apply {
                 if (isDeepLink && intent != null) {
                     action = intent.action
                     data = intent.data
                     intent.extras?.let { putExtras(it) }
+                } else if (categoryIdToUse != null) {
+                    putExtra(HomeActivity.EXTRA_INITIAL_CATEGORY_ID, categoryIdToUse)
+                    if (targetIntentToUse != null) {
+                        putExtra(HomeActivity.EXTRA_TARGET_INTENT, targetIntentToUse)
+                    }
                 }
             }
             startActivity(primaryIntent)

@@ -1,5 +1,7 @@
 package com.example.lifecycleapp
 
+import com.example.feature.home.HomeNavigationBridge
+
 import android.app.Activity
 import android.app.Application
 import android.os.Bundle
@@ -44,6 +46,25 @@ class LifecycleApp : Application() {
         CategoryItemRegistry.register(SeatItemRegistry)
         VehicleHardwareSimulator.init()
         VehicleHardwareSimulator.attachRegistry(hiltViewModelRegistry)
+        HomeNavigationBridge.registerCategoryDismissHandler { taskId ->
+            OverlayBoundsHelper.dismissCategoryContainer(taskId)
+        }
+        HomeNavigationBridge.registerModeTransitionHandler { activity, newConfig ->
+            ModeTransitionManager.checkAndHandleTransition(activity, newConfig)
+        }
+
+        registerComponentCallbacks(object : android.content.ComponentCallbacks2 {
+            override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+                val currentActivity = getTopSecondaryActivity()
+                    ?: BaseCategoryMenuActivity.getActiveMenuActivity()
+                if (currentActivity != null) {
+                    Log.d("LifecycleLog", "[LifecycleApp] onConfigurationChanged delegating to ModeTransitionManager")
+                    ModeTransitionManager.checkAndHandleTransition(currentActivity, newConfig)
+                }
+            }
+            override fun onLowMemory() {}
+            override fun onTrimMemory(level: Int) {}
+        })
 
         registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
             override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {}

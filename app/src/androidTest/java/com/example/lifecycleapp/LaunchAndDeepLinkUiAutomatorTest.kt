@@ -70,6 +70,10 @@ class LaunchAndDeepLinkUiAutomatorTest {
     fun tearDown() {
         val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as Application
         app.unregisterActivityLifecycleCallbacks(trackerCallbacks)
+        try {
+            device.executeShellCommand("wm size reset")
+        } catch (_: Exception) {}
+        AppConfig.OVERRIDE_OVERLAY_MODE = null
     }
 
     /**
@@ -168,9 +172,9 @@ class LaunchAndDeepLinkUiAutomatorTest {
         Thread.sleep(800)
     }
 
-    private fun assertLumbarDetailVisible(message: String) {
-        val detailInfoText = device.wait(Until.findObject(By.textContains("Deep Link Navigation Info")), timeout)
-            ?: device.wait(Until.findObject(By.descContains("Back to")), timeout)
+    private fun assertLumbarDetailVisible(message: String, waitTimeout: Long = timeout) {
+        val detailInfoText = device.wait(Until.findObject(By.textContains("Deep Link Navigation Info")), waitTimeout)
+            ?: device.wait(Until.findObject(By.descContains("Back to")), waitTimeout)
         assertNotNull(message, detailInfoText)
     }
 
@@ -193,7 +197,7 @@ class LaunchAndDeepLinkUiAutomatorTest {
         assertNotNull("Wide Mode Primary menu should be visible after Launcher cold start", discoveryHeader)
 
         // 2. Navigate to Seat -> Lumbar Support detail screen
-        selectCategoryInMenu("Seat", "시트")
+        selectCategoryInMenu("Seat", "?�트")
         scrollAndClickLumbarDetail()
 
         // 3. Send app to background via Home button
@@ -230,7 +234,7 @@ class LaunchAndDeepLinkUiAutomatorTest {
 
         // 1. Cold start via MAIN/LAUNCHER and select Door category
         startIntentAndWait(createLauncherIntent())
-        selectCategoryInMenu("Door", "도어")
+        selectCategoryInMenu("Door", "?�어")
 
         // 2. Warm start via DeepLink while in foreground -> should switch to Seat -> Lumbar Support
         startIntentAndWait(createDeepLinkIntent("myapp://navigate/seat/seat_lumbar"))
@@ -257,7 +261,7 @@ class LaunchAndDeepLinkUiAutomatorTest {
 
         // 2. Expand drawer -> navigate to Seat -> Lumbar Support detail screen
         expandOverlayDrawerInNarrowMode()
-        selectCategoryInMenu("Seat", "시트")
+        selectCategoryInMenu("Seat", "?�트")
         scrollAndClickLumbarDetail()
 
         // 3. Send app to background via Home button
@@ -301,7 +305,7 @@ class LaunchAndDeepLinkUiAutomatorTest {
         // 1. Cold start via MAIN/LAUNCHER and select Door category
         startIntentAndWait(createLauncherIntent())
         expandOverlayDrawerInNarrowMode()
-        selectCategoryInMenu("Door", "도어")
+        selectCategoryInMenu("Door", "?�어")
 
         // 2. Warm start via DeepLink while in foreground -> should switch to Seat -> Lumbar Support
         startIntentAndWait(createDeepLinkIntent("myapp://navigate/seat/seat_lumbar"))
@@ -434,10 +438,83 @@ class LaunchAndDeepLinkUiAutomatorTest {
             narrowDeepLink.createdActivities.contains("PrimaryActivity")
         )
         org.junit.Assert.assertTrue(
-            "Narrow Overlay DeepLink Cold Start must contain HomeActivity, PrimaryOverlayActivity, CategoryHostActivity, GenericSettingsActivity",
+            "Narrow Overlay DeepLink Cold Start must contain HomeActivity, PrimaryOverlayActivity, GenericSettingsActivity",
             narrowDeepLink.createdActivities.containsAll(
-                listOf("EntryRouterActivity", "HomeActivity", "PrimaryOverlayActivity", "CategoryHostActivity", "GenericSettingsActivity")
+                listOf("EntryRouterActivity", "HomeActivity", "PrimaryOverlayActivity", "GenericSettingsActivity")
             )
         )
+    }
+
+    @Test
+    fun scenario8_DynamicModeTransition_WideSplit_To_NarrowOverlay_And_Back() {
+        // Ensure starting state is reset to physical resolution
+        device.executeShellCommand("wm size reset")
+        device.waitForIdle()
+        Thread.sleep(1000L)
+
+        prepareColdStart(isOverlayMode = false)
+        AppConfig.OVERRIDE_OVERLAY_MODE = null
+
+        // 1. Launch in default Wide Split Mode (width 2560px / density 320 = 1280dp >= 840dp)
+        startIntentAndWait(createLauncherIntent())
+
+        val homeText = device.wait(Until.findObject(By.textContains("Quick Access")), timeout)
+        assertNotNull("Wide mode should show Home Quick Access", homeText)
+        val leftSidebarList = device.wait(Until.findObject(By.res(pkg, "listViewCategories")), timeout)
+        assertNotNull("Wide mode should show static left sidebar ListView", leftSidebarList)
+
+        // Navigate to Seat category detail (Lumbar Support)
+        startIntentAndWait(createDeepLinkIntent("myapp://navigate/seat/seat_lumbar"))
+        assertLumbarDetailVisible("Lumbar detail should be visible in Wide Split mode")
+
+        // 2. Trigger Dynamic Transition to Narrow Overlay Mode via 'wm size 1200x1600' (1200px / 2 = 600dp < 840dp)
+        android.util.Log.i("DynamicModeTransitionTest", "Changing display size to 1200x1600 (Narrow Overlay Mode)")
+        device.executeShellCommand("wm size 1200x1600")
+        device.waitForIdle()
+        Thread.sleep(1000L)
+
+        val transitionTimeout = 15000L
+
+        // Verify Narrow Mode UI is displayed:
+        // - Pinned Overlay floating hamburger button should appear first
+        val btnMore = device.wait(Until.findObject(By.res(pkg, "btnMore")), transitionTimeout)
+        assertNotNull("Narrow Overlay Mode must show floating MENU button", btnMore)
+        // - Lumbar detail should be preserved (State Preservation)
+        assertLumbarDetailVisible("Lumbar detail should be preserved after transition to Narrow Mode", transitionTimeout)
+
+        // 3. Trigger Dynamic Transition back to Wide Split Mode via 'wm size reset'
+        android.util.Log.i("DynamicModeTransitionTest", "Resetting display size to 2560x1600 (Wide Split Mode)")
+        device.executeShellCommand("wm size reset")
+        device.waitForIdle()
+        Thread.sleep(1000L)
+
+        // Verify Wide Mode UI is restored:
+        // - Left sidebar list should appear again (guarantees Wide Split mode reconstructed)
+        val leftSidebarListRestored = device.wait(Until.findObject(By.res(pkg, "listViewCategories")), transitionTimeout)
+        assertNotNull("Wide Split Mode must restore static left sidebar ListView", leftSidebarListRestored)
+        // - Lumbar detail should still be visible in Secondary
+        assertLumbarDetailVisible("Lumbar detail should still be visible after returning to Wide Split mode", transitionTimeout)
+
+        // 4. Verify Back key navigation after dynamic mode transitions
+        device.waitForIdle()
+        Thread.sleep(1500L)
+
+        device.pressBack()
+        device.waitForIdle()
+        Thread.sleep(1000L)
+
+        // Pressing Back on Lumbar Support detail returns to Category root (Seat list)
+        assertSeatCategoryListVisible("Pressing Back after transition should return to Seat Category Root")
+
+        device.waitForIdle()
+        Thread.sleep(1000L)
+
+        device.pressBack()
+        device.waitForIdle()
+        Thread.sleep(1000L)
+
+        // Pressing Back on Seat Category Root returns to HomeActivity
+        val homeRestored = device.wait(Until.findObject(By.textContains("Quick Access")), timeout)
+        assertNotNull("Pressing Back on Category Root should reveal HomeActivity", homeRestored)
     }
 }

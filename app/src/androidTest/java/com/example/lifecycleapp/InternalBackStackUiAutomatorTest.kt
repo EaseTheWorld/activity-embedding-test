@@ -12,11 +12,11 @@ import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
 import com.example.core.item.AppConfig
-import com.example.feature.home.CategoryHostActivity
 import com.example.feature.home.HomeActivity
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.FixMethodOrder
@@ -90,10 +90,10 @@ class InternalBackStackUiAutomatorTest {
                 imm?.hideSoftInputFromWindow(topSec.window.decorView.windowToken, 0)
             }
         }
-        var lumbarDetailBtn = device.findObject(By.descContains("View details for seat_lumbar"))
+        var lumbarDetailBtn = device.wait(Until.findObject(By.descContains("View details for seat_lumbar")), 2000)
         var attempts = 0
         while (lumbarDetailBtn == null && attempts < 5) {
-            device.swipe(1800, 900, 1800, 250, 15)
+            device.swipe(1800, 1300, 1800, 300, 15)
             device.waitForIdle()
             Thread.sleep(500)
             lumbarDetailBtn = device.findObject(By.descContains("View details for seat_lumbar"))
@@ -338,92 +338,26 @@ class InternalBackStackUiAutomatorTest {
     }
 
     /**
-     * Scenario 7 (Method B - Deterministic Lifecycle & Draw Order Verification):
-     * When selecting a category from the list, [CategoryHostActivity] must launch its child category
-     * synchronously during [CategoryHostActivity.onCreate] (and use a translucent window theme) so that
-     * [CategoryHostActivity] NEVER performs a standalone frame draw (`OnDrawListener.onDraw`) before
-     * the child category Activity's `startActivity` has been invoked.
-     *
-     * If `window.decorView.post { launchChildCategory(...) }` is used instead, [CategoryHostActivity]
-     * reaches `RESUMED` and draws its own empty window frame (`childLaunchHitsAtFirstDraw == 0`)
-     * before the posted `launchChildCategory` runnable executes, causing a visible black/blank flash.
+     * Scenario 7 (Direct Category Launch - No Category Shim):
+     * When selecting a category from the list, the target category Activity (GenericSettingsActivity / LightSettingsActivity)
+     * must be launched directly into the secondary TaskFragment with zero intermediary shim Activity.
      */
     @Test
-    fun scenario7_CategorySelection_NoStandaloneHostDrawBeforeChildLaunch() {
+    fun scenario7_CategorySelection_DirectLaunchWithoutHostActivity() {
         launchApp(isOverlayMode = false)
 
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val app = instrumentation.targetContext.applicationContext as Application
 
-        // Monitor every child category startActivity(ACTION_SETTINGS_EMBED) call synchronously inside execStartActivity
-        val childFilter = IntentFilter("com.example.carsettings.ACTION_SETTINGS_EMBED").apply {
-            addDataScheme("myapp")
-        }
-        val childLaunchMonitor = instrumentation.addMonitor(childFilter, null, false)
-
-        val timeline = CopyOnWriteArrayList<String>()
-        var hostCreatedCount = 0
-        var childHitsAtHostStarted = -1
-        var childHitsAtHostFirstDraw = -1
-
+        val timeline = java.util.concurrent.CopyOnWriteArrayList<String>()
         val lifecycleCallbacks = object : Application.ActivityLifecycleCallbacks {
             override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {
-                if (activity is CategoryHostActivity) {
-                    hostCreatedCount++
-                    val ta = activity.obtainStyledAttributes(intArrayOf(android.R.attr.windowIsTranslucent))
-                    val hostIsTranslucent = ta.getBoolean(0, false)
-                    ta.recycle()
-
-                    timeline.add("HOST_SUPER_ON_CREATE(childHits=${childLaunchMonitor.hits}, translucent=$hostIsTranslucent)")
-
-                    var firstDrawLogged = false
-                    activity.window.decorView.viewTreeObserver.addOnDrawListener(
-                        ViewTreeObserver.OnDrawListener {
-                            if (!firstDrawLogged) {
-                                firstDrawLogged = true
-                                childHitsAtHostFirstDraw = childLaunchMonitor.hits
-                                timeline.add("HOST_FIRST_DRAW(childHits=$childHitsAtHostFirstDraw)")
-                            }
-                        }
-                    )
-                } else if (activity is GenericSettingsActivity) {
-                    timeline.add("CHILD_ON_CREATE(${activity.javaClass.simpleName})")
-                    var childFirstDrawLogged = false
-                    activity.window.decorView.viewTreeObserver.addOnDrawListener(
-                        ViewTreeObserver.OnDrawListener {
-                            if (!childFirstDrawLogged) {
-                                childFirstDrawLogged = true
-                                timeline.add("CHILD_FIRST_DRAW(${activity.javaClass.simpleName})")
-                            }
-                        }
-                    )
-                }
+                timeline.add("ON_CREATE(" + activity.javaClass.simpleName + ")")
             }
-
-            override fun onActivityStarted(activity: Activity) {
-                if (activity is CategoryHostActivity) {
-                    childHitsAtHostStarted = childLaunchMonitor.hits
-                    timeline.add("HOST_ON_STARTED(childHits=$childHitsAtHostStarted)")
-                }
-            }
-
-            override fun onActivityResumed(activity: Activity) {
-                if (activity is CategoryHostActivity) {
-                    timeline.add("HOST_ON_RESUMED(childHits=${childLaunchMonitor.hits})")
-                }
-            }
-
-            override fun onActivityPaused(activity: Activity) {
-                if (activity is CategoryHostActivity) {
-                    timeline.add("HOST_ON_PAUSED(childHits=${childLaunchMonitor.hits})")
-                }
-            }
-
-            override fun onActivityStopped(activity: Activity) {
-                if (activity is CategoryHostActivity) {
-                    timeline.add("HOST_ON_STOPPED(childHits=${childLaunchMonitor.hits})")
-                }
-            }
+            override fun onActivityStarted(activity: Activity) {}
+            override fun onActivityResumed(activity: Activity) {}
+            override fun onActivityPaused(activity: Activity) {}
+            override fun onActivityStopped(activity: Activity) {}
             override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {}
             override fun onActivityDestroyed(activity: Activity) {}
         }
@@ -431,58 +365,30 @@ class InternalBackStackUiAutomatorTest {
         app.registerActivityLifecycleCallbacks(lifecycleCallbacks)
         try {
             selectCategoryInMenu("Seat", "시트")
-            android.util.Log.i("LifecycleLog", "[Scenario7] Recorded Timeline (Home -> Seat): $timeline")
-
-            assertEquals(
-                "CategoryHostActivity should be created when selecting Seat. Timeline: $timeline",
-                1,
-                hostCreatedCount
+            val subActivityBtn = device.wait(
+                androidx.test.uiautomator.Until.findObject(androidx.test.uiautomator.By.textContains("Open Sub-Setting Page")),
+                timeout
             )
+            assertNotNull("Seat category should be displayed directly", subActivityBtn)
             assertTrue(
-                "Child category startActivity() must be invoked synchronously inside CategoryHostActivity.onCreate() " +
-                    "BEFORE onStart/onResume (expected childHits >= 1 at onStart, but was $childHitsAtHostStarted). " +
-                    "Using window.decorView.post delays child launch until after traversal! Timeline: $timeline",
-                childHitsAtHostStarted >= 1
+                "GenericSettingsActivity should be created directly without Category. Timeline: " + timeline,
+                timeline.contains("ON_CREATE(GenericSettingsActivity)")
             )
-            assertEquals(
-                "When child category is launched synchronously without post, CategoryHostActivity must NOT draw a standalone frame before child launch! Timeline: $timeline",
-                -1,
-                childHitsAtHostFirstDraw
-            )
-
-            // Also check switching from Seat -> Door (Category A -> Category B)
-            timeline.clear()
-            childHitsAtHostFirstDraw = -1
-            selectCategoryInMenu("Door", "도어")
-            android.util.Log.i("LifecycleLog", "[Scenario7] Recorded Timeline (Seat -> Door): $timeline")
-            assertEquals(
-                "When switching categories (Seat -> Door) synchronously without post, CategoryHostActivity must NOT draw its own frame! Timeline: $timeline",
-                -1,
-                childHitsAtHostFirstDraw
-            )
-
-            // Also check switching from Door -> Light (External app category)
-            timeline.clear()
-            childHitsAtHostFirstDraw = -1
-            selectCategoryInMenu("Light", "조명")
-            android.util.Log.i("LifecycleLog", "[Scenario7] Recorded Timeline (Door -> Light): $timeline")
-            assertEquals(
-                "When switching to an external app category (Door -> Light) synchronously without post, CategoryHostActivity must NOT draw its own frame! Timeline: $timeline",
-                -1,
-                childHitsAtHostFirstDraw
+            assertFalse(
+                "No CategoryHostActivity should ever be created! Timeline: " + timeline,
+                timeline.any { it.contains("CategoryHostActivity") }
             )
         } finally {
             app.unregisterActivityLifecycleCallbacks(lifecycleCallbacks)
-            instrumentation.removeMonitor(childLaunchMonitor)
         }
     }
 
     /**
      * Scenario 8:
-     * In Narrow Overlay Mode, verifies the core architectural purpose of [CategoryHostActivity]:
+     * In Narrow Overlay Mode, verifies the core architectural purpose of [Category]:
      * When switching across internal categories (`Seat` -> `Door`), switching to an external plugin
      * category (`Door` -> `Light`), pressing Back to return to `Home`, or selecting `Home` from the drawer,
-     * [CategoryHostActivity] finishes only its own Category `ActivityStack` (`ExpandedTaskFragment #1`),
+     * [Category] finishes only its own Category `ActivityStack` (`ExpandedTaskFragment #1`),
      * so [PrimaryOverlayActivity] (`OverlayTaskFragment`) and [HomeActivity] (`ExpandedTaskFragment #0`)
      * are NEVER destroyed or recreated.
      */
@@ -560,7 +466,7 @@ class InternalBackStackUiAutomatorTest {
             val headlightsCard = device.wait(Until.findObject(By.textContains("Headlights Mode")), timeout)
             assertNotNull("LightSettingsActivity should be visible in Narrow Mode", headlightsCard)
 
-            // 4. Back press from external category -> should dismiss only CategoryHostActivity stack and reveal Home
+            // 4. Back press from external category -> should dismiss only Category stack and reveal Home
             device.pressBack()
             device.waitForIdle()
             Thread.sleep(1000)
@@ -597,7 +503,7 @@ class InternalBackStackUiAutomatorTest {
      * Scenario 9:
      * Verifies in Wide Split Mode (and Narrow Overlay Mode including sub-activities) that switching
      * categories (`Home` -> `Seat` -> `GenericSubActivity` -> `Door` -> `Light` -> `Home`) does NOT
-     * cause ANY activity (`PrimaryActivity`, `HomeActivity`, `CategoryHostActivity`, `GenericSettingsActivity`,
+     * cause ANY activity (`PrimaryActivity`, `HomeActivity`, `Category`, `GenericSettingsActivity`,
      * `GenericSubActivity`, or external `LightSettingsActivity`) to be destroyed and recreated due to
      * a Configuration Change (`isChangingConfigurations == true` or `savedInstanceState != null`).
      */
@@ -743,7 +649,7 @@ class InternalBackStackUiAutomatorTest {
      * 1) Set custom state on `HomeActivity` (search query `"Lumbar"`), verify Primary selection is `Home` (`0`).
      * 2) Select `Seat` -> verify Primary selection changes to `seat` (`> 0`), drill down to `Lumbar Support`.
      * 3) Press Back #1 -> pops `Lumbar Support` to `Seat` list; Primary selection remains `seat`.
-     * 4) Press Back #2 -> exhausts `Seat` back stack, finishes `GenericSettingsActivity` & `CategoryHostActivity`,
+     * 4) Press Back #2 -> exhausts `Seat` back stack, finishes `GenericSettingsActivity` & `Category`,
      *    reveals `HomeActivity` in its last state (search query `"Lumbar"` & search results still displayed!),
      *    and resets Primary list selection to `Home` (`selectedPosition == 0`).
      * 5) Press Back #3 on `HomeActivity` -> no more back stack -> exits the app (`finishAffinity()`).
@@ -812,7 +718,7 @@ class InternalBackStackUiAutomatorTest {
      * 1) Set custom state on `HomeActivity` (search query `"Lumbar"`), verify Primary selection is `Home` (`0`).
      * 2) Select external `Light` category -> verify Primary selection changes to `light` (`> 0`), drill down to Depth 2.
      * 3) Press Back #1 -> pops Depth 2 to `LightSettingsActivity` root; Primary selection remains `light`.
-     * 4) Press Back #2 -> exhausts `LightSettingsActivity` back stack, finishes `CategoryHostActivity`,
+     * 4) Press Back #2 -> exhausts `LightSettingsActivity` back stack, finishes `Category`,
      *    reveals `HomeActivity` in its last state (`"Lumbar"` search results preserved), and resets Primary
      *    list selection to `Home` (`selectedPosition == 0`).
      * 5) Press Back #3 on `HomeActivity` -> exits the app (`finishAffinity()`).
@@ -862,7 +768,7 @@ class InternalBackStackUiAutomatorTest {
 
         assertHomeSearchQueryPreserved(
             "Lumbar",
-            "Back #2 should finish LightSettingsActivity + CategoryHostActivity and reveal HomeActivity with 'Lumbar' search state preserved"
+            "Back #2 should finish LightSettingsActivity + Category and reveal HomeActivity with 'Lumbar' search state preserved"
         )
         assertEquals(
             "Primary list selection must reset to 0 (Home) when HomeActivity is revealed",

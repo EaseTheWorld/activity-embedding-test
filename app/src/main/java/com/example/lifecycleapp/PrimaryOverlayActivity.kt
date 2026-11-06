@@ -247,6 +247,13 @@ class PrimaryOverlayActivity : BaseCategoryMenuActivity() {
     override fun onResume() {
         super.onResume()
         applyOverlayBounds(isDrawerExpanded)
+        if (!isDrawerExpanded && !isFinishing) {
+            window.decorView.postDelayed({
+                if (!isDrawerExpanded && !isFinishing) {
+                    OverlayBoundsHelper.requestFocusOnSecondary(this)
+                }
+            }, 100L)
+        }
     }
 
     override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {

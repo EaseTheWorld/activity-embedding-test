@@ -1,5 +1,7 @@
 package com.example.lifecycleapp
 
+import com.example.feature.home.HomeNavigationBridge
+
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
@@ -33,14 +35,35 @@ class PrimaryActivity : BaseCategoryMenuActivity() {
 
         if (savedInstanceState == null) {
             val homeIntent = Intent(this, HomeActivity::class.java).apply {
-                action = ACTION_SETTINGS_EMBED
+                action = "com.example.carsettings.HOME"
                 flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
             }
             Log.i(tag, "[$activityName] Wide Mode -> launching HomeActivity into root SecondaryTaskFragment via SplitPairRule")
             startActivity(homeIntent)
         }
 
-        if (intent?.data != null || intent?.action == "com.example.lifecycleapp.open") {
+                val initialCategoryId = intent?.getStringExtra(HomeActivity.EXTRA_INITIAL_CATEGORY_ID)
+        val initialTargetIntent: Intent? = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            intent?.getParcelableExtra(HomeActivity.EXTRA_TARGET_INTENT, Intent::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            intent?.getParcelableExtra(HomeActivity.EXTRA_TARGET_INTENT)
+        }
+        if (!initialCategoryId.isNullOrEmpty()) {
+            val matchedIndex = categories.indexOfFirst { it.id.equals(initialCategoryId, ignoreCase = true) }
+            if (matchedIndex >= 0) {
+                categoryAdapter?.selectedPosition = matchedIndex
+                categoryAdapter?.notifyDataSetChanged()
+                listViewCategories.smoothScrollToPosition(matchedIndex)
+            }
+            if (initialTargetIntent != null && savedInstanceState == null) {
+                window.decorView.post {
+                    if (!isFinishing && !isDestroyed) {
+                        HomeNavigationBridge.launchCategory(this, initialTargetIntent)
+                    }
+                }
+            }
+        } else if (intent?.data != null || intent?.action == "com.example.lifecycleapp.open") {
             handleIntent(intent)
         }
 

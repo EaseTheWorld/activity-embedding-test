@@ -46,6 +46,10 @@ class LifecycleApp : Application() {
         super.onCreate()
         instance = this
         Log.d("LifecycleLog", "[LifecycleApp] onCreate()")
+        SplitInitializer.ensureInitialized(this)
+        HomeNavigationBridge.registerEnsureSplitRulesHandler { context, isNarrowMode ->
+            SplitInitializer.ensureInitialized(context, isNarrowMode)
+        }
         CategoryItemRegistry.register(DoorItemRegistry)
         CategoryItemRegistry.register(SeatItemRegistry)
         VehicleHardwareSimulator.init()
@@ -76,8 +80,8 @@ class LifecycleApp : Application() {
 
             override fun onActivityResumed(activity: Activity) {
                 if (activity is ComponentActivity &&
-                    activity !is com.example.lifecycleapp.PrimaryActivity &&
-                    activity !is com.example.lifecycleapp.PrimaryOverlayActivity
+                    activity !is com.example.lifecycleapp.BaseCategoryMenuActivity &&
+                    activity !is com.example.feature.home.HomeActivity
                 ) {
                     secondaryActivities.removeAll { it.get() === activity || it.get() == null }
                     secondaryActivities.addFirst(WeakReference(activity))

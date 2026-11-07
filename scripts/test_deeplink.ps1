@@ -27,7 +27,7 @@ function Send-DeepLink {
     } elseif ($TargetUri -match "myapp://navigate/light") {
         $comp = "-n com.example.carsettings.light/com.example.feature.light.LightSettingsActivity"
     } else {
-        $comp = "-n com.example.lifecycleapp/.PrimaryActivity"
+        $comp = "-n com.example.lifecycleapp/com.example.feature.home.HomeActivity"
     }
 
     if ($Extra -ne "") {

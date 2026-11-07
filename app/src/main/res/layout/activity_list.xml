@@ -7,7 +7,7 @@
     android:orientation="vertical"
     android:background="@color/background"
     android:padding="20dp"
-    tools:context=".PrimaryActivity">
+    tools:context=".ListActivity">
 
     <TextView
         android:id="@+id/tvTitle"

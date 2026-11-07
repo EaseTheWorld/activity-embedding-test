@@ -275,34 +275,39 @@ object OverlayBoundsHelper {
             synchronized(lock) {
                 val taskContainer = taskContainers.get(activity.taskId) ?: return false
 
-                // 1. In Wide (Split) Mode, look up the active SplitContainer's secondary container.
-                val getSplitMethod = taskContainer.javaClass.getDeclaredMethod("getTopNonFinishingSplitContainer").apply {
-                    isAccessible = true
-                }
-                val splitContainer = getSplitMethod.invoke(taskContainer)
-
-                val targetContainer = if (splitContainer != null) {
-                    val getSecondaryMethod = splitContainer.javaClass.getDeclaredMethod("getSecondaryContainer").apply {
-                        isAccessible = true
-                    }
-                    getSecondaryMethod.invoke(splitContainer)
+                val categoryToken = com.example.feature.home.CategoryStackManager.getActiveCategoryToken()
+                val fragmentToken = if (categoryToken != null) {
+                    categoryToken
                 } else {
-                    // 2. In Narrow (Overlay) Mode, look up the top non-finishing content container
-                    //    (includePin = false, includeOverlay = false).
-                    val getTopTfMethod = taskContainer.javaClass.getDeclaredMethod(
-                        "getTopNonFinishingTaskFragmentContainer",
-                        Boolean::class.javaPrimitiveType,
-                        Boolean::class.javaPrimitiveType
-                    ).apply {
+                    // 1. In Wide (Split) Mode, look up the active SplitContainer's secondary container.
+                    val getSplitMethod = taskContainer.javaClass.getDeclaredMethod("getTopNonFinishingSplitContainer").apply {
                         isAccessible = true
                     }
-                    getTopTfMethod.invoke(taskContainer, false, false)
-                } ?: return false
+                    val splitContainer = getSplitMethod.invoke(taskContainer)
 
-                val getTokenMethod = targetContainer.javaClass.getDeclaredMethod("getTaskFragmentToken").apply {
-                    isAccessible = true
+                    val targetContainer = if (splitContainer != null) {
+                        val getSecondaryMethod = splitContainer.javaClass.getDeclaredMethod("getSecondaryContainer").apply {
+                            isAccessible = true
+                        }
+                        getSecondaryMethod.invoke(splitContainer)
+                    } else {
+                        // 2. In Narrow (Overlay) Mode, look up the top non-finishing content container
+                        //    (includePin = false, includeOverlay = false).
+                        val getTopTfMethod = taskContainer.javaClass.getDeclaredMethod(
+                            "getTopNonFinishingTaskFragmentContainer",
+                            Boolean::class.javaPrimitiveType,
+                            Boolean::class.javaPrimitiveType
+                        ).apply {
+                            isAccessible = true
+                        }
+                        getTopTfMethod.invoke(taskContainer, false, false)
+                    } ?: return false
+
+                    val getTokenMethod = targetContainer.javaClass.getDeclaredMethod("getTaskFragmentToken").apply {
+                        isAccessible = true
+                    }
+                    getTokenMethod.invoke(targetContainer) as? IBinder ?: return false
                 }
-                val fragmentToken = getTokenMethod.invoke(targetContainer) as? IBinder ?: return false
 
                 // 1. First try ActivityTaskManager / WindowOrganizerController direct application (Prebuilt / System app path)
                 if (requestFocusViaAtm(fragmentToken)) {

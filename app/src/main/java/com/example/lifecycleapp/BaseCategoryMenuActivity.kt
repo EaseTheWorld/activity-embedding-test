@@ -129,6 +129,15 @@ abstract class BaseCategoryMenuActivity : BaseLoggingActivity() {
         }
     }
 
+    private val appExitListener: () -> Unit = {
+        runOnUiThread {
+            if (!isFinishing && !isDestroyed) {
+                Log.d(tag, "[$activityName] App exit notified by Task Root -> finishing menu activity")
+                finish()
+            }
+        }
+    }
+
     protected fun initCategoryMenuViews() {
         activeMenuRef = java.lang.ref.WeakReference(this)
         tvDiscoveryStatus = findViewById(R.id.tvDiscoveryStatus)
@@ -150,10 +159,14 @@ abstract class BaseCategoryMenuActivity : BaseLoggingActivity() {
 
         HomeNavigationBridge.registerHomeRevealedListener(homeRevealedListener)
         HomeNavigationBridge.registerCategorySelectedListener(categorySelectedListener)
+        HomeNavigationBridge.registerAppExitListener(appExitListener)
+        HomeNavigationBridge.registerMenuLauncher { this }
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        HomeNavigationBridge.unregisterAppExitListener(appExitListener)
+        HomeNavigationBridge.unregisterMenuLauncher()
         HomeNavigationBridge.unregisterHomeRevealedListener(homeRevealedListener)
         if (activeMenuRef?.get() === this) {
             activeMenuRef = null

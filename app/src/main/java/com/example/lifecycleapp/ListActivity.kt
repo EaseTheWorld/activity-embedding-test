@@ -1,53 +1,41 @@
 package com.example.lifecycleapp
 
 import com.example.feature.home.HomeNavigationBridge
-
-import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import android.view.MotionEvent
 import androidx.activity.OnBackPressedCallback
-import com.example.core.item.AppConfig
 import androidx.lifecycle.lifecycleScope
 import com.example.feature.home.CategoryStackManager
 import com.example.feature.home.HomeActivity
 
 /**
- * Wide Mode Split Primary Activity (`Theme.LifecycleApp` - Opaque, static sidebar layout).
+ * Wide Mode Split Secondary Menu Activity (`Theme.LifecycleApp` - Opaque, static sidebar layout).
  *
  * Responsibilities:
- * 1. Exclusively launched by [EntryRouterActivity] in Wide Mode (`AppConfig.isOverlayMode == false`).
- * 2. Acts as the permanently visible left 35% pane of `SplitPairRule` and launches `HomeActivity`
- *    + categories into the right 65% `SecondaryTaskFragment`.
- * 3. Uses `FLAG_NOT_FOCUSABLE` and `ensureSecondaryFocus()` via `OverlayBoundsHelper.requestFocusOnSecondary(this)`
- *    so WindowManager focus remains strictly on the Secondary container (including external apps).
+ * 1. Launched by [HomeActivity] in Wide Mode (`AppConfig.isOverlayMode == false`).
+ * 2. Positioned at the left 35% pane via `SplitPairRule` with `LayoutDirection.RIGHT_TO_LEFT`
+ *    paired with [HomeActivity] (Primary, right 65%).
+ * 3. Launches Category activities into the right 65% pane via `SplitPairRule(ListActivity <-> Category)`.
+ * 4. Uses `FLAG_NOT_FOCUSABLE` and `ensureSecondaryFocus()` via `OverlayBoundsHelper.requestFocusOnSecondary(this)`
+ *    so WindowManager focus remains strictly on the right content container (Home/Category).
  */
-class PrimaryActivity : BaseCategoryMenuActivity() {
+class ListActivity : BaseCategoryMenuActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         SplitInitializer.ensureInitialized(this)
 
-        // Wide Mode: Static opaque sidebar layout (no overlay toggle buttons)
-        // Prevent PrimaryActivity from stealing window focus while keeping touch input active,
-        // paired with requestFocusOnSecondary() so mFocusedApp always points to Secondary.
+        // Wide Mode: Static opaque sidebar layout
+        // Prevent ListActivity from stealing window focus while keeping touch input active
         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE)
-        setContentView(R.layout.activity_primary)
+        setContentView(R.layout.activity_list)
         initCategoryMenuViews()
         CategoryStackManager.trackSplitInfo(lifecycleScope, this, isNarrowMode = false)
 
-        if (savedInstanceState == null) {
-            val homeIntent = Intent(this, HomeActivity::class.java).apply {
-                action = "com.example.carsettings.HOME"
-                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
-            }
-            Log.i(tag, "[$activityName] Wide Mode -> launching HomeActivity into root SecondaryTaskFragment via SplitPairRule")
-            startActivity(homeIntent)
-        }
-
-                val initialCategoryId = intent?.getStringExtra(HomeActivity.EXTRA_INITIAL_CATEGORY_ID)
-        val initialTargetIntent: Intent? = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-            intent?.getParcelableExtra(HomeActivity.EXTRA_TARGET_INTENT, Intent::class.java)
+        val initialCategoryId = intent?.getStringExtra(HomeActivity.EXTRA_INITIAL_CATEGORY_ID)
+        val initialTargetIntent: android.content.Intent? = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            intent?.getParcelableExtra(HomeActivity.EXTRA_TARGET_INTENT, android.content.Intent::class.java)
         } else {
             @Suppress("DEPRECATION")
             intent?.getParcelableExtra(HomeActivity.EXTRA_TARGET_INTENT)

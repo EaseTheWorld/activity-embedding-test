@@ -88,6 +88,12 @@ object ModeTransitionManager {
      * Returns true if a mode transition was detected and handled.
      */
     fun checkAndHandleTransition(activity: Activity, newConfig: Configuration): Boolean {
+        // If an explicit override is active (e.g. during fixed-mode unit/ui tests),
+        // display configuration changes must NEVER trigger a mode transition.
+        if (AppConfig.OVERRIDE_OVERLAY_MODE != null) {
+            return false
+        }
+
         // Use maximumWindowMetrics or applicationContext so we measure the full display width, not the split sub-window width!
         val fullDisplayWidthDp = getFullDisplayWidthDp(activity, newConfig)
         val newIsOverlayMode = AppConfig.OVERRIDE_OVERLAY_MODE ?: (fullDisplayWidthDp < AppConfig.OVERLAY_MODE_WIDTH_DP_BREAKPOINT)
@@ -168,19 +174,21 @@ object ModeTransitionManager {
             // 3. Dismantle any active CategoryHostActivity in the old stack
             HomeNavigationBridge.notifyDismissCategoryStacks()
 
-            // 4. Atomically reset and construct new mode stack via EntryRouterActivity
-            val routerIntent = Intent(activity, EntryRouterActivity::class.java).apply {
+            // 4. Atomically reset and construct new mode stack via HomeActivity
+            val homeIntent = Intent(activity, HomeActivity::class.java).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
                 putExtra(EXTRA_IS_MODE_TRANSITION, true)
                 if (currentCategoryId != null) {
                     putExtra(EXTRA_RESTORE_CATEGORY_ID, currentCategoryId)
+                    putExtra(HomeActivity.EXTRA_INITIAL_CATEGORY_ID, currentCategoryId)
                 }
                 if (restoreTargetIntent != null) {
                     putExtra(EXTRA_RESTORE_TARGET_INTENT, restoreTargetIntent)
+                    putExtra(HomeActivity.EXTRA_TARGET_INTENT, restoreTargetIntent)
                 }
             }
 
-            activity.startActivity(routerIntent)
+            activity.startActivity(homeIntent)
             activity.overridePendingTransition(0, 0)
             return true
         } finally {

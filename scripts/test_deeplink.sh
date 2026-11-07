@@ -30,7 +30,7 @@ send_deeplink() {
     elif [[ "$uri" =~ myapp://navigate/light ]]; then
         comp="-n com.example.carsettings.light/com.example.feature.light.LightSettingsActivity"
     else
-        comp="-n com.example.lifecycleapp/.PrimaryActivity"
+        comp="-n com.example.lifecycleapp/com.example.feature.home.HomeActivity"
     fi
 
     if [ -n "$extra" ]; then

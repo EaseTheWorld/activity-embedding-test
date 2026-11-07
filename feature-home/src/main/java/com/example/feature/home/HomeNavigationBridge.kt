@@ -17,6 +17,19 @@ import java.util.concurrent.CopyOnWriteArraySet
  */
 object HomeNavigationBridge {
     private var modeTransitionHandler: ((Activity, android.content.res.Configuration) -> Boolean)? = null
+    private var ensureSplitRulesHandler: ((Context, Boolean) -> Unit)? = null
+
+    fun registerEnsureSplitRulesHandler(handler: (Context, Boolean) -> Unit) {
+        ensureSplitRulesHandler = handler
+    }
+
+    fun unregisterEnsureSplitRulesHandler() {
+        ensureSplitRulesHandler = null
+    }
+
+    fun ensureSplitRules(context: Context, isNarrowMode: Boolean) {
+        ensureSplitRulesHandler?.invoke(context, isNarrowMode)
+    }
 
     fun registerModeTransitionHandler(handler: (Activity, android.content.res.Configuration) -> Boolean) {
         modeTransitionHandler = handler
@@ -32,6 +45,21 @@ object HomeNavigationBridge {
 
     private val homeRevealedListeners = CopyOnWriteArraySet<() -> Unit>()
     private val categorySelectedListeners = CopyOnWriteArraySet<(String) -> Unit>()
+    private val appExitListeners = CopyOnWriteArraySet<() -> Unit>()
+
+    fun registerAppExitListener(listener: () -> Unit) {
+        appExitListeners.add(listener)
+    }
+
+    fun unregisterAppExitListener(listener: () -> Unit) {
+        appExitListeners.remove(listener)
+    }
+
+    fun notifyAppExit() {
+        for (listener in appExitListeners) {
+            listener.invoke()
+        }
+    }
 
     @Volatile
     var onHomeRevealed: (() -> Unit)? = null
@@ -64,6 +92,15 @@ object HomeNavigationBridge {
     private val categoryDismissListeners = CopyOnWriteArraySet<() -> Unit>()
     private var categoryDismissHandler: ((Int) -> Unit)? = null
     private var taskRootLaunchListener: ((Intent) -> Unit)? = null
+    private var menuLauncher: (() -> Activity?)? = null
+
+    fun registerMenuLauncher(launcher: () -> Activity?) {
+        menuLauncher = launcher
+    }
+
+    fun unregisterMenuLauncher() {
+        menuLauncher = null
+    }
 
     private val mainHandler by lazy { Handler(Looper.getMainLooper()) }
     private val clearLaunchingRunnable = Runnable { isLaunchingCategory = false }
@@ -153,9 +190,15 @@ object HomeNavigationBridge {
         if (AppConfig.isOverlayMode(caller) && rootLauncher != null) {
             rootLauncher.invoke(targetIntent)
         } else {
-            caller.startActivity(targetIntent)
-            if (caller is Activity) {
-                caller.overridePendingTransition(0, 0)
+            val menu = menuLauncher?.invoke()
+            val launchSource = if (!AppConfig.isOverlayMode(caller) && menu != null && !menu.isFinishing && !menu.isDestroyed) {
+                menu
+            } else {
+                caller
+            }
+            launchSource.startActivity(targetIntent)
+            if (launchSource is Activity) {
+                launchSource.overridePendingTransition(0, 0)
             }
         }
     }

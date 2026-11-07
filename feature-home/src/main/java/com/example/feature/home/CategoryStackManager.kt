@@ -85,6 +85,22 @@ object CategoryStackManager {
         }
     }
 
+    /**
+     * Extracts the TaskFragment [android.os.IBinder] token from the currently active category [ActivityStack].
+     * Works identically for in-process and cross-process activities.
+     */
+    fun getActiveCategoryToken(): android.os.IBinder? {
+        val stack = activeCategoryStack ?: return null
+        return try {
+            val tokenProp = stack.javaClass.getDeclaredField("token").apply { isAccessible = true }.get(stack) ?: return null
+            val binderField = tokenProp.javaClass.getDeclaredField("mToken").apply { isAccessible = true }
+            binderField.get(tokenProp) as? android.os.IBinder
+        } catch (e: Throwable) {
+            Log.w(TAG, "[getActiveCategoryToken] Failed to extract IBinder from activeCategoryStack: $e")
+            null
+        }
+    }
+
     fun clear() {
         activeCategoryStack = null
     }

@@ -38,9 +38,22 @@ class HomeActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val existing = instance
+        if (existing != null && existing !== this && !existing.isFinishing && !existing.isDestroyed) {
+            Log.i(tag, "Duplicate HomeActivity instance detected while primary instance $existing is alive")
+            if (DeepLinkResolver.isDeepLinkIntent(intent)) {
+                Log.i(tag, "Dispatching deep link to existing HomeActivity instance and finishing duplicate")
+                existing.handleTargetLaunch(intent)
+            }
+            overridePendingTransition(0, 0)
+            finish()
+            return
+        }
         instance = this
         HomeNavigationBridge.registerTaskRootLaunchListener(taskRootLaunchListener)
+
         val isNarrowOverlayMode = AppConfig.isOverlayMode(this)
+        HomeNavigationBridge.ensureSplitRules(this, isNarrowOverlayMode)
         if (isNarrowOverlayMode) {
             CategoryStackManager.trackSplitInfo(lifecycleScope, this, isNarrowMode = true)
         }
@@ -49,6 +62,7 @@ class HomeActivity : ComponentActivity() {
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 Log.d(tag, "Back pressed at Home (Root of App) -> finishAffinity to exit")
+                HomeNavigationBridge.notifyAppExit()
                 finishAffinity()
             }
         })
@@ -61,26 +75,41 @@ class HomeActivity : ComponentActivity() {
             )
         }
 
-        if (isNarrowOverlayMode && savedInstanceState == null) {
-            launchPrimaryPinnedOverlay(intent)
-            if (intent?.hasExtra(EXTRA_TARGET_INTENT) == true) {
-                window.decorView.post {
-                    if (!isFinishing && !isDestroyed) {
-                        handleTargetLaunch(intent)
-                    }
-                }
-                return
+        val resolved = if (DeepLinkResolver.isDeepLinkIntent(intent)) {
+            DeepLinkResolver.resolve(this, intent)
+        } else null
+
+        val initialCategoryId = intent?.getStringExtra(EXTRA_INITIAL_CATEGORY_ID) ?: resolved?.categoryId
+        val targetIntent = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            intent?.getParcelableExtra(EXTRA_TARGET_INTENT, Intent::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            intent?.getParcelableExtra(EXTRA_TARGET_INTENT)
+        } ?: resolved?.targetIntent
+
+        if (savedInstanceState == null) {
+            if (isNarrowOverlayMode) {
+                launchPrimaryPinnedOverlay(initialCategoryId, targetIntent)
+            } else {
+                launchListSidebar(initialCategoryId, targetIntent)
             }
         }
 
-        handleTargetLaunch(intent)
+        if (isNarrowOverlayMode && targetIntent != null) {
+            window.decorView.post {
+                if (!isFinishing && !isDestroyed) {
+                    if (initialCategoryId != null && !initialCategoryId.equals("home", ignoreCase = true)) {
+                        HomeNavigationBridge.notifyCategorySelected(initialCategoryId)
+                    }
+                    HomeNavigationBridge.launchCategory(this, targetIntent)
+                }
+            }
+        } else if (initialCategoryId?.equals("home", ignoreCase = true) == true) {
+            HomeNavigationBridge.notifyDismissCategoryStacks()
+        }
     }
 
-    /**
-     * In Narrow Mode, HomeActivity is the fullscreen Task root and spawns PrimaryOverlayActivity
-     * as an Always-On-Top Pinned Overlay (`shouldAssociateWithLaunchingActivity = false`).
-     */
-    private fun launchPrimaryPinnedOverlay(hostIntent: Intent?) {
+    private fun launchPrimaryPinnedOverlay(initialCategoryId: String?, targetIntent: Intent?) {
         try {
             val dpPx = (AppConfig.COLLAPSED_BUTTON_SIZE_DP * resources.displayMetrics.density).toInt()
             val bounds = EmbeddingBounds(
@@ -99,19 +128,37 @@ class HomeActivity : ComponentActivity() {
             }
 
             val overlayIntent = Intent().apply {
-                component = ComponentName(packageName, "com.example.lifecycleapp.PrimaryOverlayActivity")
-                hostIntent?.getStringExtra(EXTRA_INITIAL_CATEGORY_ID)?.let {
-                    putExtra(EXTRA_INITIAL_CATEGORY_ID, it)
+                component = ComponentName(packageName, "com.example.lifecycleapp.ListOverlayActivity")
+                if (initialCategoryId != null) {
+                    putExtra(EXTRA_INITIAL_CATEGORY_ID, initialCategoryId)
                 }
-                hostIntent?.getStringExtra(EXTRA_INITIAL_DEEPLINK_ACTION)?.let { action = it }
-                hostIntent?.getStringExtra(EXTRA_INITIAL_DEEPLINK_URI)?.let { data = Uri.parse(it) }
-                hostIntent?.getBundleExtra(EXTRA_INITIAL_DEEPLINK_EXTRAS)?.let { putExtras(it) }
+                if (targetIntent != null) {
+                    putExtra(EXTRA_TARGET_INTENT, targetIntent)
+                }
             }
 
-            Log.i(tag, "Launching PrimaryOverlayActivity as Always-On-Top Pinned Overlay in Narrow Mode (bounds=$bounds)")
+            Log.i(tag, "Launching ListOverlayActivity as Always-On-Top Pinned Overlay in Narrow Mode (bounds=$bounds)")
             startActivity(overlayIntent, options)
         } catch (e: Exception) {
-            Log.e(tag, "Failed to launch PrimaryOverlayActivity pinned overlay: $e", e)
+            Log.e(tag, "Failed to launch ListOverlayActivity pinned overlay: $e", e)
+        }
+    }
+
+    private fun launchListSidebar(initialCategoryId: String?, targetIntent: Intent?) {
+        try {
+            val listIntent = Intent().apply {
+                component = ComponentName(packageName, "com.example.lifecycleapp.ListActivity")
+                if (initialCategoryId != null) {
+                    putExtra(EXTRA_INITIAL_CATEGORY_ID, initialCategoryId)
+                }
+                if (targetIntent != null) {
+                    putExtra(EXTRA_TARGET_INTENT, targetIntent)
+                }
+            }
+            Log.i(tag, "Launching ListActivity sidebar in Wide Mode via RTL SplitPairRule")
+            startActivity(listIntent)
+        } catch (e: Exception) {
+            Log.e(tag, "Failed to launch ListActivity sidebar: $e", e)
         }
     }
 
@@ -148,8 +195,11 @@ class HomeActivity : ComponentActivity() {
         super.onDestroy()
         if (instance === this) {
             instance = null
+            if (isFinishing) {
+                HomeNavigationBridge.notifyAppExit()
+            }
+            HomeNavigationBridge.unregisterTaskRootLaunchListener(taskRootLaunchListener)
         }
-        HomeNavigationBridge.unregisterTaskRootLaunchListener(taskRootLaunchListener)
         Log.d(tag, "HomeActivity onDestroy()")
     }
 
@@ -172,14 +222,28 @@ class HomeActivity : ComponentActivity() {
 
     private fun handleTargetLaunch(intent: Intent?) {
         if (intent == null) return
+        val resolved = if (DeepLinkResolver.isDeepLinkIntent(intent)) {
+            DeepLinkResolver.resolve(this, intent)
+        } else null
+
         val targetIntent = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
             intent.getParcelableExtra(EXTRA_TARGET_INTENT, Intent::class.java)
         } else {
             @Suppress("DEPRECATION")
             intent.getParcelableExtra(EXTRA_TARGET_INTENT)
+        } ?: resolved?.targetIntent
+
+        val categoryId = intent.getStringExtra(EXTRA_INITIAL_CATEGORY_ID) ?: resolved?.categoryId
+
+        if (categoryId?.equals("home", ignoreCase = true) == true) {
+            HomeNavigationBridge.notifyDismissCategoryStacks()
+            return
         }
+
         if (targetIntent != null) {
-            intent.removeExtra(EXTRA_TARGET_INTENT)
+            if (categoryId != null) {
+                HomeNavigationBridge.notifyCategorySelected(categoryId)
+            }
             try {
                 Log.d(tag, "HomeActivity launching target category via HomeNavigationBridge: $targetIntent")
                 HomeNavigationBridge.launchCategory(this, targetIntent)

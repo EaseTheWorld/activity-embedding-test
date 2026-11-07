@@ -97,6 +97,8 @@ class LaunchAndDeepLinkUiAutomatorTest {
         Thread.sleep(1000)
 
         AppConfig.IS_OVERLAY_MODE = isOverlayMode
+        val context = instrumentation.targetContext
+        SplitInitializer.ensureInitialized(context, isOverlayMode)
     }
 
     /**
@@ -422,25 +424,25 @@ class LaunchAndDeepLinkUiAutomatorTest {
                 "4) $narrowDeepLink"
         )
 
-        // Verify Narrow Overlay Mode Cold Start NEVER creates PrimaryActivity (ListActivity)
+        // Verify Narrow Overlay Mode Cold Start NEVER creates ListActivity
         org.junit.Assert.assertFalse(
-            "Narrow Overlay Launcher Cold Start must NOT create PrimaryActivity! Created: ${narrowLauncher.createdActivities}",
-            narrowLauncher.createdActivities.contains("PrimaryActivity")
+            "Narrow Overlay Launcher Cold Start must NOT create ListActivity! Created: ${narrowLauncher.createdActivities}",
+            narrowLauncher.createdActivities.contains("ListActivity")
         )
         org.junit.Assert.assertEquals(
-            "Narrow Overlay Launcher Cold Start should only create [EntryRouterActivity, HomeActivity, PrimaryOverlayActivity]",
-            listOf("EntryRouterActivity", "HomeActivity", "PrimaryOverlayActivity"),
+            "Narrow Overlay Launcher Cold Start should only create [HomeActivity, ListOverlayActivity]",
+            listOf("HomeActivity", "ListOverlayActivity"),
             narrowLauncher.createdActivities
         )
 
         org.junit.Assert.assertFalse(
-            "Narrow Overlay DeepLink Cold Start must NOT create PrimaryActivity! Created: ${narrowDeepLink.createdActivities}",
-            narrowDeepLink.createdActivities.contains("PrimaryActivity")
+            "Narrow Overlay DeepLink Cold Start must NOT create ListActivity! Created: ${narrowDeepLink.createdActivities}",
+            narrowDeepLink.createdActivities.contains("ListActivity")
         )
         org.junit.Assert.assertTrue(
-            "Narrow Overlay DeepLink Cold Start must contain HomeActivity, PrimaryOverlayActivity, GenericSettingsActivity",
+            "Narrow Overlay DeepLink Cold Start must contain HomeActivity, ListOverlayActivity, GenericSettingsActivity",
             narrowDeepLink.createdActivities.containsAll(
-                listOf("EntryRouterActivity", "HomeActivity", "PrimaryOverlayActivity", "GenericSettingsActivity")
+                listOf("HomeActivity", "ListOverlayActivity", "GenericSettingsActivity")
             )
         )
     }

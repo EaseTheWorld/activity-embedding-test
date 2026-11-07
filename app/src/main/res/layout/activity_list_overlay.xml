@@ -5,7 +5,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@android:color/transparent"
-    tools:context=".PrimaryOverlayActivity">
+    tools:context=".ListOverlayActivity">
 
     <!-- 1. Collapsed Floating Overlay View: Fixed 80dp circular button placed at top-left edge -->
     <FrameLayout

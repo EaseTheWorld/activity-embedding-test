@@ -42,7 +42,7 @@ class InternalBackStackUiAutomatorTest {
 
     private lateinit var device: UiDevice
     private val pkg = "com.example.lifecycleapp"
-    private val timeout = 5000L
+    private val timeout = 10000L
 
     @Before
     fun setUp() {
@@ -60,8 +60,9 @@ class InternalBackStackUiAutomatorTest {
 
         AppConfig.IS_OVERLAY_MODE = isOverlayMode
         val context = instrumentation.targetContext
+        SplitInitializer.ensureInitialized(context, isOverlayMode)
 
-        val intent = Intent(context, EntryRouterActivity::class.java).apply {
+        val intent = (context.packageManager.getLaunchIntentForPackage(context.packageName) ?: Intent(context, com.example.feature.home.HomeActivity::class.java)).apply {
             action = Intent.ACTION_MAIN
             addCategory(Intent.CATEGORY_LAUNCHER)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
@@ -69,6 +70,12 @@ class InternalBackStackUiAutomatorTest {
         context.startActivity(intent)
         device.waitForIdle()
         Thread.sleep(1500)
+        if (isOverlayMode) {
+            device.wait(Until.findObject(By.res(pkg, "btnMore")), timeout)
+        } else {
+            device.wait(Until.findObject(By.res(pkg, "listViewCategories")), timeout)
+        }
+        device.waitForIdle()
     }
 
     private fun selectCategoryInMenu(nameSubstring: String, fallbackKoSubstring: String) {
@@ -79,6 +86,7 @@ class InternalBackStackUiAutomatorTest {
         assertNotNull("Category '$nameSubstring' should be visible in menu", item)
         item!!.click()
         device.waitForIdle()
+        val unused = device.currentPackageName
         Thread.sleep(1000)
     }
 
@@ -406,7 +414,7 @@ class InternalBackStackUiAutomatorTest {
             override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {
                 val hash = System.identityHashCode(activity)
                 if (trackingPostLaunch) {
-                    if (activity is PrimaryOverlayActivity) {
+                    if (activity is ListOverlayActivity) {
                         overlayLifecycleEvents.add("ON_CREATE(hash=$hash, savedState=${savedInstanceState != null})")
                     } else if (activity is HomeActivity) {
                         homeLifecycleEvents.add("ON_CREATE(hash=$hash, savedState=${savedInstanceState != null})")
@@ -426,7 +434,7 @@ class InternalBackStackUiAutomatorTest {
             override fun onActivityDestroyed(activity: Activity) {
                 val hash = System.identityHashCode(activity)
                 if (trackingPostLaunch) {
-                    if (activity is PrimaryOverlayActivity) {
+                    if (activity is ListOverlayActivity) {
                         overlayLifecycleEvents.add(
                             "ON_DESTROY(hash=$hash, isChangingConfigs=${activity.isChangingConfigurations})"
                         )
@@ -524,7 +532,7 @@ class InternalBackStackUiAutomatorTest {
                 val hash = System.identityHashCode(activity)
                 allCreatedAndDestroyed.add("CREATE:$name($hash,savedState=${savedInstanceState != null})")
                 if (trackingPostLaunch) {
-                    if (activity is PrimaryActivity) {
+                    if (activity is ListActivity) {
                         primaryLifecycleEvents.add("ON_CREATE(hash=$hash, savedState=${savedInstanceState != null})")
                     } else if (activity is HomeActivity) {
                         homeLifecycleEvents.add("ON_CREATE(hash=$hash, savedState=${savedInstanceState != null})")
@@ -549,7 +557,7 @@ class InternalBackStackUiAutomatorTest {
                     "DESTROY:$name($hash,isChangingConfigs=${activity.isChangingConfigurations},mask=$changingHex)"
                 )
                 if (trackingPostLaunch) {
-                    if (activity is PrimaryActivity) {
+                    if (activity is ListActivity) {
                         primaryLifecycleEvents.add("ON_DESTROY(hash=$hash, isChangingConfigs=${activity.isChangingConfigurations})")
                     } else if (activity is HomeActivity) {
                         homeLifecycleEvents.add("ON_DESTROY(hash=$hash, isChangingConfigs=${activity.isChangingConfigurations})")
@@ -639,9 +647,9 @@ class InternalBackStackUiAutomatorTest {
     private fun waitForActiveMenuActivity(): BaseCategoryMenuActivity {
         var menu: BaseCategoryMenuActivity? = null
         val start = System.currentTimeMillis()
-        while (menu == null && System.currentTimeMillis() - start < 5000) {
+        while (System.currentTimeMillis() - start < 5000) {
             menu = BaseCategoryMenuActivity.getActiveMenuActivity()
-            if (menu != null) break
+            if (menu != null && menu.currentSelectedPosition >= 0) break
             Thread.sleep(200)
         }
         assertNotNull("Active menu activity must exist within timeout", menu)

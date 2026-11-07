@@ -165,6 +165,11 @@ object HomeNavigationBridge {
     }
 
     /**
+     * Returns true if the [HomeActivity] Task Root session is currently active.
+     */
+    fun isSessionActive(): Boolean = taskRootLaunchListener != null
+
+    /**
      * Called by [HomeActivity] in `onDestroy()` to unsubscribe its launch listener.
      */
     fun unregisterTaskRootLaunchListener(listener: (Intent) -> Unit) {

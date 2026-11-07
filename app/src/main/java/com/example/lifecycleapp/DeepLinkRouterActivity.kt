@@ -17,7 +17,7 @@ import com.example.feature.home.HomeNavigationBridge
  * 1. Cold Start: Launches [HomeActivity] with `ACTION_MAIN` / `CATEGORY_LAUNCHER`, establishing
  *    [HomeActivity] as the pristine Task Root of the application task with a consistent `baseIntent`.
  * 2. Warm Start: Brings the existing application task to the foreground and delegates the deep link
- *    to the active menu session or top container without creating duplicate activities.
+ *    target directly via [HomeNavigationBridge] without referencing any menu Activity views.
  */
 class DeepLinkRouterActivity : Activity() {
 
@@ -32,13 +32,10 @@ class DeepLinkRouterActivity : Activity() {
         val resolved = DeepLinkResolver.resolve(this, intent)
         Log.i(tag, "onCreate: intent=$intent, resolved=$resolved")
 
-        val activeMenu = BaseCategoryMenuActivity.getActiveMenuActivity()
-        val topSecondary = LifecycleApp.getTopSecondaryActivity()
-        val isWarmStart = (activeMenu != null && !activeMenu.isFinishing && !activeMenu.isDestroyed) ||
-                (topSecondary != null && !topSecondary.isFinishing && !topSecondary.isDestroyed)
+        val isWarmStart = HomeNavigationBridge.isSessionActive()
 
         if (isWarmStart) {
-            Log.i(tag, "Warm start detected -> bringing task to front and dispatching deep link")
+            Log.i(tag, "Warm start detected -> bringing task to front and delegating deep link via HomeNavigationBridge")
             // Bring main app task to foreground
             val bringToFrontIntent = Intent(this, HomeActivity::class.java).apply {
                 action = Intent.ACTION_MAIN
@@ -47,19 +44,14 @@ class DeepLinkRouterActivity : Activity() {
             }
             startActivity(bringToFrontIntent)
 
-            if (activeMenu != null) {
-                val forwardedIntent = Intent(intent)
-                activeMenu.runOnUiThread {
-                    activeMenu.handleIntent(forwardedIntent)
-                }
-            } else if (topSecondary != null && resolved != null) {
-                val targetIntent = resolved.targetIntent
-                topSecondary.runOnUiThread {
-                    if (resolved.categoryId.equals("home", ignoreCase = true)) {
-                        HomeNavigationBridge.notifyDismissCategoryStacks()
-                    } else if (targetIntent != null) {
+            if (resolved != null) {
+                if (resolved.categoryId.equals("home", ignoreCase = true)) {
+                    HomeNavigationBridge.notifyDismissCategoryStacks()
+                } else {
+                    val targetIntent = resolved.targetIntent
+                    if (targetIntent != null) {
                         HomeNavigationBridge.notifyCategorySelected(resolved.categoryId)
-                        HomeNavigationBridge.launchCategory(topSecondary, targetIntent)
+                        HomeNavigationBridge.launchCategory(this, targetIntent)
                     }
                 }
             }

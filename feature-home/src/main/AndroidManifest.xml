@@ -33,18 +33,6 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
             <intent-filter>
-                <action android:name="com.example.lifecycleapp.open" />
-                <category android:name="android.intent.category.DEFAULT" />
-            </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data
-                    android:scheme="myapp"
-                    android:host="navigate" />
-            </intent-filter>
-            <intent-filter>
                 <action android:name="com.example.carsettings.ACTION_SETTINGS_EMBED" />
                 <action android:name="com.example.carsettings.HOME" />
                 <category android:name="android.intent.category.DEFAULT" />

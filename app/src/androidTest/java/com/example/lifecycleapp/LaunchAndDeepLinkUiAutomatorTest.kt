@@ -150,7 +150,15 @@ class LaunchAndDeepLinkUiAutomatorTest {
     }
 
     private fun scrollAndClickLumbarDetail() {
-        var lumbarDetailBtn = device.findObject(By.descContains("View details for seat_lumbar"))
+        assertSeatCategoryListVisible("Seat category list must be visible before scrolling to Lumbar Support")
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            val topSec = LifecycleApp.getTopSecondaryActivity()
+            if (topSec != null) {
+                val imm = topSec.getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as? android.view.inputmethod.InputMethodManager
+                imm?.hideSoftInputFromWindow(topSec.window.decorView.windowToken, 0)
+            }
+        }
+        var lumbarDetailBtn = device.wait(Until.findObject(By.descContains("View details for seat_lumbar")), 2000)
         var attempts = 0
         while (lumbarDetailBtn == null && attempts < 5) {
             device.swipe(1800, 1300, 1800, 300, 15)

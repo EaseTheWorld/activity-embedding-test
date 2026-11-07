@@ -26,14 +26,6 @@ object CategoryStackManager {
     private var activeCategoryStack: ActivityStack? = null
 
     /**
-     * Checks if an [ActivityStack] holds [HomeActivity].
-     */
-    private fun isHomeStack(stack: ActivityStack): Boolean {
-        val home = HomeActivity.instance ?: return false
-        return stack.contains(home)
-    }
-
-    /**
      * Observes [SplitController.splitInfoList] on [activity] to track the active category container.
      */
     fun trackSplitInfo(scope: CoroutineScope, activity: Activity, isNarrowMode: Boolean) {
@@ -42,16 +34,8 @@ object CategoryStackManager {
                 SplitController.getInstance(activity)
                     .splitInfoList(activity)
                     .collectLatest { splitInfoList ->
-                        val categorySplit = if (isNarrowMode) {
-                            // In Narrow mode: HomeActivity is primary, category is secondary
-                            splitInfoList.firstOrNull { split ->
-                                split.primaryActivityStack.contains(activity) && !isHomeStack(split.secondaryActivityStack)
-                            }
-                        } else {
-                            // In Wide mode: PrimaryActivity is primary, category is secondary (not Home)
-                            splitInfoList.firstOrNull { split ->
-                                split.primaryActivityStack.contains(activity) && !isHomeStack(split.secondaryActivityStack)
-                            }
+                        val categorySplit = splitInfoList.firstOrNull { split ->
+                            split.primaryActivityStack.contains(activity)
                         }
                         activeCategoryStack = categorySplit?.secondaryActivityStack
                         Log.d(

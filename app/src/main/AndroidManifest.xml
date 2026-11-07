@@ -39,6 +39,27 @@
         </provider>
 
         <activity
+            android:name=".DeepLinkRouterActivity"
+            android:exported="true"
+            android:taskAffinity="com.example.lifecycleapp.deeplink"
+            android:theme="@style/Theme.LifecycleApp.Translucent"
+            android:excludeFromRecents="true"
+            android:noHistory="true">
+            <intent-filter>
+                <action android:name="com.example.lifecycleapp.open" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="myapp"
+                    android:host="navigate" />
+            </intent-filter>
+        </activity>
+
+        <activity
             android:name=".ListActivity"
             android:exported="false"
             android:theme="@style/Theme.LifecycleApp"

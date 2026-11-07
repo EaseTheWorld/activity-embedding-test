@@ -19,8 +19,6 @@ import com.example.core.item.AppConfig
 class HomeActivity : ComponentActivity() {
 
     companion object {
-        var instance: HomeActivity? = null
-            private set
         const val EXTRA_TARGET_INTENT = "extra_target_intent"
         const val EXTRA_INITIAL_CATEGORY_ID = "extra_initial_category_id"
         const val EXTRA_INITIAL_DEEPLINK_URI = "extra_initial_deeplink_uri"
@@ -38,18 +36,6 @@ class HomeActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val existing = instance
-        if (existing != null && existing !== this && !existing.isFinishing && !existing.isDestroyed) {
-            Log.i(tag, "Duplicate HomeActivity instance detected while primary instance $existing is alive")
-            if (DeepLinkResolver.isDeepLinkIntent(intent)) {
-                Log.i(tag, "Dispatching deep link to existing HomeActivity instance and finishing duplicate")
-                existing.handleTargetLaunch(intent)
-            }
-            overridePendingTransition(0, 0)
-            finish()
-            return
-        }
-        instance = this
         HomeNavigationBridge.registerTaskRootLaunchListener(taskRootLaunchListener)
 
         val isNarrowOverlayMode = AppConfig.isOverlayMode(this)
@@ -75,17 +61,13 @@ class HomeActivity : ComponentActivity() {
             )
         }
 
-        val resolved = if (DeepLinkResolver.isDeepLinkIntent(intent)) {
-            DeepLinkResolver.resolve(this, intent)
-        } else null
-
-        val initialCategoryId = intent?.getStringExtra(EXTRA_INITIAL_CATEGORY_ID) ?: resolved?.categoryId
+        val initialCategoryId = intent?.getStringExtra(EXTRA_INITIAL_CATEGORY_ID)
         val targetIntent = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
             intent?.getParcelableExtra(EXTRA_TARGET_INTENT, Intent::class.java)
         } else {
             @Suppress("DEPRECATION")
             intent?.getParcelableExtra(EXTRA_TARGET_INTENT)
-        } ?: resolved?.targetIntent
+        }
 
         if (savedInstanceState == null) {
             if (isNarrowOverlayMode) {
@@ -193,13 +175,10 @@ class HomeActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        if (instance === this) {
-            instance = null
-            if (isFinishing) {
-                HomeNavigationBridge.notifyAppExit()
-            }
-            HomeNavigationBridge.unregisterTaskRootLaunchListener(taskRootLaunchListener)
+        if (isFinishing) {
+            HomeNavigationBridge.notifyAppExit()
         }
+        HomeNavigationBridge.unregisterTaskRootLaunchListener(taskRootLaunchListener)
         Log.d(tag, "HomeActivity onDestroy()")
     }
 
@@ -222,18 +201,15 @@ class HomeActivity : ComponentActivity() {
 
     private fun handleTargetLaunch(intent: Intent?) {
         if (intent == null) return
-        val resolved = if (DeepLinkResolver.isDeepLinkIntent(intent)) {
-            DeepLinkResolver.resolve(this, intent)
-        } else null
 
         val targetIntent = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
             intent.getParcelableExtra(EXTRA_TARGET_INTENT, Intent::class.java)
         } else {
             @Suppress("DEPRECATION")
             intent.getParcelableExtra(EXTRA_TARGET_INTENT)
-        } ?: resolved?.targetIntent
+        }
 
-        val categoryId = intent.getStringExtra(EXTRA_INITIAL_CATEGORY_ID) ?: resolved?.categoryId
+        val categoryId = intent.getStringExtra(EXTRA_INITIAL_CATEGORY_ID)
 
         if (categoryId?.equals("home", ignoreCase = true) == true) {
             HomeNavigationBridge.notifyDismissCategoryStacks()

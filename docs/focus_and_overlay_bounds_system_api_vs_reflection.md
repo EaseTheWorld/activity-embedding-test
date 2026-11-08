@@ -186,6 +186,66 @@ void handleTaskFocusChange(Task task, ActivityRecord activity) {
 
 ---
 
+### 1.5 WMS `relayoutWindow` 특성을 활용한 동적 `FLAG_NOT_FOCUSABLE` 토글 (최종 채택 아키텍처)
+
+#### 1) 문제 배경: `OP_TYPE_REQUEST_FOCUS_ON_TASK_FRAGMENT`의 WMS 반영 한계
+`services.jar` 바이트코드 분석 결과, `WindowOrganizerController.applyTaskFragmentOperation(OP_TYPE_REQUEST_FOCUS_ON_TASK_FRAGMENT)` (`opType = 12`)는 `DisplayContent.setFocusedApp(targetFocus)`만 수행하여 `mFocusedApp`을 갱신할 뿐, **WMS의 실제 윈도우 포커스 갱신 메서드인 `WindowManagerService.updateFocusedWindowLocked()`를 호출하지 않습니다.**
+
+따라서 사용자가 Wide Mode의 Primary 사이드바(`ListActivity`)나 Narrow Mode의 축소된 버튼을 터치하여 `InputDispatcher`에 의해 윈도우 포커스(`mCurrentFocus`)가 Primary로 잡힌 경우, 단순히 `requestFocusOnTaskFragment`만 호출해서는 WMS 레벨에서 윈도우 포커스가 Secondary(`GenericSettingsActivity`, `HomeActivity` 등)로 즉각 전이되지 않는 한계가 있었습니다.
+
+#### 2) `WindowManagerService.relayoutWindow` 바이트코드 발견
+AOSP 프레임워크(`services.jar` 내 `WindowManagerService.relayoutWindow`, `[2b06d4]` at `[2b1072]`) 역컴파일 분석 중 다음 핵심 분기를 확인했습니다:
+
+```java
+// WindowManagerService.relayoutWindow (services.jar)
+boolean focusMayChange = (flagChanges & WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE) != 0;
+...
+if (focusMayChange) {
+    mWmService.updateFocusedWindowLocked(0, true);
+}
+```
+
+윈도우의 `FLAG_NOT_FOCUSABLE` 플래그 비트가 변경되면, WMS는 즉시 `updateFocusedWindowLocked(0, true)`를 강제 실행하여 현재 디스플레이의 `mCurrentFocus`를 다시 계산합니다.
+
+#### 3) 동적 1프레임 토글 아키텍처 (`ensureSecondaryFocus`)
+상시 `FLAG_NOT_FOCUSABLE`을 적용할 경우 앞서 1.4절에서 상술한 멀티윈도우 포커스 트래핑 결함이 발생하므로, 평상시에는 윈도우를 Focusable 상태로 유지합니다. 대신 포커스를 Secondary로 즉시 인계해야 하는 시점에 **1프레임 동안만 플래그를 토글하여 WMS `relayoutWindow`를 유도**합니다:
+
+```kotlin
+// ListActivity.kt & ListOverlayActivity.kt
+fun ensureSecondaryFocus() {
+    if (isFinishing || isDrawerExpanded) return
+    OverlayBoundsHelper.requestFocusOnSecondary(this)
+
+    // 1. FLAG_NOT_FOCUSABLE을 추가하여 ViewRootImpl.relayoutWindow 호출 유발
+    //    -> WMS relayoutWindow의 (flagChanges & FLAG_NOT_FOCUSABLE) != 0 조건 만족
+    //    -> WMS가 updateFocusedWindowLocked(0, true)를 즉각 강제 실행
+    // 2. WMS는 해당 윈도우를 건너뛰고 Secondary(GenericSettingsActivity 등)를 mCurrentFocus로 지정
+    window.addFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE)
+
+    // 3. 다음 렌더링 프레임(post)에서 플래그를 즉시 해제하여 
+    //    윈도우를 상시 비포커스 상태가 아닌 정상 포커스 가능 상태로 복원
+    window.decorView.post {
+        if (!isFinishing && !isDestroyed && !isDrawerExpanded) {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE)
+        }
+    }
+}
+```
+
+#### 4) 모드별 적용 및 장점
+- **Wide Mode ([ListActivity.kt](file:///c:/Users/user/Documents/antigravity/kind-curie/app/src/main/java/com/example/lifecycleapp/ListActivity.kt))**:
+  - `dispatchTouchEvent`의 `ACTION_UP` 시점 및 카테고리 기동(`onBeforeCategoryLaunch`), Home 복귀(`onHomeRevealed`) 시점에 호출.
+  - 사용자가 메뉴를 클릭하거나 스크롤한 직후 손을 떼면 즉시 포커스가 우측 콘텐츠로 이전되어, 추가 터치 없이 바로 Back 키를 눌러도 하위 화면이 정상적으로 pop됩니다.
+- **Narrow Mode ([ListOverlayActivity.kt](file:///c:/Users/user/Documents/antigravity/kind-curie/app/src/main/java/com/example/lifecycleapp/ListOverlayActivity.kt))**:
+  - 드로어가 닫힌 상태(`!isDrawerExpanded`)에서만 위 동적 토글을 적용.
+  - 드로어가 열릴 때(`setDrawerExpanded(true)`)는 `window.clearFlags(FLAG_NOT_FOCUSABLE)`를 확실히 보장하여 오버레이 서랍의 `OnBackPressedCallback`이 Back 키를 정상 수신하도록 보장.
+- **최종 효과**:
+  - 상시 `FLAG_NOT_FOCUSABLE`을 전혀 사용하지 않아 멀티윈도우/Automotive 환경 규격을 완벽히 준수.
+  - 수동 Back 이벤트 포워딩이나 위임(fallback) 경로 없이도, 순수 AOSP WMS 윈도우 포커스 파이프라인만으로 완벽한 Back 키 라우팅 달성.
+
+
+---
+
 ## 2. 오버레이 바운즈(Overlay Bounds) 제어 ("왼쪽 위" 배치 & 전체 폭 확장)
 
 ### 2.1 ATMS나 Reflection이 필요한가? -> **둘 다 불필요 (0-Reflection, No-ATMS)**

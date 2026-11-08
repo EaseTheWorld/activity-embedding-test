@@ -93,9 +93,10 @@ flowchart TD
 - **애니메이션 및 윈도우 리사이징 순서 동기화**:
   - **열림 전환 (Collapsed → Expanded)**: 윈도우 바운즈를 먼저 전체 폭(`100%`)으로 즉시 확장(`applyOverlayBounds(true)`)한 뒤, `viewDimScrim`을 `fade-in`하고 `layoutExpanded`(좌측 35% 서랍)를 `slide-in-left` 합니다.
   - **닫힘 전환 (Expanded → Collapsed)**: `viewDimScrim`이 `fade-out`되고 서랍 뷰가 완전히 화면 왼쪽 밖으로 슬라이드아웃(`withEndAction`)된 이후에 뷰를 `GONE` 처리하고 윈도우 바운즈를 좌측 상단 `80dp × 80dp`로 축소(`applyOverlayBounds(false)`)합니다. 애니메이션 시작 시점에 윈도우를 미리 축소할 경우 서랍 뷰가 80dp 경계에서 중간에 잘리는(Clipping) 문제를 원천 방지합니다.
-- **No-ATMS `TaskFragmentOrganizer.applyTransaction` 기반 포커스 전환 및 백키 라우팅**:
+- **No-ATMS `TaskFragmentOrganizer.applyTransaction` 및 WMS `relayoutWindow` 기반 포커스 전환 및 백키 라우팅**:
   - `OverlayBoundsHelper.requestFocusDirect`는 `MANAGE_ACTIVITY_TASKS` 권한 없이 현재 프로세스의 `TaskFragmentOrganizer`(`SplitController.mPresenter`, 최초 1회 Reflection 캐싱)를 통해 `WindowContainerTransaction.requestFocusOnTaskFragment`를 전송합니다.
-  - 서랍이 펼쳐지면 오버레이 `TaskFragment`로 포커스를 가져와 Back 키 입력 시 서랍이 먼저 닫히게 하고, 서랍이 접히면 활성 콘텐츠 `TaskFragment`(`Category` 또는 `Home`)로 포커스를 즉시 반환하여 내부 및 외부 앱 액티비티(`LightSettingsActivity` 등)에서도 하드웨어 Back 키가 완벽히 동작합니다.
+  - 서랍이 펼쳐지면(`isDrawerExpanded = true`) 오버레이 `TaskFragment`로 포커스를 가져오고 `FLAG_NOT_FOCUSABLE`을 해제하여 Back 키 입력 시 서랍이 먼저 닫히게 합니다.
+  - 서랍이 접히면(`isDrawerExpanded = false`) `ensureSecondaryFocus()`에서 1프레임 동안 `FLAG_NOT_FOCUSABLE`을 동적 토글하여 WMS의 `relayoutWindow`(`(flagChanges & FLAG_NOT_FOCUSABLE) != 0`)를 유도, `mCurrentFocus`를 활성 콘텐츠 `TaskFragment`(`GenericSettingsActivity` 또는 `HomeActivity`, 외부 플러그인 `LightSettingsActivity` 등)로 즉시 반환하여 하드웨어 Back 키가 완벽히 동작합니다. (상세 메커니즘은 [focus_and_overlay_bounds_system_api_vs_reflection.md](focus_and_overlay_bounds_system_api_vs_reflection.md) 참조)
 
 ### 4) [SplitInitializer.kt](../app/src/main/java/com/example/lifecycleapp/SplitInitializer.kt)
 - **앱 시작 시 모드별 규칙 구성**:

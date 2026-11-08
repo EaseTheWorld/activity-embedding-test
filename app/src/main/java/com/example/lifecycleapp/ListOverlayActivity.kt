@@ -85,6 +85,19 @@ class ListOverlayActivity : BaseCategoryMenuActivity() {
     fun ensureSecondaryFocus() {
         if (isFinishing || isDrawerExpanded) return
         OverlayBoundsHelper.requestFocusOnSecondary(this)
+
+        // relayoutWindow:
+        // Temporarily add FLAG_NOT_FOCUSABLE when drawer is collapsed so WindowManagerService.relayoutWindow
+        // sees flagChanges & FLAG_NOT_FOCUSABLE != 0 and executes updateFocusedWindowLocked,
+        // shifting mCurrentFocus immediately to mFocusedApp (secondary task).
+        // Then clear FLAG_NOT_FOCUSABLE after a frame so ListOverlayActivity's collapsed button remains tap-responsive.
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE)
+        window.decorView.post {
+            if (!isFinishing && !isDestroyed && !isDrawerExpanded) {
+                window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE)
+            }
+        }
+
         window.decorView.postDelayed({
             if (!isFinishing && !isDrawerExpanded) {
                 OverlayBoundsHelper.requestFocusOnSecondary(this)
@@ -131,6 +144,7 @@ class ListOverlayActivity : BaseCategoryMenuActivity() {
         Log.i(tag, "[$activityName] setDrawerExpanded: $expanded (reason=$reason)")
 
         if (expanded) {
+            window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE)
             applyOverlayBounds(true)
             OverlayBoundsHelper.requestFocusOnOverlay(this)
             window.decorView.postDelayed({
@@ -168,12 +182,7 @@ class ListOverlayActivity : BaseCategoryMenuActivity() {
                 }
                 .start()
         } else {
-            OverlayBoundsHelper.requestFocusOnSecondary(this)
-            window.decorView.postDelayed({
-                if (!isFinishing && !isDrawerExpanded) {
-                    OverlayBoundsHelper.requestFocusOnSecondary(this)
-                }
-            }, 50L)
+            ensureSecondaryFocus()
 
             layoutCollapsed.visibility = View.VISIBLE
             layoutCollapsed.alpha = 0f
@@ -206,6 +215,7 @@ class ListOverlayActivity : BaseCategoryMenuActivity() {
                 .withEndAction {
                     layoutExpanded.visibility = View.GONE
                     applyOverlayBounds(false)
+                    ensureSecondaryFocus()
                 }
                 .start()
         }

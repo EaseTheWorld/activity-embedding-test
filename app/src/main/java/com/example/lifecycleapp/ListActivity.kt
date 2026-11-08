@@ -25,8 +25,7 @@ class ListActivity : BaseCategoryMenuActivity() {
         SplitInitializer.ensureInitialized(this)
 
         // Wide Mode: Static opaque sidebar layout
-        // Prevent ListActivity from stealing window focus while keeping touch input active
-        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE)
+        // Default is focusable (no static FLAG_NOT_FOCUSABLE) for multi-window tap responsiveness
         setContentView(R.layout.activity_list)
         initCategoryMenuViews()
         CategoryStackManager.trackSplitInfo(lifecycleScope, this, isNarrowMode = false)
@@ -60,6 +59,19 @@ class ListActivity : BaseCategoryMenuActivity() {
     private fun ensureSecondaryFocus() {
         if (isFinishing) return
         OverlayBoundsHelper.requestFocusOnSecondary(this)
+
+        // relayoutWindow experiment:
+        // Temporarily add FLAG_NOT_FOCUSABLE so WindowManagerService.relayoutWindow
+        // sees flagChanges & FLAG_NOT_FOCUSABLE != 0 and executes updateFocusedWindowLocked,
+        // shifting mCurrentFocus immediately to mFocusedApp (secondary task).
+        // Then clear FLAG_NOT_FOCUSABLE after a frame so ListActivity remains tap-focusable.
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE)
+        window.decorView.post {
+            if (!isFinishing && !isDestroyed) {
+                window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE)
+            }
+        }
+
         window.decorView.postDelayed({
             if (!isFinishing) {
                 OverlayBoundsHelper.requestFocusOnSecondary(this)

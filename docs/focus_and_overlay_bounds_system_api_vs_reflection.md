@@ -2,7 +2,7 @@
 
 본 문서는 Android 16 (API 36/37) 에뮬레이터의 `services.jar` 및 `androidx.window.extensions.jar` 바이트코드 역컴파일 분석과 실제 기기/에뮬레이터 계측 테스트(Instrumented UI Test) 결과를 바탕으로 다음 세 가지 핵심 주제를 정리합니다.
 
-1. **포커스(Focus) 이동 제어**: `ATMS (0-Reflection)` vs `No-ATMS (1-Reflection, TaskFragmentOrganizer)` 비교 및 결과
+1. **포커스(Focus) 이동 제어**: `ATMS (0-Reflection)` vs `No-ATMS (1-Reflection, TaskFragmentOrganizer)` 비교 및 멀티윈도우 환경에서 `FLAG_NOT_FOCUSABLE` 사용 시의 문제점 분석
 2. **오버레이 바운즈(Overlay Bounds) 제어**: 좌측 상단(`80dp × 80dp`) 배치 및 전체 폭(`100%`) 확장 (ATMS 불필요, Reflection 0회)
 3. **Dim 처리 실험 결과**: 자체 Full-Width `viewDimScrim` 방식 vs 표준 `androidx.window` / WindowManager Dim (`DIM_AREA_ON_TASK` + `FLAG_DIM_BEHIND`) 실패 검증 결과
 
@@ -110,6 +110,79 @@ fun requestFocusDirect(fragmentToken: IBinder): Boolean {
     }
 }
 ```
+
+---
+
+### 1.4 왜 `FLAG_NOT_FOCUSABLE`을 사용하면 안 되는가? (Automotive / 태블릿 멀티윈도우 환경 분석)
+
+단일 앱만 전체 화면으로 떠 있는 환경에서는 오버레이(`ListOverlayActivity`)나 좌측 사이드바(`ListActivity`)에 `WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE`을 설정하면 포커스가 우측 콘텐츠 화면에 머무는 것처럼 보일 수 있습니다. 그러나 **Automotive(AAOS) 다중 패널이나 태블릿 멀티윈도우(Split-Screen / Freeform)에서 여러 앱(예: A앱과 셋팅앱)이 동시에 떠 있을 때 `FLAG_NOT_FOCUSABLE`을 사용하면, 셋팅앱 오버레이를 터치해도 시스템 포커스가 여전히 A앱에 남아있는 치명적인 결함**이 발생합니다.
+
+#### 1) `services.jar` (`WindowManagerService` & `WindowState`) 바이트코드 역컴파일 검증
+멀티윈도우 환경에서 **A앱(Task #A)** 이 현재 포커스(`mFocusedApp`, `mFocusedWindow`)를 가진 상태에서 사용자가 **셋팅앱(Task #B)** 의 윈도우(`touchedTarget`)를 터치하면, `InputDispatcher`는 `WindowManagerService.onPointerDownOutsideFocusLocked`를 호출합니다.
+
+```java
+// 1. WindowManagerService.onPointerDownOutsideFocusLocked (services.jar [2b6eb8])
+private void onPointerDownOutsideFocusLocked(InputTarget touchedTarget, boolean direct) {
+    // 0002: invoke-interface {v5}, InputTarget.receiveFocusFromTapOutside:()Z
+    // 0006: if-nez v0, 000a
+    // 0008: goto/16 00a3 (return-void)
+    if (touchedTarget == null || !touchedTarget.receiveFocusFromTapOutside()) {
+        return; // <-- 조기 종료! Task 포커스 전환 자체가 아예 무시됨!
+    }
+    ...
+    // 정상 경로: touchedTarget.handleTapOutsideFocusInsideSelf() 호출
+}
+
+// 2. WindowState.receiveFocusFromTapOutside & canReceiveKeys (services.jar [2d1b88], [2cfae0])
+@Override
+public boolean receiveFocusFromTapOutside() {
+    return canReceiveKeys(true /* fromTouch */);
+}
+
+public boolean canReceiveKeys(boolean fromTouch) {
+    ...
+    // 001d: iget-object v0, v3, WindowState.mAttrs
+    // 001f: iget v0, v0, WindowManager$LayoutParams.flags
+    // 0021: and-int/lit8 v0, v0, 0x08 (FLAG_NOT_FOCUSABLE = 0x00000008)
+    // 0023: if-nez v0, 0062 (return false)
+    if ((mAttrs.flags & WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE) != 0) {
+        return false; // <-- FLAG_NOT_FOCUSABLE(0x8)이 켜져 있으면 무조건 false 반환!
+    }
+    ...
+}
+
+// 3. 원래 호출되어야 할 Task 포커스 전환 경로 (services.jar [2d5508], [2b5e30])
+@Override
+public void handleTapOutsideFocusInsideSelf() {
+    mWmService.moveDisplayToTopInternal(getDisplayId());
+    mWmService.handleTaskFocusChange(getTask(), mActivityRecord);
+}
+
+void handleTaskFocusChange(Task task, ActivityRecord activity) {
+    ...
+    // ATMS에 포커스 Task를 셋팅앱 Task로 전환 요청 (mFocusedApp 변경 및 Freeform Z-order 최상단 이동)
+    mAtmService.setFocusedTask(task.mTaskId, activity);
+}
+```
+
+#### 2) 멀티윈도우에서 `FLAG_NOT_FOCUSABLE` 사용 시 발생하는 연쇄 결함
+1. **셋팅앱 오버레이 터치 시에도 포커스(`mFocusedApp`, `mCurrentFocus`)가 A앱에 고착됨**:
+   - `canReceiveKeys(true)`가 `false`를 반환하므로 `onPointerDownOutsideFocusLocked`가 첫 줄에서 바로 `return` 됩니다.
+   - `mAtmService.setFocusedTask(settingsTaskId, ...)`가 호출되지 않아, 터치 이벤트(`MotionEvent`)만 셋팅앱 오버레이로 전달될 뿐 **시스템의 Focused Task와 Focused Window는 여전히 A앱에 머물러 있습니다.**
+2. **Back 키 입력 시 셋팅앱 서랍이 아닌 A앱이 뒤로 가거나 종료됨**:
+   - 사용자가 셋팅앱 오버레이의 `MENU` 버튼을 눌러 서랍을 펼치거나 메뉴를 스크롤한 뒤 서랍을 닫으려고 하드웨어/시스템 **Back 키**(또는 차량 스티어링 휠의 Back 버튼)를 누르면, `InputDispatcher`는 여전히 `mFocusedWindow`인 **A앱으로 `KEYCODE_BACK`을 전송**합니다.
+3. **Automotive 로터리(Rotary) 컨트롤러 / 키보드 입력 포커스 이동 불가**:
+   - 차량용 조그 다이얼(Rotary Controller)이나 외장 키보드 입력 역시 `mFocusedWindow`를 따라가므로, 셋팅앱 메뉴를 터치해도 조작 포커스가 A앱에 묶여 있게 됩니다.
+4. **Freeform / 데스크톱 멀티윈도우에서 창 Z-Order가 최상단으로 올라오지 않음**:
+   - `mAtmService.setFocusedTask()`가 생략되므로, 창이 겹쳐진 멀티윈도우 환경에서 셋팅앱 오버레이를 터치해도 셋팅앱 Task가 앞으로 올라오지 않습니다.
+
+#### 3) 현재 아키텍처(`Focusable` 유지 + `requestFocusOnTaskFragment`)와의 비교
+
+| 멀티윈도우 시나리오 (A앱 + 셋팅앱 동시 실행) | `FLAG_NOT_FOCUSABLE` 사용 시 | 현재 구현 (`Focusable` 유지 + `requestFocusOnTaskFragment`) **[채택]** |
+| :--- | :--- | :--- |
+| **A앱 사용 중 셋팅앱 Overlay(`MENU`) 터치** | `receiveFocusFromTapOutside() == false` → **시스템 포커스가 여전히 A앱에 남음** | `receiveFocusFromTapOutside() == true` → `setFocusedTask`가 호출되어 **즉시 셋팅앱 Task로 시스템 포커스 이동** |
+| **셋팅앱 서랍 열림 상태에서 Back 키** | **A앱**이 Back 키를 받아 뒤로 감 (**버그**) | 셋팅앱의 `ListOverlayActivity`가 포커스를 가지므로 **셋팅앱 서랍이 정상적으로 닫힘** |
+| **셋팅앱 서랍 닫힘 상태(`80dp` 버튼)에서 Back 키** | A앱이 포커스를 가졌던 경우 A앱이 반응 | `requestFocusOnSecondary`를 통해 셋팅앱 내부의 **콘텐츠 `TaskFragment`로 포커스가 이동**되어 콘텐츠 화면이 정상 수신 |
 
 ---
 

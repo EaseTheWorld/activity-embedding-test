@@ -8,9 +8,6 @@ import androidx.window.embedding.ActivityFilter
 import androidx.window.embedding.ActivityRule
 import androidx.window.embedding.EmbeddingAnimationBackground
 import androidx.window.embedding.EmbeddingAnimationParams
-import androidx.window.embedding.EmbeddingBounds
-import androidx.window.embedding.OverlayAttributes
-import androidx.window.embedding.OverlayController
 import androidx.window.embedding.RuleController
 import androidx.window.embedding.SplitAttributes
 import androidx.window.embedding.SplitPairFilter
@@ -49,23 +46,6 @@ class SplitInitializer : Initializer<RuleController> {
                 return
             }
             SplitInitializer().create(context.applicationContext, currentMode)
-        }
-
-        fun computeOverlayBounds(context: Context, isExpanded: Boolean): EmbeddingBounds {
-            return if (isExpanded) {
-                EmbeddingBounds(
-                    EmbeddingBounds.Alignment.ALIGN_LEFT,
-                    EmbeddingBounds.Dimension.ratio(AppConfig.PRIMARY_DRAWER_RATIO),
-                    EmbeddingBounds.Dimension.DIMENSION_EXPANDED
-                )
-            } else {
-                val dpPx = (AppConfig.COLLAPSED_BUTTON_SIZE_DP * context.resources.displayMetrics.density).toInt()
-                EmbeddingBounds(
-                    EmbeddingBounds.Alignment.ALIGN_LEFT,
-                    EmbeddingBounds.Dimension.pixel(dpPx),
-                    EmbeddingBounds.Dimension.pixel(dpPx)
-                )
-            }
         }
     }
 

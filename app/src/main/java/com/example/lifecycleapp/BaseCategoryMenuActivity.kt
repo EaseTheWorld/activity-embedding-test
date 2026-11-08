@@ -186,19 +186,6 @@ abstract class BaseCategoryMenuActivity : BaseLoggingActivity() {
         handleIntent(intent)
     }
 
-    protected fun navigateBackToHomeOrFinish() {
-        val currentPos = categoryAdapter?.selectedPosition ?: 0
-        if (currentPos != 0) {
-            categoryAdapter?.selectedPosition = 0
-            categoryAdapter?.notifyDataSetChanged()
-            categories.firstOrNull()?.let { homeCat ->
-                launchCategory(homeCat)
-            }
-        } else {
-            finishAffinity()
-        }
-    }
-
     private fun refreshCategories() {
         val updated = discoverCategories()
         categories.clear()

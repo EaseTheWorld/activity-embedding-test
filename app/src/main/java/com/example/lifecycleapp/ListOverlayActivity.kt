@@ -4,8 +4,6 @@ import android.os.Bundle
 import android.util.Log
 import android.view.View
 import androidx.activity.OnBackPressedCallback
-import androidx.window.embedding.OverlayAttributes
-import androidx.window.embedding.OverlayController
 import com.example.core.item.AppConfig
 import com.example.feature.home.HomeActivity
 
@@ -15,8 +13,8 @@ import com.example.feature.home.HomeActivity
  * Responsibilities:
  * 1. Exclusively launched by `HomeActivity` in Narrow Mode as an Always-On-Top Pinned Overlay
  *    (`setOverlayCreateParams` + `shouldAssociateWithLaunchingActivity = false`).
- * 2. Toggles between a collapsed `80dp × 80dp` floating `MENU` button and an expanded `35%` drawer
- *    via `OverlayController.updateOverlayAttributes`.
+ * 2. Toggles between a collapsed `80dp × 80dp` floating `MENU` button and an expanded full-width
+ *    overlay (left 35% drawer + right 65% `viewDimScrim`) via `OverlayBoundsHelper.updateOverlayBounds`.
  * 3. Uses `WindowContainerTransaction.requestFocusOnTaskFragment` to shift WindowManager focus
  *    between the overlay drawer (when expanded) and the content container (when collapsed).
  */
@@ -74,25 +72,10 @@ class ListOverlayActivity : BaseCategoryMenuActivity() {
             handleIntent(intent)
         }
 
-        backCallback = object : OnBackPressedCallback(true) {
+        backCallback = object : OnBackPressedCallback(false) {
             override fun handleOnBackPressed() {
                 if (isDrawerExpanded) {
                     setDrawerExpanded(false, "BackPressedCollapse")
-                    return
-                }
-                val topSecondary = LifecycleApp.getTopSecondaryActivity()
-                if (topSecondary != null) {
-                    Log.d(tag, "[$activityName] Forwarding Back key to top secondary activity: ${topSecondary.javaClass.simpleName}")
-                    topSecondary.onBackPressedDispatcher.onBackPressed()
-                } else if (com.example.feature.home.CategoryStackManager.getActiveCategoryToken() != null) {
-                    Log.d(tag, "[$activityName] External category active, dismissing via CategoryStackManager")
-                    com.example.feature.home.CategoryStackManager.dismissCurrentCategory(this@ListOverlayActivity)
-                    categoryAdapter?.selectedPosition = 0
-                    categoryAdapter?.notifyDataSetChanged()
-                    listViewCategories.smoothScrollToPosition(0)
-                } else {
-                    Log.d(tag, "[$activityName] No category stack active, fallback to navigateBackToHomeOrFinish()")
-                    navigateBackToHomeOrFinish()
                 }
             }
         }
@@ -133,30 +116,18 @@ class ListOverlayActivity : BaseCategoryMenuActivity() {
     private lateinit var backCallback: OnBackPressedCallback
 
     private fun applyOverlayBounds(expanded: Boolean) {
-        val updated = OverlayBoundsHelper.updateOverlayBounds(
+        OverlayBoundsHelper.updateOverlayBounds(
             this,
             AppConfig.TAG_PRIMARY_OVERLAY,
             expanded
         )
-        if (!updated) {
-            try {
-                val overlayController = OverlayController.getInstance(this)
-                val bounds = SplitInitializer.computeOverlayBounds(this, expanded)
-                overlayController.updateOverlayAttributes(
-                    AppConfig.TAG_PRIMARY_OVERLAY,
-                    OverlayAttributes(bounds)
-                )
-                Log.d(tag, "[$activityName] applyOverlayBounds (Fallback Controller): expanded=$expanded, bounds=$bounds")
-            } catch (e: Exception) {
-                Log.e(tag, "[$activityName] Failed to update overlay attributes: $e", e)
-            }
-        }
     }
 
     fun setDrawerExpanded(expanded: Boolean, reason: String = "Unknown") {
         if (isDrawerExpanded == expanded) return
         isDrawerExpanded = expanded
         SplitInitializer.isOverlayDrawerExpanded = expanded
+        backCallback.isEnabled = expanded
         Log.i(tag, "[$activityName] setDrawerExpanded: $expanded (reason=$reason)")
 
         if (expanded) {
@@ -199,7 +170,7 @@ class ListOverlayActivity : BaseCategoryMenuActivity() {
         } else {
             OverlayBoundsHelper.requestFocusOnSecondary(this)
             window.decorView.postDelayed({
-                if (!isDrawerExpanded && !isFinishing) {
+                if (!isFinishing && !isDrawerExpanded) {
                     OverlayBoundsHelper.requestFocusOnSecondary(this)
                 }
             }, 50L)

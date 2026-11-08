@@ -2,9 +2,7 @@ package com.example.lifecycleapp
 
 import com.example.feature.home.HomeNavigationBridge
 import android.os.Bundle
-import android.util.Log
 import android.view.MotionEvent
-import androidx.activity.OnBackPressedCallback
 import androidx.lifecycle.lifecycleScope
 import com.example.feature.home.CategoryStackManager
 import com.example.feature.home.HomeActivity
@@ -57,19 +55,6 @@ class ListActivity : BaseCategoryMenuActivity() {
         } else if (intent?.data != null || intent?.action == "com.example.lifecycleapp.open") {
             handleIntent(intent)
         }
-
-        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
-            override fun handleOnBackPressed() {
-                val topSecondary = LifecycleApp.getTopSecondaryActivity()
-                if (topSecondary != null) {
-                    Log.d(tag, "[$activityName] Forwarding Back key to top secondary activity: ${topSecondary.javaClass.simpleName}")
-                    topSecondary.onBackPressedDispatcher.onBackPressed()
-                } else {
-                    Log.d(tag, "[$activityName] No in-process secondary activity found, fallback to navigateBackToHomeOrFinish()")
-                    navigateBackToHomeOrFinish()
-                }
-            }
-        })
     }
 
     private fun ensureSecondaryFocus() {

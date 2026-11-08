@@ -25,8 +25,19 @@ object CategoryStackManager {
     @Volatile
     private var activeCategoryStack: ActivityStack? = null
 
+    @Volatile
+    private var activeHomeStack: ActivityStack? = null
+
+    @Volatile
+    private var homeActivityRef: java.lang.ref.WeakReference<Activity>? = null
+
+    fun registerHomeActivity(activity: Activity) {
+        homeActivityRef = java.lang.ref.WeakReference(activity)
+    }
+
     /**
-     * Observes [SplitController.splitInfoList] on [activity] to track the active category container.
+     * Observes [SplitController.splitInfoList] on [activity] to track the active category container
+     * and the root Home content container.
      */
     fun trackSplitInfo(scope: CoroutineScope, activity: Activity, isNarrowMode: Boolean) {
         scope.launch {
@@ -38,9 +49,21 @@ object CategoryStackManager {
                             split.primaryActivityStack.contains(activity)
                         }
                         activeCategoryStack = categorySplit?.secondaryActivityStack
+
+                        activeHomeStack = if (isNarrowMode) {
+                            categorySplit?.primaryActivityStack
+                                ?: ActivityEmbeddingController.getInstance(activity).getActivityStack(activity)
+                        } else {
+                            // In Wide Mode (RTL Split), HomeActivity is the primary stack and ListActivity is secondary
+                            val homeSplit = splitInfoList.firstOrNull { split ->
+                                split.secondaryActivityStack.contains(activity)
+                            }
+                            homeSplit?.primaryActivityStack
+                        }
+
                         Log.d(
                             TAG,
-                            "[trackSplitInfo] isNarrowMode=$isNarrowMode, splitCount=${splitInfoList.size}, activeCategoryStack=$activeCategoryStack"
+                            "[trackSplitInfo] isNarrowMode=$isNarrowMode, splitCount=${splitInfoList.size}, activeCategoryStack=$activeCategoryStack, activeHomeStack=$activeHomeStack"
                         )
                     }
             } catch (e: Throwable) {
@@ -74,18 +97,56 @@ object CategoryStackManager {
      * Works identically for in-process and cross-process activities.
      */
     fun getActiveCategoryToken(): android.os.IBinder? {
-        val stack = activeCategoryStack ?: return null
+        return extractToken(activeCategoryStack)
+    }
+
+    /**
+     * Extracts the TaskFragment [android.os.IBinder] token from the active content pane
+     * (either the active Category stack if open, or the Home content stack).
+     */
+    fun getActiveContentToken(): android.os.IBinder? {
+        val tracked = extractToken(activeCategoryStack ?: activeHomeStack)
+        if (tracked != null) return tracked
+        val homeActivity = homeActivityRef?.get() ?: return null
+        return getActivityStackToken(homeActivity)
+    }
+
+    /**
+     * Extracts the TaskFragment [android.os.IBinder] token for the [ActivityStack] containing [activity]
+     * via public [ActivityEmbeddingController.getActivityStack].
+     */
+    fun getActivityStackToken(activity: Activity): android.os.IBinder? {
         return try {
-            val tokenProp = stack.javaClass.getDeclaredField("token").apply { isAccessible = true }.get(stack) ?: return null
-            val binderField = tokenProp.javaClass.getDeclaredField("mToken").apply { isAccessible = true }
-            binderField.get(tokenProp) as? android.os.IBinder
+            val stack = ActivityEmbeddingController.getInstance(activity).getActivityStack(activity)
+            extractToken(stack)
         } catch (e: Throwable) {
-            Log.w(TAG, "[getActiveCategoryToken] Failed to extract IBinder from activeCategoryStack: $e")
+            Log.w(TAG, "[getActivityStackToken] Failed to resolve stack token for $activity: $e")
+            null
+        }
+    }
+
+    private const val KEY_ACTIVITY_STACK_TOKEN =
+        "androidx.window.extensions.embedding.ActivityStack.Token"
+
+    private val stackTokenField by lazy {
+        ActivityStack::class.java.getDeclaredField("token").apply { isAccessible = true }
+    }
+
+    fun extractToken(stack: ActivityStack?): android.os.IBinder? {
+        if (stack == null) return null
+        return try {
+            val oemToken = stackTokenField.get(stack)
+                as? androidx.window.extensions.embedding.ActivityStack.Token
+                ?: return null
+            oemToken.toBundle().getBinder(KEY_ACTIVITY_STACK_TOKEN)
+        } catch (e: Throwable) {
+            Log.w(TAG, "[extractToken] Failed to extract IBinder from stack: $e")
             null
         }
     }
 
     fun clear() {
         activeCategoryStack = null
+        activeHomeStack = null
     }
 }

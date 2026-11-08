@@ -250,9 +250,15 @@ class InternalBackStackUiAutomatorTest {
         selectCategoryInMenu("Seat", "시트")
         scrollAndClickLumbarDetail()
 
-        // Touch overlay by expanding and collapsing the drawer without changing category
+        // Touch overlay by expanding and collapsing the drawer via the right dimmed area without changing category
         expandOverlayDrawerInNarrowMode()
-        collapseOverlayDrawerInNarrowMode()
+        val dimScrim = device.wait(Until.findObject(By.res(pkg, "viewDimScrim")), timeout)
+        assertNotNull("Dimmed scrim should be visible when overlay drawer is expanded", dimScrim)
+        device.click((device.displayWidth * 0.75).toInt(), device.displayHeight / 2)
+        device.waitForIdle()
+        Thread.sleep(800)
+        val collapsedBtn = device.wait(Until.findObject(By.res(pkg, "btnMore")), timeout)
+        assertNotNull("Touching the right dimmed outside area should collapse the overlay drawer", collapsedBtn)
 
         device.pressBack()
         device.waitForIdle()
@@ -892,5 +898,104 @@ class InternalBackStackUiAutomatorTest {
             "Back #3 at HomeActivity in Narrow Mode should finish the app (PrimaryOverlayActivity finishing/destroyed)",
             overlayMenu.isFinishing || overlayMenu.isDestroyed || BaseCategoryMenuActivity.getActiveMenuActivity() == null
         )
+    }
+
+    /**
+     * Scenario 13 (Dim Scrim Touch Consumption & Modal Blocking):
+     * When the Narrow Mode overlay drawer is expanded:
+     * 1. The overlay ActivityStack expands to full Task width & height (`100%`), showing `viewDimScrim` over the right 65% outside area.
+     * 2. Clicking the exact coordinates of an underlying clickable button (`"Open Sub-Setting Page"`) located in the right 65% dimmed area:
+     *    - Is CONSUMED by `viewDimScrim` (does NOT trigger `"Open Sub-Setting Page"` or launch `SubSettingActivity`).
+     *    - Collapses the overlay drawer back to the `80dp` floating button (`btnMore`).
+     * 3. Once the overlay drawer is collapsed (`viewDimScrim` is gone), clicking the exact same coordinates DOES trigger `"Open Sub-Setting Page"`, proving the touch was blocked solely by `viewDimScrim`.
+     */
+    @Test
+    fun scenario13_NarrowOverlayMode_DimScrimConsumesTouchAndBlocksUnderlyingUiClick() {
+        launchApp(isOverlayMode = true)
+
+        val overlayMenu = waitForActiveMenuActivity()
+        assertNotNull("Active PrimaryOverlayActivity must exist", overlayMenu)
+
+        // 1. Search "Lumbar" on HomeActivity so a full-width clickable SearchResultItemCard is displayed
+        enterSearchQueryOnHome("Lumbar")
+
+        val lumbarResultText = device.wait(
+            Until.findObject(By.textContains("Lumbar Support")),
+            timeout
+        )
+        assertNotNull("HomeActivity should display 'Lumbar Support' search result card", lumbarResultText)
+        device.waitForIdle()
+        Thread.sleep(400)
+        device.takeScreenshot(java.io.File("/sdcard/Download/1_collapsed_top_left.png"))
+
+        // Pick a point at 65% of screen width (well inside the right 65% dimmed outside area)
+        // at the vertical center of the full-width SearchResultItemCard.
+        val clickX = (device.displayWidth * 65) / 100
+        val clickY = lumbarResultText!!.visibleBounds.centerY()
+        assertTrue(
+            "Target clickX ($clickX) must lie in the right 65% outside area (> ${device.displayWidth * 35 / 100})",
+            clickX > (device.displayWidth * 35) / 100
+        )
+
+        // 2. Expand the overlay drawer so viewDimScrim covers the full Task width
+        expandOverlayDrawerInNarrowMode()
+
+        val dimScrim = device.wait(Until.findObject(By.res(pkg, "viewDimScrim")), timeout)
+        assertNotNull("viewDimScrim must be visible when overlay drawer is expanded", dimScrim)
+        val scrimBounds = dimScrim!!.visibleBounds
+        assertTrue(
+            "viewDimScrim must span full width (actual=$scrimBounds, displayWidth=${device.displayWidth})",
+            scrimBounds.width() >= (device.displayWidth * 90) / 100
+        )
+        assertTrue(
+            "viewDimScrim bounds $scrimBounds must cover target coordinates ($clickX, $clickY)",
+            scrimBounds.contains(clickX, clickY)
+        )
+        Thread.sleep(400)
+        device.takeScreenshot(java.io.File("/sdcard/Download/2_expanded_full_width_dimmed.png"))
+
+        // 3. Click the exact coordinates of the underlying full-width "Lumbar" card while dimmed
+        device.click(clickX, clickY)
+        device.waitForIdle()
+        Thread.sleep(1000)
+        device.takeScreenshot(java.io.File("/sdcard/Download/3_collapsed_after_dim_touch.png"))
+
+        // 4. Verify the touch was CONSUMED by viewDimScrim:
+        //    - Overlay drawer collapsed (btnMore is visible, viewDimScrim is gone)
+        //    - Underlying "Lumbar" card was NOT clicked (still on "home", Lumbar detail screen did NOT open)
+        val btnMoreAfterDimClick = device.wait(Until.findObject(By.res(pkg, "btnMore")), timeout)
+        assertNotNull("Clicking dimmed outside area must collapse the overlay drawer", btnMoreAfterDimClick)
+        assertNull(
+            "viewDimScrim must be GONE after collapsing",
+            device.findObject(By.res(pkg, "viewDimScrim"))
+        )
+        assertEquals(
+            "Touch on viewDimScrim must be consumed and MUST NOT trigger underlying 'Lumbar' card navigation",
+            "home",
+            overlayMenu!!.currentSelectedCategoryId
+        )
+        assertNull(
+            "Lumbar detail screen must NOT be opened when clicking on viewDimScrim",
+            device.findObject(By.textContains("Deep Link Navigation Info"))
+        )
+
+        // 5. Sanity check: Clicking the exact same coordinates (clickX, clickY) now that the drawer is collapsed
+        //    DOES click the underlying full-width "Lumbar" card and navigates to Seat -> Lumbar detail screen.
+        device.click(clickX, clickY)
+        device.waitForIdle()
+        Thread.sleep(1000)
+
+        val lumbarDetailOpened = device.wait(
+            Until.findObject(By.textContains("Deep Link Navigation Info")),
+            timeout
+        )
+        assertNotNull(
+            "Clicking the same coordinates ($clickX, $clickY) after dim scrim is gone MUST click the underlying card",
+            lumbarDetailOpened
+        )
+        assertEquals("seat", overlayMenu.currentSelectedCategoryId)
+        device.waitForIdle()
+        Thread.sleep(400)
+        device.takeScreenshot(java.io.File("/sdcard/Download/4_underlying_clicked_after_unblocked.png"))
     }
 }

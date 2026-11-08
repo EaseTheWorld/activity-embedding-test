@@ -40,6 +40,7 @@ class HomeActivity : ComponentActivity() {
 
         val isNarrowOverlayMode = AppConfig.isOverlayMode(this)
         HomeNavigationBridge.ensureSplitRules(this, isNarrowOverlayMode)
+        CategoryStackManager.registerHomeActivity(this)
         if (isNarrowOverlayMode) {
             CategoryStackManager.trackSplitInfo(lifecycleScope, this, isNarrowMode = true)
         }

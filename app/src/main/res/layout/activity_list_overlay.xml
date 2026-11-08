@@ -50,64 +50,88 @@
 
     </FrameLayout>
 
-    <!-- 2. Expanded Drawer View (Shown when overlay expands to 35% width) -->
-    <LinearLayout
-        android:id="@+id/layoutExpanded"
+    <!-- 2. Dimmed Scrim for the outside area when overlay is expanded to full width -->
+    <View
+        android:id="@+id/viewDimScrim"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:orientation="vertical"
-        android:background="@color/background"
-        android:elevation="12dp"
-        android:padding="20dp"
-        android:visibility="gone">
+        android:background="#80000000"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="gone" />
+
+    <!-- 3. Expanded Drawer Container (Left 35% Drawer + Right 65% transparent pass-through to viewDimScrim) -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="horizontal"
+        android:weightSum="1.0"
+        android:background="@android:color/transparent"
+        android:clickable="false"
+        android:focusable="false">
 
         <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:layout_marginBottom="4dp">
+            android:id="@+id/layoutExpanded"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="0.35"
+            android:orientation="vertical"
+            android:background="@color/background"
+            android:elevation="12dp"
+            android:padding="20dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:visibility="gone">
 
-            <TextView
-                android:id="@+id/tvTitle"
-                android:layout_width="0dp"
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="Vehicle Settings"
-                android:textSize="24sp"
-                android:textStyle="bold"
-                android:textColor="@color/text_primary" />
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="4dp">
+
+                <TextView
+                    android:id="@+id/tvTitle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Vehicle Settings"
+                    android:textSize="24sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/text_primary" />
+
+                <TextView
+                    android:id="@+id/btnCollapse"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:background="?android:attr/selectableItemBackgroundBorderless"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:text="◀"
+                    android:textSize="16sp"
+                    android:textColor="@color/text_secondary"
+                    android:gravity="center" />
+            </LinearLayout>
 
             <TextView
-                android:id="@+id/btnCollapse"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
-                android:background="?android:attr/selectableItemBackgroundBorderless"
-                android:clickable="true"
-                android:focusable="true"
-                android:text="◀"
-                android:textSize="16sp"
-                android:textColor="@color/text_secondary"
-                android:gravity="center" />
+                android:id="@+id/tvDiscoveryStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Discovering Category Providers..."
+                android:textSize="13sp"
+                android:textColor="@color/accent"
+                android:textStyle="bold"
+                android:layout_marginBottom="16dp" />
+
+            <ListView
+                android:id="@+id/listViewCategories"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:divider="@android:color/transparent"
+                android:dividerHeight="10dp" />
+
         </LinearLayout>
-
-        <TextView
-            android:id="@+id/tvDiscoveryStatus"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Discovering Category Providers..."
-            android:textSize="13sp"
-            android:textColor="@color/accent"
-            android:textStyle="bold"
-            android:layout_marginBottom="16dp" />
-
-        <ListView
-            android:id="@+id/listViewCategories"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:divider="@android:color/transparent"
-            android:dividerHeight="10dp" />
 
     </LinearLayout>
 

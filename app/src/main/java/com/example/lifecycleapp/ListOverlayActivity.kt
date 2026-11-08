@@ -24,6 +24,7 @@ class ListOverlayActivity : BaseCategoryMenuActivity() {
 
     private lateinit var layoutCollapsed: View
     private lateinit var layoutExpanded: View
+    private lateinit var viewDimScrim: View
     private lateinit var btnMore: View
     private lateinit var btnCollapse: View
     private var isDrawerExpanded: Boolean = false
@@ -38,17 +39,23 @@ class ListOverlayActivity : BaseCategoryMenuActivity() {
 
         layoutCollapsed = findViewById(R.id.layoutCollapsed)
         layoutExpanded = findViewById(R.id.layoutExpanded)
+        viewDimScrim = findViewById(R.id.viewDimScrim)
         btnMore = findViewById(R.id.btnMore)
         btnCollapse = findViewById(R.id.btnCollapse)
 
         btnMore.setOnClickListener {
-            Log.d(tag, "[$activityName] 'MENU' button clicked -> expanding overlay drawer to 35%")
+            Log.d(tag, "[$activityName] 'MENU' button clicked -> expanding overlay drawer to 35% with full-width dimmed scrim")
             setDrawerExpanded(true, "MenuButtonClicked")
         }
 
         btnCollapse.setOnClickListener {
             Log.d(tag, "[$activityName] 'Collapse' button clicked -> collapsing overlay to 80dp button")
             setDrawerExpanded(false, "CollapseButtonClicked")
+        }
+
+        viewDimScrim.setOnClickListener {
+            Log.d(tag, "[$activityName] Dimmed outside area clicked -> collapsing overlay to 80dp button")
+            setDrawerExpanded(false, "DimScrimClicked")
         }
 
         updateOverlayViews()
@@ -161,6 +168,14 @@ class ListOverlayActivity : BaseCategoryMenuActivity() {
                 }
             }, 50L)
 
+            viewDimScrim.animate().cancel()
+            viewDimScrim.visibility = View.VISIBLE
+            viewDimScrim.alpha = 0f
+            viewDimScrim.animate()
+                .alpha(1f)
+                .setDuration(250)
+                .start()
+
             layoutExpanded.visibility = View.VISIBLE
             layoutExpanded.alpha = 0f
             layoutExpanded.translationX = -layoutExpanded.width.toFloat().coerceAtLeast(300f)
@@ -202,6 +217,15 @@ class ListOverlayActivity : BaseCategoryMenuActivity() {
                 .setInterpolator(android.view.animation.OvershootInterpolator())
                 .start()
 
+            viewDimScrim.animate().cancel()
+            viewDimScrim.animate()
+                .alpha(0f)
+                .setDuration(200)
+                .withEndAction {
+                    viewDimScrim.visibility = View.GONE
+                }
+                .start()
+
             val slideDistance = if (layoutExpanded.width > 0) layoutExpanded.width.toFloat() else 400f
             layoutExpanded.animate()
                 .translationX(-slideDistance)
@@ -219,6 +243,8 @@ class ListOverlayActivity : BaseCategoryMenuActivity() {
     private fun updateOverlayViews() {
         if (isDrawerExpanded) {
             layoutCollapsed.visibility = View.GONE
+            viewDimScrim.visibility = View.VISIBLE
+            viewDimScrim.alpha = 1f
             layoutExpanded.visibility = View.VISIBLE
             layoutExpanded.translationX = 0f
             layoutExpanded.alpha = 1f
@@ -227,6 +253,8 @@ class ListOverlayActivity : BaseCategoryMenuActivity() {
             layoutCollapsed.alpha = 1f
             layoutCollapsed.scaleX = 1f
             layoutCollapsed.scaleY = 1f
+            viewDimScrim.visibility = View.GONE
+            viewDimScrim.alpha = 0f
             layoutExpanded.visibility = View.GONE
         }
     }

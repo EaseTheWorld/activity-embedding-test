@@ -38,6 +38,7 @@ android {
 }
 
 dependencies {
+    compileOnly(project(":framework-stubs"))
     implementation(project(":core-item-contract"))
     implementation(project(":common-ui-settings"))
     implementation(libs.kotlinx.coroutines.android)

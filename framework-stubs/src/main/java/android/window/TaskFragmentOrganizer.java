@@ -7,6 +7,9 @@ import java.util.concurrent.Executor;
  */
 public class TaskFragmentOrganizer extends WindowOrganizer {
 
+    public static final int TASK_FRAGMENT_TRANSIT_NONE = 0;
+    public static final int TASK_FRAGMENT_TRANSIT_CHANGE = 6;
+
     public TaskFragmentOrganizer(Executor executor) {}
 
     public void registerOrganizer() {
@@ -19,6 +22,13 @@ public class TaskFragmentOrganizer extends WindowOrganizer {
 
     @Override
     public void applyTransaction(WindowContainerTransaction t) {
+        throw new RuntimeException("Stub!");
+    }
+
+    public void applyTransaction(
+            WindowContainerTransaction t,
+            int transitionType,
+            boolean shouldApplyIndependently) {
         throw new RuntimeException("Stub!");
     }
 }

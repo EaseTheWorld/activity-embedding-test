@@ -27,8 +27,8 @@ import android.view.WindowManager
 object FloatingMenuManager {
     private const val TAG = "FloatingMenuManager"
 
-    private const val HANDLE_TOUCH_WIDTH_DP = 32
-    private const val HANDLE_TOUCH_HEIGHT_DP = 72
+    private const val HANDLE_TOUCH_WIDTH_DP = 40
+    private const val HANDLE_TOUCH_HEIGHT_DP = 80
     private const val SWIPE_THRESHOLD_DP = 16
 
     private var windowManager: WindowManager? = null
@@ -71,6 +71,15 @@ object FloatingMenuManager {
                 val view = inflater.inflate(R.layout.layout_floating_menu_button, null)
                 val btnMore = view.findViewById<View>(R.id.btnMore)
 
+                // Exclude this handle region from Android 10+ system gesture navigation (Edge Back Gesture)
+                view.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q && view.width > 0 && view.height > 0) {
+                        view.systemGestureExclusionRects = listOf(
+                            android.graphics.Rect(0, 0, view.width, view.height)
+                        )
+                    }
+                }
+
                 var startX = 0f
                 var startY = 0f
                 var isSwipeTriggered = false
@@ -82,7 +91,7 @@ object FloatingMenuManager {
                             startY = event.rawY
                             isSwipeTriggered = false
                             v.animate().scaleX(1.15f).setDuration(80).start()
-                            false
+                            true
                         }
                         MotionEvent.ACTION_MOVE -> {
                             val dx = event.rawX - startX
@@ -92,23 +101,23 @@ object FloatingMenuManager {
                                 v.animate().scaleX(1.0f).setDuration(80).start()
                                 Log.d(TAG, "Edge Swipe Right detected (dx=$dx, dy=$dy) -> launching overlay drawer")
                                 launchDrawer(context)
-                                true
-                            } else {
-                                false
                             }
+                            true
                         }
                         MotionEvent.ACTION_UP -> {
                             v.animate().scaleX(1.0f).setDuration(80).start()
-                            if (isSwipeTriggered) {
-                                true
-                            } else {
-                                v.performClick()
-                                true
+                            if (!isSwipeTriggered) {
+                                val dx = Math.abs(event.rawX - startX)
+                                val dy = Math.abs(event.rawY - startY)
+                                if (dx < swipeThresholdPx && dy < swipeThresholdPx) {
+                                    v.performClick()
+                                }
                             }
+                            true
                         }
                         MotionEvent.ACTION_CANCEL -> {
                             v.animate().scaleX(1.0f).setDuration(80).start()
-                            false
+                            true
                         }
                         else -> false
                     }

@@ -70,6 +70,9 @@ object DeepLinkResolver {
         uri: Uri,
         extras: Bundle?
     ): Intent {
+        val breakpoint = com.example.core.item.AppConfig.OVERLAY_MODE_WIDTH_DP_BREAKPOINT
+        val breakpointExtraKey = com.example.core.item.AppConfig.EXTRA_CATEGORY_HEADER_BREAKPOINT_DP
+
         return if (categoryId.equals("light", ignoreCase = true)) {
             Intent(ACTION_SETTINGS_EMBED).apply {
                 setClassName(
@@ -78,6 +81,7 @@ object DeepLinkResolver {
                 )
                 data = uri
                 putExtra("category_id", categoryId)
+                putExtra(breakpointExtraKey, breakpoint)
                 if (extras != null) putExtras(extras)
             }
         } else {
@@ -88,6 +92,7 @@ object DeepLinkResolver {
                 )
                 data = uri
                 putExtra("category_id", categoryId)
+                putExtra(breakpointExtraKey, breakpoint)
                 if (extras != null) putExtras(extras)
             }
         }

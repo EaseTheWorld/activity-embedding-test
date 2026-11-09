@@ -19,6 +19,21 @@ object AppConfig {
     const val TAG_PRIMARY_OVERLAY: String = "tag_primary_overlay"
 
     /**
+     * Intent Extra Key to control category header display based on breakpoint width in DP.
+     * Host app passes the breakpoint (e.g. 840dp).
+     * If screen/window width is strictly smaller than this breakpoint (Narrow/Overlay Mode),
+     * each category's main screen renders its own top category title/header.
+     * If width is greater than or equal to breakpoint (Wide/Split Mode), the title is hidden
+     * because the persistent 35% primary sidebar already highlights the active category.
+     */
+    const val EXTRA_CATEGORY_HEADER_BREAKPOINT_DP: String = "extra_category_header_breakpoint_dp"
+
+    /**
+     * Backward-compatible boolean extra key for explicit override.
+     */
+    const val EXTRA_SHOW_CATEGORY_HEADER: String = "extra_show_category_header"
+
+    /**
      * WindowManager Window Extension Bundle Key for configuring whether the overlay activity stack
      * is associated with the launching activity. Setting this to `false` creates an Always-On-Top
      * Pinned Overlay that survives launcher navigation and finishing.
@@ -53,6 +68,57 @@ object AppConfig {
         val widthDp = extractScreenWidthDp(context)
         return if (widthDp > 0) {
             widthDp < OVERLAY_MODE_WIDTH_DP_BREAKPOINT
+        } else {
+            true
+        }
+    }
+
+    /**
+     * Determines whether a Category's main screen should render its top category title.
+     * Evaluates dynamically using [EXTRA_CATEGORY_HEADER_BREAKPOINT_DP] from the intent
+     * (or fallback [OVERLAY_MODE_WIDTH_DP_BREAKPOINT]) against the current screen/task width.
+     *
+     * Sub-screens are excluded because they already have their own dedicated top app bar / title.
+     */
+    fun shouldShowCategoryHeader(context: Any?, intent: Any? = null): Boolean {
+        OVERRIDE_OVERLAY_MODE?.let { return it }
+
+        // 1. Check for legacy/explicit boolean override if present
+        if (intent != null) {
+            try {
+                val hasExtraMethod = intent.javaClass.getMethod("hasExtra", String::class.java)
+                val hasBoolean = hasExtraMethod.invoke(intent, EXTRA_SHOW_CATEGORY_HEADER) as? Boolean ?: false
+                if (hasBoolean) {
+                    val getBooleanExtraMethod = intent.javaClass.getMethod(
+                        "getBooleanExtra",
+                        String::class.java,
+                        Boolean::class.javaPrimitiveType
+                    )
+                    return getBooleanExtraMethod.invoke(intent, EXTRA_SHOW_CATEGORY_HEADER, true) as Boolean
+                }
+            } catch (_: Exception) {}
+        }
+
+        // 2. Extract breakpoint from Intent extras (defaults to 840dp)
+        var breakpoint = OVERLAY_MODE_WIDTH_DP_BREAKPOINT
+        if (intent != null) {
+            try {
+                val getIntExtraMethod = intent.javaClass.getMethod(
+                    "getIntExtra",
+                    String::class.java,
+                    Int::class.javaPrimitiveType
+                )
+                breakpoint = getIntExtraMethod.invoke(
+                    intent,
+                    EXTRA_CATEGORY_HEADER_BREAKPOINT_DP,
+                    OVERLAY_MODE_WIDTH_DP_BREAKPOINT
+                ) as Int
+            } catch (_: Exception) {}
+        }
+
+        val widthDp = extractScreenWidthDp(context)
+        return if (widthDp > 0) {
+            widthDp < breakpoint
         } else {
             true
         }

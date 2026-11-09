@@ -308,6 +308,10 @@ abstract class BaseCategoryMenuActivity : BaseLoggingActivity() {
             targetIntent.putExtra(GenericSettingsActivity.EXTRA_CATEGORY_ID, category.id)
             targetIntent.putExtra(GenericSettingsActivity.EXTRA_AUTHORITY, category.authority)
             targetIntent.putExtra(GenericSettingsActivity.EXTRA_TITLE, category.title)
+            targetIntent.putExtra(
+                com.example.core.item.AppConfig.EXTRA_CATEGORY_HEADER_BREAKPOINT_DP,
+                com.example.core.item.AppConfig.OVERLAY_MODE_WIDTH_DP_BREAKPOINT
+            )
             if (extras != null) {
                 targetIntent.putExtras(extras)
             }

@@ -204,7 +204,25 @@ context.startActivity(homeIntent)
 
 ---
 
-## 6. 결론
+## 6. 동적 카테고리 헤더 제어 계약 (`EXTRA_CATEGORY_HEADER_BREAKPOINT_DP`)
+
+Narrow(Overlay) 모드와 Wide(Split) 모드 간의 UI 맥락 차이를 해결하기 위해 Intent Extra 기반의 동적 Breakpoint 계약을 도입했습니다.
+
+### 6.1 설계 배경 및 문제 해결
+* **Wide (Split) 모드**: 좌측 35% 사이드바에 현재 선택된 카테고리가 항상 하이라이트되어 노출되므로, 우측 카테고리 화면 상단에 거대한 카테고리 타이틀/서브타이틀이 중복 표시되면 수직 공간 낭비가 발생합니다.
+* **Narrow (Overlay) 모드**: 사이드바가 닫혀있고 최소형 엣지 핸들(`›`)만 노출되므로, 전체 화면으로 열린 카테고리 상단에 명확한 카테고리 타이틀과 설명이 있어야 사용자가 자신의 위치를 인지할 수 있습니다.
+* **Intent Extra Breakpoint 계약의 우수성**:
+  - Intent Extra에 고정된 `Boolean`(`true/false`)을 주입하면 화면 회전이나 폴더블 디스플레이 접힘/펼침으로 액티비티가 recreate되거나 `onConfigurationChanged`가 발생했을 때 과거 모드의 값에 갇히게 됩니다.
+  - 호스트 앱은 불변의 기준 너비인 **`EXTRA_CATEGORY_HEADER_BREAKPOINT_DP` (840dp)**만 Extra로 전달합니다.
+  - 각 카테고리 Activity는 자기 자신의 현재 너비(`resources.configuration.screenWidthDp`)를 breakpoint와 실시간 비교하여:
+    - `screenWidthDp < breakpoint` (Narrow Overlay): **카테고리 메인 헤더 표시 (`View.VISIBLE`)**
+    - `screenWidthDp >= breakpoint` (Wide Split): **카테고리 메인 헤더 숨김 (`View.GONE`)**
+  - **Main Screen에만 한정**: 서브 스크린(`GenericSubActivity`, 아이템 상세 화면 등)은 이미 고유한 상단바/뒤로가기 버튼이 존재하므로 영향을 받지 않고 오직 루트 카테고리 메인 화면에만 적용됩니다.
+  - **외부 플러그인 호환성**: `LightSettingsActivity`와 같은 독립 플러그인 앱도 별도의 내부 라이브러리 컴파일 의존 없이 `intent.getIntExtra("extra_category_header_breakpoint_dp", 840)` 한 줄만으로 완벽하게 동작합니다.
+
+---
+
+## 7. 결론
 
 이번 리팩토링을 통해 **"비표준 윈도우 확장 API 및 복잡한 TaskFragment 관리"**에서 벗어나, **"안드로이드 표준 액티비티 스택 플래그(`CLEAR_TOP`)와 독립된 WindowManager 뷰(`FloatingMenuManager`)"**를 결합한 견고하고 우아한 아키텍처를 완성했습니다.
 

@@ -185,6 +185,7 @@ class HomeActivity : ComponentActivity() {
             data = targetUri
             putExtra("category_id", item.categoryId)
             putExtra("target_item_id", item.itemId)
+            putExtra(AppConfig.EXTRA_CATEGORY_HEADER_BREAKPOINT_DP, AppConfig.OVERLAY_MODE_WIDTH_DP_BREAKPOINT)
         }
 
         Log.d(tag, "Launching target setting from Home search: $targetComponent, uri=$targetUri, categoryId=${item.categoryId}")

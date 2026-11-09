@@ -23,6 +23,7 @@ class LightSettingsActivity : AppCompatActivity() {
     private lateinit var switchFrunkLight: MaterialSwitch
     private lateinit var switchTrunkLight: MaterialSwitch
     private lateinit var switchAutoHighBeam: MaterialSwitch
+    private lateinit var layoutCategoryHeader: View
 
     private val providerUri by lazy {
         Uri.parse("content://com.example.carsettings.provider.light/items")
@@ -38,6 +39,9 @@ class LightSettingsActivity : AppCompatActivity() {
         switchFrunkLight = findViewById(R.id.switchFrunkLight)
         switchTrunkLight = findViewById(R.id.switchTrunkLight)
         switchAutoHighBeam = findViewById(R.id.switchAutoHighBeam)
+
+        layoutCategoryHeader = findViewById(R.id.layoutCategoryHeader)
+        updateCategoryHeaderVisibility()
 
         val btnOff = findViewById<Button>(R.id.btnHeadlightOff)
         val btnPark = findViewById<Button>(R.id.btnHeadlightParking)
@@ -91,6 +95,7 @@ class LightSettingsActivity : AppCompatActivity() {
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
         setIntent(intent)
+        updateCategoryHeaderVisibility()
         handleDeepLinkIntent(intent)
     }
 
@@ -202,6 +207,16 @@ class LightSettingsActivity : AppCompatActivity() {
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
         Log.d(tag, "[$activityName] onConfigurationChanged(newConfig = $newConfig)")
+        updateCategoryHeaderVisibility()
+    }
+
+    private fun updateCategoryHeaderVisibility() {
+        if (!::layoutCategoryHeader.isInitialized) return
+        val breakpoint = intent?.getIntExtra("extra_category_header_breakpoint_dp", 840) ?: 840
+        // If current window/screen width is smaller than breakpoint, we are in Narrow Overlay mode -> show header
+        val isNarrow = resources.configuration.screenWidthDp < breakpoint
+        layoutCategoryHeader.visibility = if (isNarrow) View.VISIBLE else View.GONE
+        Log.d(tag, "[$activityName] updateCategoryHeaderVisibility: screenWidthDp=${resources.configuration.screenWidthDp}, breakpoint=$breakpoint -> isNarrow=$isNarrow")
     }
 
     private fun updateSetting(key: String, value: String) {

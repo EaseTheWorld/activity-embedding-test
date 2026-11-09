@@ -12,22 +12,29 @@
         android:orientation="vertical"
         android:padding="24dp">
 
-        <TextView
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:id="@+id/layoutCategoryHeader"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Vehicle Lights"
-            android:textSize="26sp"
-            android:textStyle="bold"
-            android:textColor="#1C1B1F"
-            android:layout_marginBottom="4dp" />
+            android:orientation="vertical">
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Exterior illumination, interior ambiance, and compartment lighting"
-            android:textSize="14sp"
-            android:textColor="#49454F"
-            android:layout_marginBottom="12dp" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Vehicle Lights"
+                android:textSize="26sp"
+                android:textStyle="bold"
+                android:textColor="#1C1B1F"
+                android:layout_marginBottom="4dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Exterior illumination, interior ambiance, and compartment lighting"
+                android:textSize="14sp"
+                android:textColor="#49454F"
+                android:layout_marginBottom="12dp" />
+        </LinearLayout>
 
         <Button
             android:id="@+id/btnOpenLightDetail"

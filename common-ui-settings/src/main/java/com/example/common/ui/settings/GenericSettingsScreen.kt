@@ -36,6 +36,14 @@ import androidx.compose.material3.IconButton
 import androidx.compose.ui.Alignment
 
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
+
+/**
+ * CompositionLocal to control whether the Category Main Screen renders its top title/header.
+ * - Narrow (Overlay) Mode: true (Displays title to clarify current category context).
+ * - Wide (Split) Mode: false (Hidden to avoid redundancy with the persistent left 35% sidebar).
+ */
+val LocalShowCategoryHeader = compositionLocalOf { true }
 
 /**
  * Universal Settings Screen rendered via Jetpack Compose.
@@ -51,6 +59,7 @@ fun GenericSettingsScreen(
     subtitle: String,
     items: List<Item>,
     targetItemId: String? = null,
+    showCategoryHeader: Boolean = LocalShowCategoryHeader.current,
     onNavigateBack: (() -> Unit)? = null,
     onItemClick: ((Item) -> Unit)? = null,
     viewModelRegistry: ItemViewModelRegistry = LocalItemViewModelRegistry.current
@@ -69,6 +78,7 @@ fun GenericSettingsScreen(
                 .fillMaxSize()
                 .padding(24.dp)
         ) {
+            if (showCategoryHeader) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
@@ -101,6 +111,16 @@ fun GenericSettingsScreen(
                 }
             }
             Spacer(modifier = Modifier.height(12.dp))
+            } else if (onNavigateBack != null) {
+                IconButton(onClick = onNavigateBack) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back",
+                        tint = Color(0xFF1E1E2E)
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+            }
             val context = androidx.compose.ui.platform.LocalContext.current
             androidx.compose.material3.Button(
                 onClick = {

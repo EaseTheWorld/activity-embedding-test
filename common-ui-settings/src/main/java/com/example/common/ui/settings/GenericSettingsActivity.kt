@@ -29,6 +29,7 @@ open class GenericSettingsActivity : AppCompatActivity() {
     private var pendingIntent = mutableStateOf<Intent?>(null)
     private var navTrigger = mutableStateOf(0)
     private var currentHighlightEvent = mutableStateOf<HighlightEvent?>(null)
+    private var showCategoryHeader = mutableStateOf(true)
 
     protected open fun getViewModelRegistry(): ItemViewModelRegistry = defaultViewModelRegistry
 
@@ -41,6 +42,7 @@ open class GenericSettingsActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         pendingIntent.value = intent
+        showCategoryHeader.value = com.example.core.item.AppConfig.shouldShowCategoryHeader(this, intent)
 
         val initialDestination = resolveInitialDestination(intent)
 
@@ -84,7 +86,8 @@ open class GenericSettingsActivity : AppCompatActivity() {
 
             CompositionLocalProvider(
                 LocalItemViewModelRegistry provides getViewModelRegistry(),
-                LocalHighlightEvent provides currentHighlightEvent.value
+                LocalHighlightEvent provides currentHighlightEvent.value,
+                LocalShowCategoryHeader provides showCategoryHeader.value
             ) {
                 SettingsNavHost(
                     navController = navController,
@@ -104,7 +107,14 @@ open class GenericSettingsActivity : AppCompatActivity() {
         setIntent(intent)
         Log.d(tag, "onNewIntent received: $intent, data=${intent?.data}, extras=${intent?.extras}")
         pendingIntent.value = intent
+        showCategoryHeader.value = com.example.core.item.AppConfig.shouldShowCategoryHeader(this, intent)
         navTrigger.value++
+    }
+
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        showCategoryHeader.value = com.example.core.item.AppConfig.shouldShowCategoryHeader(this, intent)
+        Log.d(tag, "onConfigurationChanged: newConfig=$newConfig, showCategoryHeader=${showCategoryHeader.value}")
     }
 
     protected fun resolveInitialDestination(intent: Intent?): String {

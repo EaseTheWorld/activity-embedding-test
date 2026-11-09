@@ -283,18 +283,13 @@ abstract class BaseCategoryMenuActivity : BaseLoggingActivity() {
         onBeforeCategoryLaunch()
 
         if (category.id == "home") {
-            if (AppConfig.isOverlayMode(this)) {
-                Log.d(tag, "[$activityName] Navigating to HomeActivity in Narrow Mode via CLEAR_TOP")
-                val homeIntent = Intent(this, HomeActivity::class.java).apply {
-                    flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-                    putExtra(HomeActivity.EXTRA_INITIAL_CATEGORY_ID, "home")
-                }
-                startActivity(homeIntent)
-                overridePendingTransition(0, 0)
-            } else {
-                Log.d(tag, "[$activityName] Navigating to HomeActivity -> HomeNavigationBridge.notifyDismissCategoryStacks(taskId)")
-                HomeNavigationBridge.notifyDismissCategoryStacks(taskId)
+            Log.d(tag, "[$activityName] Navigating to HomeActivity via CLEAR_TOP")
+            val homeIntent = Intent(this, HomeActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                putExtra(HomeActivity.EXTRA_INITIAL_CATEGORY_ID, "home")
             }
+            startActivity(homeIntent)
+            overridePendingTransition(0, 0)
             return
         }
 

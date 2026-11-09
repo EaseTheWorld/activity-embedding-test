@@ -70,52 +70,16 @@ class HomeActivity : ComponentActivity() {
             intent?.getParcelableExtra(EXTRA_TARGET_INTENT)
         }
 
-        if (savedInstanceState == null) {
-            if (isNarrowOverlayMode) {
-                launchPrimaryPinnedOverlay(initialCategoryId, targetIntent)
-            } else {
-                launchListSidebar(initialCategoryId, targetIntent)
-            }
-        }
-
-        if (isNarrowOverlayMode && targetIntent != null) {
+        if (targetIntent != null) {
             window.decorView.post {
                 if (!isFinishing && !isDestroyed) {
                     if (initialCategoryId != null && !initialCategoryId.equals("home", ignoreCase = true)) {
                         HomeNavigationBridge.notifyCategorySelected(initialCategoryId)
                     }
-                    HomeNavigationBridge.launchCategory(this, targetIntent)
+                    startActivity(targetIntent)
+                    overridePendingTransition(0, 0)
                 }
             }
-        } else if (initialCategoryId?.equals("home", ignoreCase = true) == true) {
-            HomeNavigationBridge.notifyDismissCategoryStacks()
-        }
-    }
-
-    private fun launchPrimaryPinnedOverlay(initialCategoryId: String?, targetIntent: Intent?) {
-        try {
-            Log.i(tag, "Attaching FloatingMenuButton in Narrow Mode")
-            HomeNavigationBridge.showFloatingOverlay(this, initialCategoryId)
-        } catch (e: Exception) {
-            Log.e(tag, "Failed to attach floating overlay: $e", e)
-        }
-    }
-
-    private fun launchListSidebar(initialCategoryId: String?, targetIntent: Intent?) {
-        try {
-            val listIntent = Intent().apply {
-                component = ComponentName(packageName, "com.example.lifecycleapp.ListActivity")
-                if (initialCategoryId != null) {
-                    putExtra(EXTRA_INITIAL_CATEGORY_ID, initialCategoryId)
-                }
-                if (targetIntent != null) {
-                    putExtra(EXTRA_TARGET_INTENT, targetIntent)
-                }
-            }
-            Log.i(tag, "Launching ListActivity sidebar in Wide Mode via RTL SplitPairRule")
-            startActivity(listIntent)
-        } catch (e: Exception) {
-            Log.e(tag, "Failed to launch ListActivity sidebar: $e", e)
         }
     }
 

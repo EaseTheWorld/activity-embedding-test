@@ -206,8 +206,8 @@ object HomeNavigationBridge {
     }
 
     /**
-     * Dismisses any currently active Category `ActivityStack` and launches [targetIntent]
-     * directly into the category stack.
+     * Launches [targetIntent] via unified CLEAR_TOP | SINGLE_TOP on [HomeActivity].
+     * Works identically and cleanly in both Wide Mode and Narrow Mode!
      */
     @Suppress("DEPRECATION")
     fun launchCategory(caller: Context, targetIntent: Intent) {
@@ -215,40 +215,21 @@ object HomeNavigationBridge {
         mainHandler.removeCallbacks(clearLaunchingRunnable)
         mainHandler.postDelayed(clearLaunchingRunnable, 400L)
 
-        if (AppConfig.isOverlayMode(caller)) {
-            // Narrow Mode: Clean, native Android ActivityStack management with CLEAR_TOP | SINGLE_TOP.
-            // Eliminates all TaskFragment and ActivityEmbedding rules in Narrow Mode!
-            if (caller is HomeActivity) {
-                caller.startActivity(targetIntent)
-                caller.overridePendingTransition(0, 0)
-            } else {
-                val categoryId = targetIntent.getStringExtra("category_id")
-                val homeIntent = Intent(caller, HomeActivity::class.java).apply {
-                    flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-                    putExtra(HomeActivity.EXTRA_TARGET_INTENT, targetIntent)
-                    if (categoryId != null) {
-                        putExtra(HomeActivity.EXTRA_INITIAL_CATEGORY_ID, categoryId)
-                    }
-                }
-                caller.startActivity(homeIntent)
-                if (caller is Activity) {
-                    caller.overridePendingTransition(0, 0)
-                }
-            }
+        if (caller is HomeActivity) {
+            caller.startActivity(targetIntent)
+            caller.overridePendingTransition(0, 0)
         } else {
-            // Wide Mode: Uses SplitPairRule and CategoryStackManager
-            val taskId = (caller as? Activity)?.taskId ?: -1
-            notifyDismissCategoryStacks(taskId)
-
-            val menu = menuLauncher?.invoke()
-            val launchSource = if (menu != null && !menu.isFinishing && !menu.isDestroyed) {
-                menu
-            } else {
-                caller
+            val categoryId = targetIntent.getStringExtra("category_id")
+            val homeIntent = Intent(caller, HomeActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                putExtra(HomeActivity.EXTRA_TARGET_INTENT, targetIntent)
+                if (categoryId != null) {
+                    putExtra(HomeActivity.EXTRA_INITIAL_CATEGORY_ID, categoryId)
+                }
             }
-            launchSource.startActivity(targetIntent)
-            if (launchSource is Activity) {
-                launchSource.overridePendingTransition(0, 0)
+            caller.startActivity(homeIntent)
+            if (caller is Activity) {
+                caller.overridePendingTransition(0, 0)
             }
         }
     }

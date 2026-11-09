@@ -64,14 +64,8 @@ class SplitInitializer : Initializer<RuleController> {
             Log.d("LifecycleLog", "[SplitInitializer] Initialized Narrow Mode: No SplitRules required (pure native Activity stack)")
         } else {
             // Wide Mode:
-            // 1. HomeActivity (Primary, Task Root) <-> ListActivity (Secondary, sidebar menu)
-            //    Configured with LayoutDirection.RIGHT_TO_LEFT so HomeActivity stays on the RIGHT (65%),
-            //    and ListActivity is pinned to the LEFT (35%).
-            // 2. ListActivity (Primary) <-> Category (Secondary, ACTION_SETTINGS_EMBED)
-            //    Configured with LayoutDirection.LEFT_TO_RIGHT so Category launches into the RIGHT (65%),
-            //    covering HomeActivity. Dismissing the category reveals HomeActivity underneath.
+            // Standard LTR Split: ListActivity (Primary, 35% left) <-> Content (Secondary, 65% right)
             val listComponent = ComponentName(context, ListActivity::class.java)
-            val homeComponent = ComponentName(context, com.example.feature.home.HomeActivity::class.java)
             val wildcardComponent = ComponentName("*", "*")
 
             val animParams = EmbeddingAnimationParams.Builder()
@@ -81,34 +75,17 @@ class SplitInitializer : Initializer<RuleController> {
                 .setCloseAnimation(EmbeddingAnimationParams.AnimationSpec.DEFAULT)
                 .build()
 
-            // RTL Split: HomeActivity (Primary, 65% right) <-> ListActivity (Secondary, 35% left)
-            val rtlSplitAttributes = SplitAttributes.Builder()
-                .setSplitType(SplitAttributes.SplitType.ratio(1.0f - AppConfig.PRIMARY_DRAWER_RATIO))
-                .setLayoutDirection(SplitAttributes.LayoutDirection.RIGHT_TO_LEFT)
-                .setAnimationParams(animParams)
-                .build()
-
-            val homeListSplitRule = SplitPairRule.Builder(
-                setOf(SplitPairFilter(homeComponent, listComponent, null))
-            )
-                .setMinWidthDp(0)
-                .setMinHeightDp(0)
-                .setMinSmallestWidthDp(0)
-                .setDefaultSplitAttributes(rtlSplitAttributes)
-                .setFinishPrimaryWithSecondary(SplitRule.FinishBehavior.ALWAYS)
-                .setFinishSecondaryWithPrimary(SplitRule.FinishBehavior.ALWAYS)
-                .setClearTop(false)
-                .build()
-
-            // LTR Split: ListActivity (Primary, 35% left) <-> Category (Secondary, 65% right)
             val ltrSplitAttributes = SplitAttributes.Builder()
                 .setSplitType(SplitAttributes.SplitType.ratio(AppConfig.PRIMARY_DRAWER_RATIO))
                 .setLayoutDirection(SplitAttributes.LayoutDirection.LEFT_TO_RIGHT)
                 .setAnimationParams(animParams)
                 .build()
 
-            val categorySplitRule = SplitPairRule.Builder(
-                setOf(SplitPairFilter(listComponent, wildcardComponent, ACTION_SETTINGS_EMBED))
+            val splitRule = SplitPairRule.Builder(
+                setOf(
+                    SplitPairFilter(listComponent, wildcardComponent, null),
+                    SplitPairFilter(listComponent, wildcardComponent, ACTION_SETTINGS_EMBED)
+                )
             )
                 .setMinWidthDp(0)
                 .setMinHeightDp(0)
@@ -119,8 +96,8 @@ class SplitInitializer : Initializer<RuleController> {
                 .setClearTop(false)
                 .build()
 
-            ruleController.setRules(setOf(homeListSplitRule, categorySplitRule))
-            Log.d("LifecycleLog", "[SplitInitializer] Initialized Wide Mode (HomeActivity Primary RTL 65:35 ListActivity + ListActivity LTR 35:65 Category)")
+            ruleController.setRules(setOf(splitRule))
+            Log.d("LifecycleLog", "[SplitInitializer] Initialized Wide Mode (Standard LTR Split ListActivity 35% <-> Content 65%)")
         }
 
         return ruleController

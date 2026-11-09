@@ -14,10 +14,10 @@ import com.example.feature.home.HomeNavigationBridge
  *
  * Runs in its own ephemeral task (`android:taskAffinity="com.example.lifecycleapp.deeplink"`)
  * with a translucent theme, finishes immediately, and ensures:
- * 1. Cold Start: Launches [HomeActivity] with `ACTION_MAIN` / `CATEGORY_LAUNCHER`, establishing
- *    [HomeActivity] as the pristine Task Root of the application task with a consistent `baseIntent`.
+ * 1. Cold Start: Launches [ListActivity] with `ACTION_MAIN` / `CATEGORY_LAUNCHER`, establishing
+ *    [ListActivity] as the pristine Task Root of the application task with a consistent `baseIntent`.
  * 2. Warm Start: Brings the existing application task to the foreground and delegates the deep link
- *    target directly via [HomeNavigationBridge] without referencing any menu Activity views.
+ *    target directly via [HomeNavigationBridge] or [HomeActivity] CLEAR_TOP.
  */
 class DeepLinkRouterActivity : Activity() {
 
@@ -35,9 +35,9 @@ class DeepLinkRouterActivity : Activity() {
         val isWarmStart = HomeNavigationBridge.isSessionActive()
 
         if (isWarmStart) {
-            Log.i(tag, "Warm start detected -> bringing task to front and delegating deep link via HomeNavigationBridge")
+            Log.i(tag, "Warm start detected -> bringing task to front and delegating deep link")
             // Bring main app task to foreground
-            val bringToFrontIntent = Intent(this, HomeActivity::class.java).apply {
+            val bringToFrontIntent = Intent(this, ListActivity::class.java).apply {
                 action = Intent.ACTION_MAIN
                 addCategory(Intent.CATEGORY_LAUNCHER)
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK
@@ -46,7 +46,11 @@ class DeepLinkRouterActivity : Activity() {
 
             if (resolved != null) {
                 if (resolved.categoryId.equals("home", ignoreCase = true)) {
-                    HomeNavigationBridge.notifyDismissCategoryStacks()
+                    val homeIntent = Intent(this, HomeActivity::class.java).apply {
+                        flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                        putExtra(HomeActivity.EXTRA_INITIAL_CATEGORY_ID, "home")
+                    }
+                    startActivity(homeIntent)
                 } else {
                     val targetIntent = resolved.targetIntent
                     if (targetIntent != null) {
@@ -56,9 +60,9 @@ class DeepLinkRouterActivity : Activity() {
                 }
             }
         } else {
-            Log.i(tag, "Cold start detected -> launching HomeActivity as pristine Task Root")
+            Log.i(tag, "Cold start detected -> launching ListActivity as pristine Task Root")
             val targetIntent = resolved?.targetIntent
-            val homeIntent = Intent(this, HomeActivity::class.java).apply {
+            val listIntent = Intent(this, ListActivity::class.java).apply {
                 action = Intent.ACTION_MAIN
                 addCategory(Intent.CATEGORY_LAUNCHER)
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK
@@ -69,7 +73,7 @@ class DeepLinkRouterActivity : Activity() {
                     }
                 }
             }
-            startActivity(homeIntent)
+            startActivity(listIntent)
         }
 
         overridePendingTransition(0, 0)

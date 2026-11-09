@@ -1,70 +1,84 @@
 package com.example.lifecycleapp
 
-import com.example.feature.home.HomeNavigationBridge
+import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.view.MotionEvent
-import androidx.lifecycle.lifecycleScope
-import com.example.feature.home.CategoryStackManager
+import com.example.core.item.AppConfig
 import com.example.feature.home.HomeActivity
+import com.example.feature.home.HomeNavigationBridge
 
 /**
- * Wide Mode Split Secondary Menu Activity (`Theme.LifecycleApp` - Opaque, static sidebar layout).
+ * Task Root Activity for the application.
  *
  * Responsibilities:
- * 1. Launched by [HomeActivity] in Wide Mode (`AppConfig.isOverlayMode == false`).
- * 2. Positioned at the left 35% pane via `SplitPairRule` with `LayoutDirection.RIGHT_TO_LEFT`
- *    paired with [HomeActivity] (Primary, right 65%).
- * 3. Launches Category activities into the right 65% pane via `SplitPairRule(ListActivity <-> Category)`.
- * 4. Uses `FLAG_NOT_FOCUSABLE` and `ensureSecondaryFocus()` via `OverlayBoundsHelper.requestFocusOnSecondary(this)`
- *    so WindowManager focus remains strictly on the right content container (Home/Category).
+ * 1. Wide Mode (`AppConfig.isOverlayMode == false`):
+ *    - Serves as the Task Root and primary left 35% sidebar.
+ *    - Pairs with Home/Category in the right 65% secondary container via [SplitInitializer].
+ * 2. Narrow Mode (`AppConfig.isOverlayMode == true`):
+ *    - Serves as the pristine Task Root beneath [HomeActivity].
+ *    - Attaches the 80dp floating circular MENU button via [FloatingMenuManager].
+ *    - Launches [HomeActivity] to cover the full screen.
  */
 class ListActivity : BaseCategoryMenuActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        SplitInitializer.ensureInitialized(this)
+        val isNarrow = AppConfig.isOverlayMode(this)
+        SplitInitializer.ensureInitialized(this, isNarrow)
 
-        // Wide Mode: Static opaque sidebar layout
-        // Default is focusable (no static FLAG_NOT_FOCUSABLE) for multi-window tap responsiveness
-        setContentView(R.layout.activity_list)
-        initCategoryMenuViews()
-        CategoryStackManager.trackSplitInfo(lifecycleScope, this, isNarrowMode = false)
+        if (isNarrow) {
+            // Narrow Mode: Floating MENU button is attached via WindowManager
+            FloatingMenuManager.attach(this)
+        } else {
+            // Wide Mode: Static sidebar layout on the left 35%
+            setContentView(R.layout.activity_list)
+            initCategoryMenuViews()
+        }
 
         val initialCategoryId = intent?.getStringExtra(HomeActivity.EXTRA_INITIAL_CATEGORY_ID)
-        val initialTargetIntent: android.content.Intent? = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-            intent?.getParcelableExtra(HomeActivity.EXTRA_TARGET_INTENT, android.content.Intent::class.java)
+        val initialTargetIntent: Intent? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            intent?.getParcelableExtra(HomeActivity.EXTRA_TARGET_INTENT, Intent::class.java)
         } else {
             @Suppress("DEPRECATION")
             intent?.getParcelableExtra(HomeActivity.EXTRA_TARGET_INTENT)
         }
-        if (!initialCategoryId.isNullOrEmpty()) {
+
+        if (savedInstanceState == null) {
+            val homeIntent = Intent(this, HomeActivity::class.java).apply {
+                action = ACTION_SETTINGS_EMBED
+                if (initialCategoryId != null) {
+                    putExtra(HomeActivity.EXTRA_INITIAL_CATEGORY_ID, initialCategoryId)
+                }
+                if (initialTargetIntent != null) {
+                    putExtra(HomeActivity.EXTRA_TARGET_INTENT, initialTargetIntent)
+                }
+            }
+            startActivity(homeIntent)
+            overridePendingTransition(0, 0)
+        }
+
+        if (!initialCategoryId.isNullOrEmpty() && !isNarrow) {
             val matchedIndex = categories.indexOfFirst { it.id.equals(initialCategoryId, ignoreCase = true) }
             if (matchedIndex >= 0) {
                 categoryAdapter?.selectedPosition = matchedIndex
                 categoryAdapter?.notifyDataSetChanged()
                 listViewCategories.smoothScrollToPosition(matchedIndex)
             }
-            if (initialTargetIntent != null && savedInstanceState == null) {
-                window.decorView.post {
-                    if (!isFinishing && !isDestroyed) {
-                        HomeNavigationBridge.launchCategory(this, initialTargetIntent)
-                    }
-                }
-            }
         } else if (intent?.data != null || intent?.action == "com.example.lifecycleapp.open") {
             handleIntent(intent)
         }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        FloatingMenuManager.detach()
     }
 
     private fun ensureSecondaryFocus() {
         if (isFinishing) return
         OverlayBoundsHelper.requestFocusOnSecondary(this)
 
-        // relayoutWindow experiment:
-        // Temporarily add FLAG_NOT_FOCUSABLE so WindowManagerService.relayoutWindow
-        // sees flagChanges & FLAG_NOT_FOCUSABLE != 0 and executes updateFocusedWindowLocked,
-        // shifting mCurrentFocus immediately to mFocusedApp (secondary task).
-        // Then clear FLAG_NOT_FOCUSABLE after a frame so ListActivity remains tap-focusable.
         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE)
         window.decorView.post {
             if (!isFinishing && !isDestroyed) {

@@ -29,10 +29,6 @@
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density"
             android:theme="@style/Theme.AppCompat.DayNight.NoActionBar">
             <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-            <intent-filter>
                 <action android:name="com.example.carsettings.ACTION_SETTINGS_EMBED" />
                 <action android:name="com.example.carsettings.HOME" />
                 <category android:name="android.intent.category.DEFAULT" />

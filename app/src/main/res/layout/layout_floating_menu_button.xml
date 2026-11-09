@@ -1,40 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/layoutCollapsed"
-    android:layout_width="80dp"
-    android:layout_height="80dp"
-    android:padding="8dp">
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content">
 
-    <LinearLayout
+    <!-- Touch target container with id 'btnMore' for 100% test & accessibility compatibility -->
+    <FrameLayout
         android:id="@+id/btnMore"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:orientation="vertical"
-        android:gravity="center"
-        android:background="@drawable/bg_icon_circle"
-        android:elevation="6dp"
+        android:layout_width="32dp"
+        android:layout_height="72dp"
         android:clickable="true"
         android:focusable="true">
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="☰"
-            android:textColor="@color/primary"
-            android:textSize="26sp"
-            android:textStyle="bold"
+        <!-- Visual Mini Edge Swipe Pill Handle -->
+        <LinearLayout
+            android:layout_width="6dp"
+            android:layout_height="52dp"
+            android:layout_gravity="start|center_vertical"
+            android:background="@drawable/bg_edge_handle"
+            android:elevation="4dp"
             android:gravity="center"
-            android:includeFontPadding="false" />
+            android:orientation="vertical">
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="1dp"
-            android:text="MENU"
-            android:textColor="@color/primary"
-            android:textSize="9sp"
-            android:textStyle="bold"
-            android:includeFontPadding="false" />
-    </LinearLayout>
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="›"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:includeFontPadding="false" />
+        </LinearLayout>
+    </FrameLayout>
 
 </FrameLayout>

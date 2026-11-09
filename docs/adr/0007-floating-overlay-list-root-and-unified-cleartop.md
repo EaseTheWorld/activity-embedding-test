@@ -24,11 +24,13 @@ Previously, [HomeActivity.kt](file:///c:/Users/user/Documents/antigravity/kind-c
 
 ## Technical Discovery & Core Breakthrough
 
-### 1. Floating Window (`WindowManager`) Decoupled Overlay
+### 1. Floating Window (`WindowManager`) Decoupled Overlay & Mini Edge Swipe Handle
 Instead of running a heavy pinned Activity/TaskFragment 24/7 as an overlay:
-- **Collapsed State**: [FloatingMenuManager.kt](file:///c:/Users/user/Documents/antigravity/kind-curie/app/src/main/java/com/example/lifecycleapp/FloatingMenuManager.kt) attaches an 80dp circular floating button directly to the system `WindowManager` (`TYPE_APPLICATION` / `TYPE_APPLICATION_PANEL`).
-  - Outside the 80dp circle, no window exists—touch events pass 100% cleanly to underlying views without any window bound resizing.
-- **Expanded State**: Clicking the button temporarily detaches the floating view and launches [ListWithTranslucentActivity.kt](file:///c:/Users/user/Documents/antigravity/kind-curie/app/src/main/java/com/example/lifecycleapp/ListWithTranslucentActivity.kt), a standard translucent Activity with a 35% left drawer and 65% modal dim scrim.
+- **Collapsed State**: [FloatingMenuManager.kt](file:///c:/Users/user/Documents/antigravity/kind-curie/app/src/main/java/com/example/lifecycleapp/FloatingMenuManager.kt) attaches an ultra-minimal Edge Swipe Pill Handle (6dp visual width, 32dp touch area) directly to the system `WindowManager` along the left vertical center (`Gravity.START | Gravity.CENTER_VERTICAL`).
+  - Completely avoids top app-bars, titles, and subscreen back buttons without requiring left insets or auto-hide IPC.
+  - Supports both a gentle tap (click) and rightward swipe/drag gesture (`dx > 16dp`) to launch the overlay drawer.
+  - Outside this tiny edge strip, no window exists—touch events pass 100% cleanly to underlying views without any window bound resizing.
+- **Expanded State**: Clicking or swiping the handle temporarily detaches the floating view and launches [ListWithTranslucentActivity.kt](file:///c:/Users/user/Documents/antigravity/kind-curie/app/src/main/java/com/example/lifecycleapp/ListWithTranslucentActivity.kt), a standard translucent Activity with a 35% left drawer and 65% modal dim scrim.
   - Tapping the dim scrim or pressing Back simply finishes this single-instance activity. Its lifecycle is identical to any standard Android Activity.
 
 ### 2. Setting ListActivity as Pristine Task Root

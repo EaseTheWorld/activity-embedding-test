@@ -69,8 +69,8 @@ sequenceDiagram
     User->>HA: 하위 화면 자유롭게 터치 및 스크롤 (터치 통과 100%)
     
     Note over User,LTA: 메뉴 펼침 인터랙션
-    User->>FMM: 80dp MENU 버튼 클릭
-    FMM->>FMM: WindowManager.removeView() (플로팅 버튼 숨김)
+    User->>FMM: 좌측 미니 에지 핸들 탭(클릭) 또는 오른쪽 스와이프
+    FMM->>FMM: WindowManager.removeView() (플로팅 뷰 숨김)
     FMM->>LTA: startActivity(ListWithTranslucentActivity)
     LTA->>LTA: 좌측 35% Drawer 슬라이드인 + 우측 65% Dim Scrim 페이드인
     
@@ -87,14 +87,16 @@ sequenceDiagram
     end
 ```
 
-* **접힌 상태 (Collapsed)**:
-  - [`FloatingMenuManager`](file:///c:/Users/user/Documents/antigravity/kind-curie/app/src/main/java/com/example/lifecycleapp/FloatingMenuManager.kt)가 안드로이드 표준 `WindowManager.addView()`를 통해 좌측 상단에 80dp 크기의 플로팅 뷰([`layout_floating_menu.xml`](file:///c:/Users/user/Documents/antigravity/kind-curie/app/src/main/res/layout/layout_floating_menu.xml))를 직접 부착.
-  - 80dp 바깥 영역은 윈도우 자체가 존재하지 않으므로, 하위 UI(`HomeActivity`, `CategoryActivity`)로 들어가는 터치 이벤트가 0.001%의 왜곡 없이 100% 통과.
+* **접힌 상태 (Collapsed) - 미니 에지 스와이프 핸들**:
+  - [`FloatingMenuManager`](file:///c:/Users/user/Documents/antigravity/kind-curie/app/src/main/java/com/example/lifecycleapp/FloatingMenuManager.kt)가 안드로이드 표준 `WindowManager.addView()`를 통해 화면 좌측 수직 중앙(`Gravity.START | Gravity.CENTER_VERTICAL`)에 6dp 시각적 폭(32dp 터치 타깃)의 미니 에지 알약 핸들([`layout_floating_menu_button.xml`](file:///c:/Users/user/Documents/antigravity/kind-curie/app/src/main/res/layout/layout_floating_menu_button.xml))을 직접 부착.
+  - 상단 툴바/타이틀(Top 0~80dp) 및 서브스크린 뒤로가기 버튼 영역을 전혀 침범하지 않으므로 화면 가림(Occlusion)이 0%로 완전히 해소됨.
+  - **듀얼 제스처 지원**: 핸들을 가볍게 탭(클릭)하거나 오른쪽으로 가볍게 쓸어넘기면(Edge Swipe Right, `dx > 16dp`) 즉시 서랍이 열림.
+  - 외부 플러그인(`LightSettingsActivity`)을 포함하여 어떤 화면이든 WindowManager 레벨에서 100% 무간섭 동작.
 * **펼쳐진 상태 (Expanded)**:
-  - 플로팅 버튼을 터치하면 버튼을 일시 제거(`removeView`)하고, 표준 반투명 액티비티인 [`ListWithTranslucentActivity`](file:///c:/Users/user/Documents/antigravity/kind-curie/app/src/main/java/com/example/lifecycleapp/ListWithTranslucentActivity.kt)를 `startActivity`로 띄움.
+  - 에지 핸들을 터치하거나 스와이프하면 뷰를 일시 제거(`removeView`)하고, 표준 반투명 액티비티인 [`ListWithTranslucentActivity`](file:///c:/Users/user/Documents/antigravity/kind-curie/app/src/main/java/com/example/lifecycleapp/ListWithTranslucentActivity.kt)를 `startActivity`로 띄움.
   - 이 액티비티는 좌측 35% 메뉴 서랍과 우측 65% Dim 뷰([`viewDimScrim`](file:///c:/Users/user/Documents/antigravity/kind-curie/app/src/main/res/layout/activity_list_translucent.xml))로 구성.
   - 우측 Dim 터치 또는 Back 키 입력 시 단순히 `finish()`되어 일반 액티비티 스택 규칙에 따라 자연스럽게 파괴.
-  - `onDestroy()` 콜백 시점에 `FloatingMenuManager.attach()`를 재호출하여 다시 80dp 플로팅 버튼 복원.
+  - `onDestroy()` 콜백 시점에 `FloatingMenuManager.attach()`를 재호출하여 다시 미니 에지 스와이프 핸들 복원.
 
 ---
 

@@ -90,6 +90,9 @@ flowchart TD
    - Bypassed `CategoryStackManager` and WindowManager `finishActivityStacks()` entirely.
 4. **Guaranteed Clean App Termination**:
    - When the user presses Back on `HomeActivity`, `HomeActivity` calls `finishAffinity()`, guaranteeing that `ListActivity` at the root and all active floating views are cleanly destroyed together.
+5. **Eliminate `CLEAR_TASK` in `ModeTransitionManager` (Zero-Restart Seamless Transition)**:
+   - Completely abolished the legacy `FLAG_ACTIVITY_CLEAR_TASK` re-launch logic in `ModeTransitionManager`.
+   - Runtime mode transition (Fold ↔ Unfold) now operates purely via synchronous `SplitInitializer.ensureInitialized()` rule toggling, `FloatingMenuManager` attach/detach, and `ListActivity.ensureWideContentView()` without destroying or restarting any activity, ensuring 100% preservation of search state, scroll offsets, and sub-screen back stacks.
 
 ---
 

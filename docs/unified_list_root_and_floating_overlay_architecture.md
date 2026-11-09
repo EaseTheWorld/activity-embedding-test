@@ -122,15 +122,37 @@ sequenceDiagram
 | **Wide Mode** | 좌측 35% 분할 사이드바로 상시 노출 | 우측 65% 컨테이너 기본 화면 | 우측 65% 컨테이너 상단에 적층 |
 | **Narrow Mode** | 백스택 최하단(바닥)에 상주 + Floating Window 관리 | 전체 화면 전면 노출 | 전체 화면 전면 노출 |
 
-### 3.3 Overlay ↔ Split 모드 전환(Fold/Unfold) 시 상태 보존 원리
-Narrow 모드에서도 `ListActivity`는 파괴(finish)되지 않고 바닥(STOPPED)에 살아있습니다.
+### 3.3 Overlay ↔ Split 모드 전환(Fold/Unfold) 시 상태 보존 원리 (No-Restart Transition)
+과거의 [`ModeTransitionManager`](file:///c:/Users/user/Documents/antigravity/kind-curie/app/src/main/java/com/example/lifecycleapp/ModeTransitionManager.kt)는 두 모드의 스택 구조가 상이하여 `FLAG_ACTIVITY_CLEAR_TASK`로 태스크 전체를 날리고 `HomeActivity`를 재시작하는 치명적인 모순(검색어/스크롤/백스택 전멸)이 있었습니다.
+
+새 아키텍처에서는 Narrow 모드에서도 `ListActivity`가 백스택 최하단(STOPPED)에 살아있으므로, **`CLEAR_TASK` 및 액티비티 재기동을 전면 제거**하고 순수한 규칙/뷰 토글만으로 전환합니다:
+
+```mermaid
+flowchart LR
+    subgraph Fold ["Fold 접힘 (Wide -> Narrow)"]
+        WtoN1["1. SplitInitializer.setRules(emptySet())<br/>(우측 화면이 전체 화면으로 자연스럽게 확장)"]
+        WtoN2["2. FloatingMenuManager.attach()<br/>(80dp 플로팅 버튼 노출)"]
+        WtoN1 --> WtoN2
+    end
+
+    subgraph Unfold ["Unfold 펼침 (Narrow -> Wide)"]
+        NtoW1["1. SplitInitializer.setRules(setOf(splitRule))<br/>(바닥의 ListActivity가 좌측 35%로, 화면이 우측 65%로 배치)"]
+        NtoW2["2. FloatingMenuManager.detach()<br/>(80dp 플로팅 버튼 제거)"]
+        NtoW3["3. ListActivity.ensureWideContentView()<br/>(사이드바 뷰 바인딩 보장)"]
+        NtoW1 --> NtoW2 --> NtoW3
+    end
+```
+
 * **Narrow → Wide (Unfold)**:
   - `SplitInitializer.kt`의 `SplitPairRule(ListActivity 35% <-> Home/Category 65%)`을 활성화.
+  - `FloatingMenuManager.detach()`로 플로팅 버튼 제거.
+  - `ListActivity.ensureWideContentView()`로 좌측 사이드바 뷰 인플레이션 및 리스트 바인딩 보장.
   - 안드로이드 Activity Embedding 프레임워크가 바닥에 있던 `ListActivity`를 좌측 35%로 올리고, 우측 65%에 전면 액티비티를 나란히 배치.
-  - **어떤 액티비티도 재생성되지 않으므로 검색어, 스크롤, 서브 페이지 스택 100% 보존.**
+  - **어떤 액티비티도 파괴/재생성되지 않으므로 검색어, 스크롤, 서브 페이지 스택 100% 무중단 보존.**
 * **Wide → Narrow (Fold)**:
-  - `SplitInitializer.setRules(emptySet())` 호출 후 `FloatingMenuManager.attach()`.
-  - 상단 화면이 전체 화면으로 확장되고 `ListActivity`는 조용히 바닥으로 복귀.
+  - `SplitInitializer.setRules(emptySet())` 호출로 임베딩 해제.
+  - `FloatingMenuManager.attach()`로 80dp 원형 플로팅 버튼을 시스템에 즉시 부착.
+  - 상단 화면이 전체 화면으로 매끄럽게 확장되고 `ListActivity`는 조용히 바닥으로 복귀.
 
 ---
 

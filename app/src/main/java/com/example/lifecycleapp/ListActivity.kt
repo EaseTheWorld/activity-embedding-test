@@ -70,6 +70,31 @@ class ListActivity : BaseCategoryMenuActivity() {
         }
     }
 
+    /**
+     * Ensures the left 35% sidebar layout is inflated and bound when transitioning to Wide Mode
+     * without restarting the activity.
+     */
+    fun ensureWideContentView() {
+        if (categoryAdapter == null) {
+            setContentView(R.layout.activity_list)
+            initCategoryMenuViews()
+            val initialCategoryId = intent?.getStringExtra(HomeActivity.EXTRA_INITIAL_CATEGORY_ID)
+            if (!initialCategoryId.isNullOrEmpty()) {
+                val matchedIndex = categories.indexOfFirst { it.id.equals(initialCategoryId, ignoreCase = true) }
+                if (matchedIndex >= 0) {
+                    categoryAdapter?.selectedPosition = matchedIndex
+                    categoryAdapter?.notifyDataSetChanged()
+                    listViewCategories.smoothScrollToPosition(matchedIndex)
+                }
+            }
+        }
+    }
+
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        ModeTransitionManager.checkAndHandleTransition(this, newConfig)
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         FloatingMenuManager.detach()

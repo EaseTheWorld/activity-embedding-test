@@ -40,9 +40,8 @@ class HomeActivity : ComponentActivity() {
 
         val isNarrowOverlayMode = AppConfig.isOverlayMode(this)
         HomeNavigationBridge.ensureSplitRules(this, isNarrowOverlayMode)
-        CategoryStackManager.registerHomeActivity(this)
-        if (isNarrowOverlayMode) {
-            CategoryStackManager.trackSplitInfo(lifecycleScope, this, isNarrowMode = true)
+        if (!isNarrowOverlayMode) {
+            CategoryStackManager.registerHomeActivity(this)
         }
         Log.d(tag, "HomeActivity created (isNarrowOverlayMode=$isNarrowOverlayMode)")
 
@@ -189,7 +188,8 @@ class HomeActivity : ComponentActivity() {
         val categoryId = intent.getStringExtra(EXTRA_INITIAL_CATEGORY_ID)
 
         if (categoryId?.equals("home", ignoreCase = true) == true) {
-            HomeNavigationBridge.notifyDismissCategoryStacks()
+            Log.d(tag, "HomeActivity revealed via CLEAR_TOP for category 'home'")
+            HomeNavigationBridge.notifyHomeRevealed()
             return
         }
 
@@ -198,8 +198,9 @@ class HomeActivity : ComponentActivity() {
                 HomeNavigationBridge.notifyCategorySelected(categoryId)
             }
             try {
-                Log.d(tag, "HomeActivity launching target category via HomeNavigationBridge: $targetIntent")
-                HomeNavigationBridge.launchCategory(this, targetIntent)
+                Log.d(tag, "HomeActivity launching target category: $targetIntent")
+                startActivity(targetIntent)
+                overridePendingTransition(0, 0)
             } catch (e: Exception) {
                 Log.e(tag, "Failed to launch target intent: $e")
             }

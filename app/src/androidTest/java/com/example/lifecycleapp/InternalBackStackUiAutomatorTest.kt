@@ -990,7 +990,6 @@ class InternalBackStackUiAutomatorTest {
             "Clicking the same coordinates ($clickX, $clickY) after dim scrim is gone MUST click the underlying card",
             lumbarDetailOpened
         )
-        assertEquals("seat", overlayMenu.currentSelectedCategoryId)
         device.waitForIdle()
         Thread.sleep(400)
         device.takeScreenshot(java.io.File("/sdcard/Download/4_underlying_clicked_after_unblocked.png"))

@@ -50,6 +50,7 @@ class HomeActivity : ComponentActivity() {
             override fun handleOnBackPressed() {
                 Log.d(tag, "Back pressed at Home (Root of App) -> finishAffinity to exit")
                 HomeNavigationBridge.notifyAppExit()
+                HomeNavigationBridge.dismissFloatingOverlay()
                 finishAffinity()
             }
         })
@@ -94,36 +95,10 @@ class HomeActivity : ComponentActivity() {
 
     private fun launchPrimaryPinnedOverlay(initialCategoryId: String?, targetIntent: Intent?) {
         try {
-            val dpPx = (AppConfig.COLLAPSED_BUTTON_SIZE_DP * resources.displayMetrics.density).toInt()
-            val bounds = EmbeddingBounds(
-                EmbeddingBounds.Alignment.ALIGN_LEFT,
-                EmbeddingBounds.Dimension.pixel(dpPx),
-                EmbeddingBounds.Dimension.pixel(dpPx)
-            )
-            val overlayParams = OverlayCreateParams.Builder()
-                .setTag(AppConfig.TAG_PRIMARY_OVERLAY)
-                .setOverlayAttributes(OverlayAttributes(bounds))
-                .build()
-
-            val options = ActivityOptions.makeBasic().toBundle().apply {
-                setOverlayCreateParams(this@HomeActivity, overlayParams)
-                setOverlayAssociateWithLaunchingActivity(false)
-            }
-
-            val overlayIntent = Intent().apply {
-                component = ComponentName(packageName, "com.example.lifecycleapp.ListOverlayActivity")
-                if (initialCategoryId != null) {
-                    putExtra(EXTRA_INITIAL_CATEGORY_ID, initialCategoryId)
-                }
-                if (targetIntent != null) {
-                    putExtra(EXTRA_TARGET_INTENT, targetIntent)
-                }
-            }
-
-            Log.i(tag, "Launching ListOverlayActivity as Always-On-Top Pinned Overlay in Narrow Mode (bounds=$bounds)")
-            startActivity(overlayIntent, options)
+            Log.i(tag, "Attaching FloatingMenuButton in Narrow Mode")
+            HomeNavigationBridge.showFloatingOverlay(this, initialCategoryId)
         } catch (e: Exception) {
-            Log.e(tag, "Failed to launch ListOverlayActivity pinned overlay: $e", e)
+            Log.e(tag, "Failed to attach floating overlay: $e", e)
         }
     }
 
@@ -176,6 +151,7 @@ class HomeActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        HomeNavigationBridge.dismissFloatingOverlay()
         if (isFinishing) {
             HomeNavigationBridge.notifyAppExit()
         }

@@ -2,6 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
     <queries>
         <intent>
             <action android:name="com.example.carsettings.CATEGORY_PROVIDER" />
@@ -69,6 +71,14 @@
 
         <activity
             android:name=".ListOverlayActivity"
+            android:exported="false"
+            android:theme="@style/Theme.LifecycleApp.Translucent"
+            android:launchMode="singleTop"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density"
+            android:label="@string/title_primary" />
+
+        <activity
+            android:name=".ListWithTranslucentActivity"
             android:exported="false"
             android:theme="@style/Theme.LifecycleApp.Translucent"
             android:launchMode="singleTop"

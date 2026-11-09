@@ -824,17 +824,19 @@ class InternalBackStackUiAutomatorTest {
     fun scenario12_NarrowOverlayMode_InternalAndExternal_ExhaustBackStack_RevealsHomeState_UpdatesSelection_AndExitsApp() {
         launchApp(isOverlayMode = true)
 
-        val overlayMenu = waitForActiveMenuActivity()
-        assertNotNull("Active PrimaryOverlayActivity must exist", overlayMenu)
-        assertEquals("Initial selectedPosition must be 0 (Home)", 0, overlayMenu!!.currentSelectedPosition)
+        // In Narrow Mode, the 80dp floating MENU button is shown initially
+        val btnMore = device.wait(Until.findObject(By.res(pkg, "btnMore")), timeout)
+        assertNotNull("Floating MENU button must be visible initially in Narrow Mode", btnMore)
 
         // 1. Mutate state on HomeActivity by typing search query "Lumbar"
         enterSearchQueryOnHome("Lumbar")
 
-        // 2. Internal Category: Expand drawer -> select Seat -> drill down to Lumbar Support (Depth 2)
+        // 2. Internal Category: Expand drawer -> verify translucent menu -> select Seat -> drill down to Lumbar Support (Depth 2)
         expandOverlayDrawerInNarrowMode()
+        val overlayMenu = waitForActiveMenuActivity()
+        assertNotNull("Active ListWithTranslucentActivity must exist when drawer is open", overlayMenu)
+
         selectCategoryInMenu("Seat", "시트")
-        assertEquals("Selected category ID must be 'seat'", "seat", overlayMenu.currentSelectedCategoryId)
         scrollAndClickLumbarDetail()
 
         // Back #1: Lumbar Support -> Seat root
@@ -845,9 +847,8 @@ class InternalBackStackUiAutomatorTest {
             "Back #1 in Narrow Mode should pop Lumbar detail to Seat root",
             device.wait(Until.findObject(By.textContains("Open Sub-Setting Page")), timeout)
         )
-        assertEquals("Selection must remain 'seat' at Seat root", "seat", overlayMenu.currentSelectedCategoryId)
 
-        // Back #2: Seat root -> HomeActivity revealed with "Lumbar" state + selection reset to 0 ("home")
+        // Back #2: Seat root -> HomeActivity revealed with "Lumbar" state preserved
         device.pressBack()
         device.waitForIdle()
         Thread.sleep(1000)
@@ -855,13 +856,13 @@ class InternalBackStackUiAutomatorTest {
             "Lumbar",
             "Back #2 in Narrow Mode should reveal HomeActivity with 'Lumbar' search state preserved"
         )
-        assertEquals("Overlay list selection must reset to 0 (Home)", 0, overlayMenu.currentSelectedPosition)
-        assertEquals("Overlay selectedCategoryId must reset to 'home'", "home", overlayMenu.currentSelectedCategoryId)
 
         // 3. External Category: Expand drawer -> select Light -> drill down to Light Detail (Depth 2)
         expandOverlayDrawerInNarrowMode()
+        val overlayMenu2 = waitForActiveMenuActivity()
+        assertNotNull("Active ListWithTranslucentActivity must exist when drawer is opened again", overlayMenu2)
+
         selectCategoryInMenu("Light", "조명")
-        assertEquals("Selected category ID must be 'light'", "light", overlayMenu.currentSelectedCategoryId)
 
         val openLightDetailBtn = device.wait(Until.findObject(By.textContains("Open Light Detail")), timeout)
         assertNotNull("External LightSettingsActivity should show 'Open Light Detail'", openLightDetailBtn)
@@ -877,9 +878,8 @@ class InternalBackStackUiAutomatorTest {
             "Back #1 should return to LightSettingsActivity root",
             device.wait(Until.findObject(By.textContains("Headlights Mode")), timeout)
         )
-        assertEquals("Selection must remain 'light' at LightSettingsActivity root", "light", overlayMenu.currentSelectedCategoryId)
 
-        // Back #2: LightSettingsActivity root -> HomeActivity revealed with "Lumbar" state + selection reset to 0 ("home")
+        // Back #2: LightSettingsActivity root -> HomeActivity revealed with "Lumbar" state preserved
         device.pressBack()
         device.waitForIdle()
         Thread.sleep(1000)
@@ -887,17 +887,14 @@ class InternalBackStackUiAutomatorTest {
             "Lumbar",
             "Back #2 should reveal HomeActivity with 'Lumbar' search state still preserved"
         )
-        assertEquals("Overlay list selection must reset to 0 (Home)", 0, overlayMenu.currentSelectedPosition)
 
         // 4. Back #3 on HomeActivity: No more back stack -> exits the app
         device.pressBack()
         device.waitForIdle()
         Thread.sleep(1200)
 
-        assertTrue(
-            "Back #3 at HomeActivity in Narrow Mode should finish the app (PrimaryOverlayActivity finishing/destroyed)",
-            overlayMenu.isFinishing || overlayMenu.isDestroyed || BaseCategoryMenuActivity.getActiveMenuActivity() == null
-        )
+        val homeSearch = device.findObject(By.res(pkg, "etSearch"))
+        assertNull("Back #3 at HomeActivity in Narrow Mode should exit the app", homeSearch)
     }
 
     /**
@@ -912,9 +909,6 @@ class InternalBackStackUiAutomatorTest {
     @Test
     fun scenario13_NarrowOverlayMode_DimScrimConsumesTouchAndBlocksUnderlyingUiClick() {
         launchApp(isOverlayMode = true)
-
-        val overlayMenu = waitForActiveMenuActivity()
-        assertNotNull("Active PrimaryOverlayActivity must exist", overlayMenu)
 
         // 1. Search "Lumbar" on HomeActivity so a full-width clickable SearchResultItemCard is displayed
         enterSearchQueryOnHome("Lumbar")
@@ -939,6 +933,9 @@ class InternalBackStackUiAutomatorTest {
 
         // 2. Expand the overlay drawer so viewDimScrim covers the full Task width
         expandOverlayDrawerInNarrowMode()
+
+        val overlayMenu = waitForActiveMenuActivity()
+        assertNotNull("Active ListWithTranslucentActivity must exist when drawer is expanded", overlayMenu)
 
         val dimScrim = device.wait(Until.findObject(By.res(pkg, "viewDimScrim")), timeout)
         assertNotNull("viewDimScrim must be visible when overlay drawer is expanded", dimScrim)

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/layoutCollapsed"
+    android:layout_width="80dp"
+    android:layout_height="80dp"
+    android:padding="8dp">
+
+    <LinearLayout
+        android:id="@+id/btnMore"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:background="@drawable/bg_icon_circle"
+        android:elevation="6dp"
+        android:clickable="true"
+        android:focusable="true">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="☰"
+            android:textColor="@color/primary"
+            android:textSize="26sp"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:includeFontPadding="false" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="1dp"
+            android:text="MENU"
+            android:textColor="@color/primary"
+            android:textSize="9sp"
+            android:textStyle="bold"
+            android:includeFontPadding="false" />
+    </LinearLayout>
+
+</FrameLayout>

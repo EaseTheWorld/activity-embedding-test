@@ -43,6 +43,33 @@ object HomeNavigationBridge {
         return modeTransitionHandler?.invoke(activity, config) ?: false
     }
 
+    private var floatingOverlayLauncher: ((Context, String?) -> Unit)? = null
+    private var floatingOverlayDismissListener: (() -> Unit)? = null
+
+    fun registerFloatingOverlayLauncher(launcher: (Context, String?) -> Unit) {
+        floatingOverlayLauncher = launcher
+    }
+
+    fun unregisterFloatingOverlayLauncher() {
+        floatingOverlayLauncher = null
+    }
+
+    fun showFloatingOverlay(context: Context, initialCategoryId: String?) {
+        floatingOverlayLauncher?.invoke(context, initialCategoryId)
+    }
+
+    fun registerFloatingOverlayDismissListener(listener: () -> Unit) {
+        floatingOverlayDismissListener = listener
+    }
+
+    fun unregisterFloatingOverlayDismissListener() {
+        floatingOverlayDismissListener = null
+    }
+
+    fun dismissFloatingOverlay() {
+        floatingOverlayDismissListener?.invoke()
+    }
+
     private val homeRevealedListeners = CopyOnWriteArraySet<() -> Unit>()
     private val categorySelectedListeners = CopyOnWriteArraySet<(String) -> Unit>()
     private val appExitListeners = CopyOnWriteArraySet<() -> Unit>()

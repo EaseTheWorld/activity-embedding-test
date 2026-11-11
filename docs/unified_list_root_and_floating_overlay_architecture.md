@@ -98,6 +98,15 @@ sequenceDiagram
   - 우측 Dim 터치 또는 Back 키 입력 시 단순히 `finish()`되어 일반 액티비티 스택 규칙에 따라 자연스럽게 파괴.
   - `onDestroy()` 콜백 시점에 `FloatingMenuManager.attach()`를 재호출하여 다시 미니 에지 스와이프 핸들 복원.
 
+* **태스크 가시성 기반 백그라운드 자동 은닉 (Auto-Hide on Home / App Switch)**:
+  - `TYPE_APPLICATION_OVERLAY`는 시스템 레이어에 위치하므로, 사용자가 하드웨어 Home 키를 누르거나 다른 앱으로 전환할 때도 기본적으로 화면에 남아있는 문제가 있었습니다.
+  - 단순 `registerActivityLifecycleCallbacks`는 **외부 카테고리 플러그인(`LightSettingsActivity` 등 독립 프로세스)의 생명주기를 감지할 수 없어**, 플러그인 화면에서 핸들이 오작동으로 숨겨지는 치명적 한계가 있습니다.
+  - 이를 해결하기 위해 `ActivityManager.getAppTasks()`의 `task.taskInfo.isVisible` (API 29+)을 활용:
+    - 외부 플러그인이든 내부 카테고리든 **우리 앱의 Task가 화면 전면에 노출되어 있으면 `isVisible == true` (핸들 유지)**.
+    - 홈 키 입력 / 타 앱 전환으로 **우리 Task 전체가 백그라운드로 내려가면 즉시 `isVisible == false` (`floatingView.visibility = View.GONE` 처리)**.
+    - 다시 우리 앱으로 복귀하면 즉시 `View.VISIBLE`로 자동 복구.
+    - 서드파티 플러그인 앱에 어떠한 IPC나 수명주기 코드를 강제하지 않고도 100% 무결하게 동작.
+
 ---
 
 ## 3. ListActivity를 Task Root로 전환

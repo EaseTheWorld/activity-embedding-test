@@ -38,6 +38,21 @@ object FloatingMenuManager {
     private var isAppForeground = true
     private val mainHandler = Handler(Looper.getMainLooper())
 
+    private val visibilityCheckRunnable = object : Runnable {
+        override fun run() {
+            floatingView?.context?.let { ctx ->
+                val visible = isAppTaskVisible(ctx)
+                if (isAppForeground != visible) {
+                    isAppForeground = visible
+                    updateVisibility()
+                }
+            }
+            if (isAttached) {
+                mainHandler.postDelayed(this, 300L)
+            }
+        }
+    }
+
     @SuppressLint("ClickableViewAccessibility")
     fun attach(context: Context) {
         mainHandler.post {
@@ -132,6 +147,8 @@ object FloatingMenuManager {
                 floatingView = view
                 isAttached = true
                 Log.i(TAG, "Attached Mini Edge Swipe Handle (width=${handleWidthPx}px, height=${handleHeightPx}px at CenterVertical)")
+                mainHandler.removeCallbacks(visibilityCheckRunnable)
+                mainHandler.post(visibilityCheckRunnable)
                 updateVisibility()
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to attach floating window: $e", e)
@@ -148,6 +165,7 @@ object FloatingMenuManager {
 
     fun detach() {
         mainHandler.post {
+            mainHandler.removeCallbacks(visibilityCheckRunnable)
             try {
                 floatingView?.let { view ->
                     windowManager?.removeView(view)
@@ -176,9 +194,28 @@ object FloatingMenuManager {
         // Kept for interface compatibility; visibility is tied to attach/suppress lifecycle
     }
 
+    fun isAppTaskVisible(context: Context): Boolean {
+        try {
+            val am = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+            val appTasks = am.appTasks
+            for (task in appTasks) {
+                val info = task.taskInfo
+                val isVisible = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                    info.isVisible
+                } else {
+                    true
+                }
+                if (isVisible) return true
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "isAppTaskVisible error: $e", e)
+        }
+        return false
+    }
+
     private fun updateVisibility() {
-        val shouldShow = isAttached && !isSuppressed
+        val shouldShow = isAttached && !isSuppressed && isAppForeground
         floatingView?.visibility = if (shouldShow) View.VISIBLE else View.GONE
-        Log.d(TAG, "FloatingView visibility updated: ${if (shouldShow) "VISIBLE" else "GONE"} (isAttached=$isAttached, isSuppressed=$isSuppressed)")
+        Log.d(TAG, "FloatingView visibility updated: ${if (shouldShow) "VISIBLE" else "GONE"} (isAttached=$isAttached, isSuppressed=$isSuppressed, isAppForeground=$isAppForeground)")
     }
 }

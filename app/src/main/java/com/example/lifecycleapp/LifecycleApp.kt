@@ -27,6 +27,7 @@ class LifecycleApp : Application() {
         lateinit var instance: LifecycleApp
             private set
         private val secondaryActivities = ArrayDeque<WeakReference<ComponentActivity>>()
+        private var taskRootListActivityRef: WeakReference<ListActivity>? = null
 
         fun getTopSecondaryActivity(): ComponentActivity? {
             while (secondaryActivities.isNotEmpty()) {
@@ -71,8 +72,9 @@ class LifecycleApp : Application() {
             override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
                 val currentActivity = getTopSecondaryActivity()
                     ?: BaseCategoryMenuActivity.getActiveMenuActivity()
+                    ?: taskRootListActivityRef?.get()?.takeIf { !it.isFinishing && !it.isDestroyed }
                 if (currentActivity != null) {
-                    Log.d("LifecycleLog", "[LifecycleApp] onConfigurationChanged delegating to ModeTransitionManager")
+                    Log.d("LifecycleLog", "[LifecycleApp] onConfigurationChanged delegating to ModeTransitionManager (activity=${currentActivity.javaClass.simpleName})")
                     ModeTransitionManager.checkAndHandleTransition(currentActivity, newConfig)
                 }
             }
@@ -81,10 +83,18 @@ class LifecycleApp : Application() {
         })
 
         registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
-            override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {}
+            override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {
+                if (activity is ListActivity) {
+                    taskRootListActivityRef = WeakReference(activity)
+                }
+            }
             override fun onActivityStarted(activity: Activity) {}
 
             override fun onActivityResumed(activity: Activity) {
+                FloatingMenuManager.onHostActivityResumed(activity)
+                if (activity is ListActivity) {
+                    taskRootListActivityRef = WeakReference(activity)
+                }
                 if (activity is ComponentActivity &&
                     activity !is com.example.lifecycleapp.BaseCategoryMenuActivity &&
                     activity !is com.example.feature.home.HomeActivity
@@ -100,6 +110,9 @@ class LifecycleApp : Application() {
             override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {}
 
             override fun onActivityDestroyed(activity: Activity) {
+                if (taskRootListActivityRef?.get() === activity) {
+                    taskRootListActivityRef = null
+                }
                 secondaryActivities.removeAll { it.get() === activity || it.get() == null }
             }
         })

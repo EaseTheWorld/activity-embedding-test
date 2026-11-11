@@ -7,4 +7,6 @@ public interface IActivityTaskManager extends IInterface {
     IWindowOrganizerController getWindowOrganizerController();
     void setFocusedTask(int taskId);
     void setFocusedRootTask(int taskId);
+    void registerTaskStackListener(ITaskStackListener listener);
+    void unregisterTaskStackListener(ITaskStackListener listener);
 }

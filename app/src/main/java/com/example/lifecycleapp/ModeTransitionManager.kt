@@ -131,6 +131,7 @@ object ModeTransitionManager {
                 Log.i(TAG, "Transitioning to Wide Mode: detaching FloatingMenuManager and ensuring ListActivity content view")
                 FloatingMenuManager.detach()
                 val activeMenu = BaseCategoryMenuActivity.getActiveMenuActivity()
+                    ?: (activity as? ListActivity)?.takeIf { !it.isFinishing && !it.isDestroyed }
                 if (activeMenu is ListActivity) {
                     activeMenu.ensureWideContentView()
                 }

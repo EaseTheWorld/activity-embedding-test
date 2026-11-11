@@ -22,8 +22,8 @@ import android.util.Log
  * (`oom_adj >= 900`), causing `CachedAppsFreezer` to freeze the host PID ~10 seconds later.
  * If the user subsequently returns directly to an external plugin Activity (e.g.
  * `LightSettingsActivity` running in its own process) via Back or Recents, only the plugin PID
- * unfreezes while the host PID stays frozen — blocking any polling loop, `TaskStackListener`, or
- * `IUidObserver` callback from restoring the floating handle.
+ * unfreezes while the host PID stays frozen — blocking `TaskStackListener` callbacks or any
+ * polling loop from restoring the floating handle.
  *
  * Keeping this minimal `specialUse` foreground service active while `isAttached == true`
  * maintains `PERCEPTIBLE` (`oom_adj ~200`), preventing freezer suspension until [detach] (Wide

@@ -51,43 +51,20 @@ class FloatingMenuManagerTest {
     }
 
     @Test
-    fun `isTaskForegroundActive hides during Quickstep Recents live tile and background`() {
+    fun `isTaskForegroundActive requires both taskVisible and taskFocused`() {
         // Active foreground (internal or external plugin Activity): visible + focused
         assertTrue(
             FloatingMenuManager.isTaskForegroundActive(
                 taskVisible = true,
-                taskFocused = true,
-                isHomeUidTop = false,
-                hasTaskStackListener = false
+                taskFocused = true
             )
         )
 
-        // Quickstep Recents live tile on Android 14-17: task stays isVisible=true
-        // (and on Android 17 may retain isFocused=true) while Home Launcher is TOP (`isHomeUidTop=true`)
+        // Unfocused visible task (e.g. unfocused split pane or live tile)
         assertFalse(
             FloatingMenuManager.isTaskForegroundActive(
                 taskVisible = true,
-                taskFocused = false,
-                isHomeUidTop = true,
-                hasTaskStackListener = false
-            )
-        )
-        assertFalse(
-            FloatingMenuManager.isTaskForegroundActive(
-                taskVisible = true,
-                taskFocused = true,
-                isHomeUidTop = true,
-                hasTaskStackListener = false
-            )
-        )
-
-        // Exiting Recents back to external plugin: Home leaves TOP, task regains focus
-        assertTrue(
-            FloatingMenuManager.isTaskForegroundActive(
-                taskVisible = true,
-                taskFocused = true,
-                isHomeUidTop = false,
-                hasTaskStackListener = false
+                taskFocused = false
             )
         )
 
@@ -95,55 +72,15 @@ class FloatingMenuManagerTest {
         assertFalse(
             FloatingMenuManager.isTaskForegroundActive(
                 taskVisible = false,
-                taskFocused = false,
-                isHomeUidTop = true,
-                hasTaskStackListener = false
+                taskFocused = false
             )
         )
+
+        // Focused flag without task visibility
         assertFalse(
             FloatingMenuManager.isTaskForegroundActive(
                 taskVisible = false,
-                taskFocused = false,
-                isHomeUidTop = false,
-                hasTaskStackListener = false
-            )
-        )
-
-        // Split-screen under IUidObserver fallback keeps visible side pane active when Home is not TOP
-        assertTrue(
-            FloatingMenuManager.isTaskForegroundActive(
-                taskVisible = true,
-                taskFocused = false,
-                isHomeUidTop = false,
-                hasTaskStackListener = false
-            )
-        )
-
-        // Split-screen under TaskStackListener follows exact task focus changes
-        assertFalse(
-            FloatingMenuManager.isTaskForegroundActive(
-                taskVisible = true,
-                taskFocused = false,
-                isHomeUidTop = false,
-                hasTaskStackListener = true
-            )
-        )
-
-        // Defensive null-field fallback
-        assertTrue(
-            FloatingMenuManager.isTaskForegroundActive(
-                taskVisible = true,
-                taskFocused = null,
-                isHomeUidTop = false,
-                hasTaskStackListener = false
-            )
-        )
-        assertFalse(
-            FloatingMenuManager.isTaskForegroundActive(
-                taskVisible = true,
-                taskFocused = null,
-                isHomeUidTop = true,
-                hasTaskStackListener = false
+                taskFocused = true
             )
         )
     }

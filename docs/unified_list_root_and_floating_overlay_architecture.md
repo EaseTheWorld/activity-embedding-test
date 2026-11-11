@@ -98,17 +98,16 @@ sequenceDiagram
   - 우측 Dim 터치 또는 Back 키 입력 시 단순히 `finish()`되어 일반 액티비티 스택 규칙에 따라 자연스럽게 파괴.
   - `onDestroy()` 콜백 시점에 `FloatingMenuManager.attach()`를 재호출하여 다시 미니 에지 스와이프 핸들 복원.
 
-* **옵션 A — 특권 시스템 앱 기반 이벤트 드리븐 태스크/UID 가시성 제어 (폴링 루프 제거 & Auto-Hide / Auto-Restore)**:
+* **옵션 A — 특권 시스템 앱 기반 이벤트 드리븐 태스크 가시성 제어 (폴링 루프 제거 & Auto-Hide / Auto-Restore)**:
   - `TYPE_APPLICATION_OVERLAY`는 시스템 레이어에 위치하므로, 사용자가 하드웨어 Home 키·최근 앱(Recents)을 누르거나 다른 앱으로 전환할 때도 기본적으로 화면에 남아있는 문제가 있습니다.
   - 또한 단순 `registerActivityLifecycleCallbacks`는 **외부 카테고리 플러그인(`LightSettingsActivity` 등 독립 프로세스)의 생명주기를 감지할 수 없어**, 플러그인 화면에서 핸들이 잘못 숨겨지는 한계가 있습니다.
-  - 이를 해결하기 위해 호스트 앱을 `/system/priv-app/LifecycleApp/LifecycleApp.apk` 특권 시스템 앱으로 배포하고 [`privapp-permissions-lifecycleapp.xml`](file:///c:/Users/user/Documents/antigravity/kind-curie/app/privapp-permissions-lifecycleapp.xml)(`ACTIVITY_EMBEDDING`, `MANAGE_ACTIVITY_TASKS`, `PACKAGE_USAGE_STATS`) 및 `:framework-stubs` + `HiddenApiBypass`를 결합해 연속 폴링 루프 없는 **OS Binder 이벤트 드리븐 아키텍처(옵션 A)**를 구현했습니다:
-    1. **2단계 OS 이벤트 옵저버 ([`FloatingMenuManager`](file:///c:/Users/user/Documents/antigravity/kind-curie/app/src/main/java/com/example/lifecycleapp/FloatingMenuManager.kt))**:
-       - **Primary (`TaskStackListener`)**: 플랫폼 서명 또는 `RECENTS` 권한이 부여된 환경(OEM IVI/시스템 이미지)에서는 `ActivityTaskManager.getService().registerTaskStackListener()`로 태스크 전환·포커스 이벤트를 직접 수신 (`MANAGE_ACTIVITY_TASKS` 미보유 AOSP/에뮬레이터 환경에서는 `SecurityException` 처리 후 자동 폴백).
-       - **Privileged Fallback (`IUidObserver` via `PACKAGE_USAGE_STATS`)**: `IActivityManager.registerUidObserver(..., UID_OBSERVER_PROCSTATE or UID_OBSERVER_GONE, PROCESS_STATE_TOP)`를 등록하여 홈 런처(`homePackageUids`) 및 외부 플러그인/서드파티 앱의 `TOP(2)` 진입·이탈 시점에만 OS Binder 콜백을 수신.
-    2. **태스크 가시성 판정 및 Android 17 Quickstep Live-Tile 대응 (`isAppTaskVisible` / `isTaskForegroundActive`)**:
-       - 이벤트 수신 시 `ActivityManager.getAppTasks()`의 `TaskInfo.isVisible` (API 29+), Hidden API인 `TaskInfo.isFocused`, 그리고 런처 UID 상태(`isHomeUidTop`)를 함께 판정.
-       - Pixel Tablet(Android 17) Quickstep Live-Tile Recents 화면에서 `TaskInfo.isVisible == true` 및 `isFocused == true`가 일시 유지되더라도 `isHomeUidTop == true`이면 즉시 `View.GONE`으로 숨기고, `Back` 키나 Recents 카드 선택으로 외부 플러그인(`LightSettingsActivity`)에 직접 복귀해도 즉시 `View.VISIBLE`로 복원.
-       - 시스템 `Settings`(`uid=1000`, `PROCESS_STATE_PERSISTENT`) 등 cutpoint를 통과하지 않는 앱에서 `Back`으로 복귀할 때 OS 전환 애니메이션이 `TaskInfo.isVisible`을 커밋하는 시차를 보정하기 위해, Binder 이벤트 발생 시점에 한정된 2회 단발성 안착 재확인(`TRANSITION_SETTLE_EARLY_MS = 220L`, `TRANSITION_SETTLE_LATE_MS = 550L`, `detach()` 시 취소)만 수행하고 유휴 상태의 주기적 폴링은 전혀 수행하지 않음.
+  - 이를 해결하기 위해 호스트 앱을 `/system/priv-app/LifecycleApp/LifecycleApp.apk` 특권 시스템 앱으로 배포하고 [`privapp-permissions-lifecycleapp.xml`](file:///c:/Users/user/Documents/antigravity/kind-curie/app/privapp-permissions-lifecycleapp.xml)(`ACTIVITY_EMBEDDING`, `MANAGE_ACTIVITY_TASKS`) 및 `:framework-stubs` + `HiddenApiBypass`를 결합해 연속 폴링 루프 없는 **OS Binder 이벤트 드리븐 아키텍처(옵션 A)**를 구현했습니다:
+    1. **OS 태스크 스택 옵저버 ([`FloatingMenuManager`](file:///c:/Users/user/Documents/antigravity/kind-curie/app/src/main/java/com/example/lifecycleapp/FloatingMenuManager.kt))**:
+       - `ActivityTaskManager.getService().registerTaskStackListener()`로 태스크 전환·포커스·생성·제거 이벤트를 직접 수신합니다.
+       - POC 원칙에 따라 `IUidObserver` / `PACKAGE_USAGE_STATS` 우회 폴백 없이, `MANAGE_ACTIVITY_TASKS`(플랫폼 서명 또는 `RECENTS`)가 없는 환경에서는 즉시 `SecurityException`으로 실패를 드러냅니다.
+    2. **태스크 가시성 판정 (`isAppTaskVisible` / `isTaskForegroundActive`)**:
+       - 이벤트 수신 시 `ActivityManager.getAppTasks()`의 `TaskInfo.isVisible` (API 29+)과 Hidden API인 `TaskInfo.isFocused`를 함께 판정(`taskVisible && taskFocused`)합니다.
+       - OS 전환 애니메이션이 `TaskInfo.isVisible`/`isFocused`를 커밋하는 시차를 보정하기 위해 Binder 이벤트 수신 시점에 한정된 2회 단발성 안착 재확인(`TRANSITION_SETTLE_EARLY_MS = 220L`, `TRANSITION_SETTLE_LATE_MS = 550L`, `detach()` 시 취소)만 수행하고 유휴 상태의 주기적 폴링은 전혀 수행하지 않습니다.
     3. **Android 17 `CachedAppsFreezer` 대응 ([`FloatingOverlayService`](file:///c:/Users/user/Documents/antigravity/kind-curie/app/src/main/java/com/example/lifecycleapp/FloatingOverlayService.kt))**:
        - 핸들이 `View.GONE`으로 숨겨져 `hasOverlayUi`가 해제된 상태에서 ~10초 이상 백그라운드에 머물면 호스트 프로세스가 `CACHED` → Freezer 동결되어 외부 플러그인 복귀 이벤트를 수신할 수 없는 문제를 방지하기 위해, Narrow 모드에서 핸들이 attach된 동안만 경량 `specialUse` Foreground Service(`IMPORTANCE_MIN`, `NOTIFICATION_ID = 1001`)를 유지하고 Wide 전환(`detach()`) 또는 Recents 스와이프 제거(`onTaskRemoved()`) 시 즉시 종료.
 

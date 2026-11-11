@@ -71,7 +71,7 @@ class InternalBackStackUiAutomatorTest {
         device.waitForIdle()
         Thread.sleep(1500)
         if (isOverlayMode) {
-            device.wait(Until.findObject(By.res(pkg, "btnMore")), timeout)
+            device.wait(Until.findObject(By.desc("Open Menu")), timeout)
         } else {
             device.wait(Until.findObject(By.res(pkg, "listViewCategories")), timeout)
         }
@@ -126,9 +126,9 @@ class InternalBackStackUiAutomatorTest {
     }
 
     private fun expandOverlayDrawerInNarrowMode() {
-        val btnMore = device.wait(Until.findObject(By.res(pkg, "btnMore")), timeout)
-        assertNotNull("Collapsed MENU button should be visible", btnMore)
-        btnMore!!.click()
+        val btnMenu = device.wait(Until.findObject(By.desc("Open Menu")), timeout)
+        assertNotNull("In-screen MENU button should be visible on category main screen", btnMenu)
+        btnMenu!!.click()
         device.waitForIdle()
         Thread.sleep(800)
     }
@@ -248,18 +248,18 @@ class InternalBackStackUiAutomatorTest {
 
         expandOverlayDrawerInNarrowMode()
         selectCategoryInMenu("Seat", "시트")
-        scrollAndClickLumbarDetail()
 
-        // Touch overlay by expanding and collapsing the drawer via the right dimmed area without changing category
+        // Touch overlay by expanding drawer from Seat main screen and dismissing via the right dimmed area
         expandOverlayDrawerInNarrowMode()
         val dimScrim = device.wait(Until.findObject(By.res(pkg, "viewDimScrim")), timeout)
         assertNotNull("Dimmed scrim should be visible when overlay drawer is expanded", dimScrim)
         device.click((device.displayWidth * 0.75).toInt(), device.displayHeight / 2)
         device.waitForIdle()
         Thread.sleep(800)
-        val collapsedBtn = device.wait(Until.findObject(By.res(pkg, "btnMore")), timeout)
-        assertNotNull("Touching the right dimmed outside area should collapse the overlay drawer", collapsedBtn)
+        val menuBtnAfterDim = device.wait(Until.findObject(By.desc("Open Menu")), timeout)
+        assertNotNull("Touching the right dimmed outside area should dismiss the drawer and return to Seat main screen", menuBtnAfterDim)
 
+        scrollAndClickLumbarDetail()
         device.pressBack()
         device.waitForIdle()
         Thread.sleep(1000)
@@ -824,9 +824,9 @@ class InternalBackStackUiAutomatorTest {
     fun scenario12_NarrowOverlayMode_InternalAndExternal_ExhaustBackStack_RevealsHomeState_UpdatesSelection_AndExitsApp() {
         launchApp(isOverlayMode = true)
 
-        // In Narrow Mode, the 80dp floating MENU button is shown initially
-        val btnMore = device.wait(Until.findObject(By.res(pkg, "btnMore")), timeout)
-        assertNotNull("Floating MENU button must be visible initially in Narrow Mode", btnMore)
+        // In Narrow Mode, the inline MENU button is shown on HomeActivity
+        val btnMenu = device.wait(Until.findObject(By.desc("Open Menu")), timeout)
+        assertNotNull("Inline MENU button must be visible initially on Home in Narrow Mode", btnMenu)
 
         // 1. Mutate state on HomeActivity by typing search query "Lumbar"
         enterSearchQueryOnHome("Lumbar")
@@ -958,10 +958,10 @@ class InternalBackStackUiAutomatorTest {
         device.takeScreenshot(java.io.File("/sdcard/Download/3_collapsed_after_dim_touch.png"))
 
         // 4. Verify the touch was CONSUMED by viewDimScrim:
-        //    - Overlay drawer collapsed (btnMore is visible, viewDimScrim is gone)
+        //    - Overlay drawer dismissed (inline menu button is visible, viewDimScrim is gone)
         //    - Underlying "Lumbar" card was NOT clicked (still on "home", Lumbar detail screen did NOT open)
-        val btnMoreAfterDimClick = device.wait(Until.findObject(By.res(pkg, "btnMore")), timeout)
-        assertNotNull("Clicking dimmed outside area must collapse the overlay drawer", btnMoreAfterDimClick)
+        val btnMenuAfterDimClick = device.wait(Until.findObject(By.desc("Open Menu")), timeout)
+        assertNotNull("Clicking dimmed outside area must dismiss the overlay drawer", btnMenuAfterDimClick)
         assertNull(
             "viewDimScrim must be GONE after collapsing",
             device.findObject(By.res(pkg, "viewDimScrim"))

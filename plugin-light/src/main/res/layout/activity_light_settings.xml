@@ -18,21 +18,54 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
-            <TextView
+            <LinearLayout
+                android:id="@+id/btnMenu"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Vehicle Lights"
-                android:textSize="26sp"
-                android:textStyle="bold"
-                android:textColor="#1C1B1F"
-                android:layout_marginBottom="4dp" />
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:background="@drawable/bg_menu_pill"
+                android:clickable="true"
+                android:focusable="true"
+                android:contentDescription="Open Menu"
+                android:paddingStart="6dp"
+                android:paddingTop="6dp"
+                android:paddingBottom="6dp"
+                android:paddingEnd="18dp"
+                android:elevation="2dp"
+                android:layout_marginBottom="6dp">
+
+                <FrameLayout
+                    android:id="@+id/frameMenuIcon"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:background="@drawable/bg_menu_circle">
+
+                    <ImageView
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:layout_gravity="center"
+                        android:src="@drawable/ic_menu"
+                        android:contentDescription="@null" />
+                </FrameLayout>
+
+                <TextView
+                    android:id="@+id/tvCategoryTitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:text="Vehicle Lights"
+                    android:textSize="22sp"
+                    android:textStyle="bold"
+                    android:textColor="#1E1E2E" />
+            </LinearLayout>
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Exterior illumination, interior ambiance, and compartment lighting"
                 android:textSize="14sp"
-                android:textColor="#49454F"
+                android:textColor="#6B7280"
                 android:layout_marginBottom="12dp" />
         </LinearLayout>
 

@@ -1,9 +1,11 @@
 package com.example.lifecycleapp
 
 import android.app.Activity
+import android.content.ComponentName
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
+import com.example.core.item.AppConfig
 import com.example.feature.home.DeepLinkResolver
 import com.example.feature.home.HomeActivity
 import com.example.feature.home.HomeNavigationBridge
@@ -29,7 +31,8 @@ class DeepLinkRouterActivity : Activity() {
         // Ensure WindowManager embedding rules are initialized for the active mode
         SplitInitializer.ensureInitialized(this)
 
-        val resolved = DeepLinkResolver.resolve(this, intent)
+        val menuComponent = ComponentName(this, ListWithTranslucentActivity::class.java)
+        val resolved = DeepLinkResolver.resolve(this, intent, menuComponent)
         Log.i(tag, "onCreate: intent=$intent, resolved=$resolved")
 
         val isWarmStart = HomeNavigationBridge.isSessionActive()
@@ -49,6 +52,11 @@ class DeepLinkRouterActivity : Activity() {
                     val homeIntent = Intent(this, HomeActivity::class.java).apply {
                         flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
                         putExtra(HomeActivity.EXTRA_INITIAL_CATEGORY_ID, "home")
+                        putExtra(AppConfig.EXTRA_MENU_COMPONENT, menuComponent)
+                        putExtra(
+                            AppConfig.EXTRA_CATEGORY_HEADER_BREAKPOINT_DP,
+                            AppConfig.OVERLAY_MODE_WIDTH_DP_BREAKPOINT
+                        )
                     }
                     startActivity(homeIntent)
                 } else {
@@ -66,6 +74,11 @@ class DeepLinkRouterActivity : Activity() {
                 action = Intent.ACTION_MAIN
                 addCategory(Intent.CATEGORY_LAUNCHER)
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                putExtra(AppConfig.EXTRA_MENU_COMPONENT, menuComponent)
+                putExtra(
+                    AppConfig.EXTRA_CATEGORY_HEADER_BREAKPOINT_DP,
+                    AppConfig.OVERLAY_MODE_WIDTH_DP_BREAKPOINT
+                )
                 if (resolved != null) {
                     putExtra(HomeActivity.EXTRA_INITIAL_CATEGORY_ID, resolved.categoryId)
                     if (targetIntent != null) {

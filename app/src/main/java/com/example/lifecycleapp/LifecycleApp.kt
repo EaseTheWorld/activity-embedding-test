@@ -60,16 +60,11 @@ class LifecycleApp : Application() {
         HomeNavigationBridge.registerModeTransitionHandler { activity, newConfig ->
             ModeTransitionManager.checkAndHandleTransition(activity, newConfig)
         }
-        HomeNavigationBridge.registerFloatingOverlayLauncher { context, _ ->
-            FloatingMenuManager.attach(context)
-        }
-        HomeNavigationBridge.registerFloatingOverlayDismissListener {
-            FloatingMenuManager.detach()
-        }
 
         registerComponentCallbacks(object : android.content.ComponentCallbacks2 {
             override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
                 val currentActivity = getTopSecondaryActivity()
+                    ?: ListActivity.getActiveInstance()
                     ?: BaseCategoryMenuActivity.getActiveMenuActivity()
                 if (currentActivity != null) {
                     Log.d("LifecycleLog", "[LifecycleApp] onConfigurationChanged delegating to ModeTransitionManager")

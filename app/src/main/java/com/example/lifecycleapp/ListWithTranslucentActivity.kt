@@ -1,22 +1,24 @@
 package com.example.lifecycleapp
 
+import android.content.res.Configuration
 import android.os.Bundle
 import android.util.Log
 import android.view.View
 import android.view.animation.AccelerateInterpolator
 import android.view.animation.DecelerateInterpolator
 import androidx.activity.OnBackPressedCallback
+import com.example.core.item.AppConfig
 
 /**
  * Translucent modal drawer activity for Narrow Mode.
  *
- * Launched when the user taps the 80dp floating MENU button.
+ * Launched when the user taps the category main screen's top-left menu button.
  * Occupies the top of the standard Android ActivityStack:
  * - Left 35%: Category navigation drawer (`layoutExpanded`)
  * - Right 65%: Modal dim background (`viewDimScrim`)
  *
  * Disappears naturally via [finish] on Back key press, Dim scrim click, or category selection,
- * passing focus and control back to the underlying screen without complex WindowManager focus hacks.
+ * passing focus and control back to the underlying screen without overlay windows.
  */
 class ListWithTranslucentActivity : BaseCategoryMenuActivity() {
 
@@ -35,6 +37,17 @@ class ListWithTranslucentActivity : BaseCategoryMenuActivity() {
         btnCollapse = findViewById(R.id.btnCollapse)
 
         initCategoryMenuViews()
+
+        val initialCategoryId = intent?.getStringExtra("extra_category_id")
+            ?: intent?.getStringExtra("category_id")
+        if (!initialCategoryId.isNullOrEmpty()) {
+            val matchedIndex = categories.indexOfFirst { it.id.equals(initialCategoryId, ignoreCase = true) }
+            if (matchedIndex >= 0) {
+                categoryAdapter?.selectedPosition = matchedIndex
+                categoryAdapter?.notifyDataSetChanged()
+                listViewCategories.smoothScrollToPosition(matchedIndex)
+            }
+        }
 
         viewDimScrim.setOnClickListener {
             Log.d(tag, "[$activityName] Dimmed scrim clicked -> closing menu")
@@ -56,19 +69,15 @@ class ListWithTranslucentActivity : BaseCategoryMenuActivity() {
         animateOpen()
     }
 
-    override fun onStart() {
-        super.onStart()
-        FloatingMenuManager.setSuppressed(true)
-    }
-
-    override fun onResume() {
-        super.onResume()
-        FloatingMenuManager.setSuppressed(true)
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        FloatingMenuManager.setSuppressed(false)
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        ModeTransitionManager.checkAndHandleTransition(this, newConfig)
+        if (!AppConfig.isOverlayMode(this) && !isFinishing && !isClosing) {
+            Log.d(tag, "[$activityName] Transitioned to Wide Mode -> closing narrow menu drawer")
+            isClosing = true
+            finish()
+            overridePendingTransition(0, 0)
+        }
     }
 
     private fun animateOpen() {

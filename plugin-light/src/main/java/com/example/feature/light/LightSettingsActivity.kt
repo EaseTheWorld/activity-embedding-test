@@ -1,11 +1,17 @@
 package com.example.feature.light
 
+import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
+import android.content.pm.ComponentInfo
 import android.content.res.Configuration
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.os.Parcelable
 import android.util.Log
 import android.view.View
+import android.view.WindowManager
 import android.widget.Button
 import android.widget.TextView
 import androidx.activity.OnBackPressedCallback
@@ -14,6 +20,11 @@ import androidx.window.layout.WindowMetricsCalculator
 import com.google.android.material.materialswitch.MaterialSwitch
 
 class LightSettingsActivity : AppCompatActivity() {
+
+    private companion object {
+        const val EXTRA_CATEGORY_HEADER_BREAKPOINT_DP = "extra_category_header_breakpoint_dp"
+        const val EXTRA_MENU_COMPONENT = "extra_menu_component"
+    }
 
     private val tag = "LifecycleLog"
     private val activityName = "LightSettingsActivity"
@@ -24,6 +35,12 @@ class LightSettingsActivity : AppCompatActivity() {
     private lateinit var switchTrunkLight: MaterialSwitch
     private lateinit var switchAutoHighBeam: MaterialSwitch
     private lateinit var layoutCategoryHeader: View
+    private lateinit var btnMenu: View
+    private lateinit var frameMenuIcon: View
+    private lateinit var layoutLightDetail: View
+
+    private var menuComponent: ComponentName? = null
+    private var headerBreakpointDp: Int = 840
 
     private val providerUri by lazy {
         Uri.parse("content://com.example.carsettings.provider.light/items")
@@ -41,20 +58,39 @@ class LightSettingsActivity : AppCompatActivity() {
         switchAutoHighBeam = findViewById(R.id.switchAutoHighBeam)
 
         layoutCategoryHeader = findViewById(R.id.layoutCategoryHeader)
-        updateCategoryHeaderVisibility()
+        btnMenu = findViewById(R.id.btnMenu)
+        frameMenuIcon = findViewById(R.id.frameMenuIcon)
+        layoutLightDetail = findViewById(R.id.layoutLightDetail)
+
+        updateHeaderAndMenuState(intent)
+
+        btnMenu.setOnClickListener {
+            val targetMenu = menuComponent ?: return@setOnClickListener
+            val menuIntent = Intent().apply {
+                component = targetMenu
+                putExtra("extra_category_id", "light")
+            }
+            try {
+                startActivity(menuIntent)
+                @Suppress("DEPRECATION")
+                overridePendingTransition(0, 0)
+            } catch (e: Exception) {
+                Log.e(tag, "[$activityName] Failed to launch menu component=$targetMenu: $e")
+            }
+        }
 
         val btnOff = findViewById<Button>(R.id.btnHeadlightOff)
         val btnPark = findViewById<Button>(R.id.btnHeadlightParking)
         val btnOn = findViewById<Button>(R.id.btnHeadlightOn)
         val btnAuto = findViewById<Button>(R.id.btnHeadlightAuto)
         val btnOpenLightDetail = findViewById<Button>(R.id.btnOpenLightDetail)
-        val layoutLightDetail = findViewById<View>(R.id.layoutLightDetail)
 
         val detailBackCallback = object : OnBackPressedCallback(false) {
             override fun handleOnBackPressed() {
                 Log.d(tag, "[$activityName] Popping internal light detail back stack")
                 layoutLightDetail.visibility = View.GONE
                 isEnabled = false
+                updateCategoryHeaderVisibility()
             }
         }
         onBackPressedDispatcher.addCallback(this, detailBackCallback)
@@ -63,6 +99,7 @@ class LightSettingsActivity : AppCompatActivity() {
             Log.d(tag, "[$activityName] Pushing internal light detail back stack")
             layoutLightDetail.visibility = View.VISIBLE
             detailBackCallback.isEnabled = true
+            updateCategoryHeaderVisibility()
         }
 
         // Initial state sync
@@ -95,7 +132,7 @@ class LightSettingsActivity : AppCompatActivity() {
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
         setIntent(intent)
-        updateCategoryHeaderVisibility()
+        updateHeaderAndMenuState(intent)
         handleDeepLinkIntent(intent)
     }
 
@@ -210,13 +247,76 @@ class LightSettingsActivity : AppCompatActivity() {
         updateCategoryHeaderVisibility()
     }
 
+    private fun updateHeaderAndMenuState(sourceIntent: Intent?) {
+        if (sourceIntent?.hasExtra(EXTRA_CATEGORY_HEADER_BREAKPOINT_DP) == true) {
+            headerBreakpointDp = sourceIntent.getIntExtra(EXTRA_CATEGORY_HEADER_BREAKPOINT_DP, 840)
+        }
+        extractMenuComponent(sourceIntent)?.let { menuComponent = it }
+        if (::btnMenu.isInitialized && ::frameMenuIcon.isInitialized) {
+            val hasMenu = menuComponent != null
+            frameMenuIcon.visibility = if (hasMenu) View.VISIBLE else View.GONE
+            btnMenu.isClickable = hasMenu
+            btnMenu.isFocusable = hasMenu
+        }
+        updateCategoryHeaderVisibility()
+    }
+
+    private fun extractMenuComponent(sourceIntent: Intent?): ComponentName? {
+        if (sourceIntent == null) return null
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            sourceIntent.getParcelableExtra(EXTRA_MENU_COMPONENT, ComponentName::class.java)?.let { return it }
+            sourceIntent.getParcelableExtra(EXTRA_MENU_COMPONENT, ComponentInfo::class.java)?.let { info ->
+                if (!info.packageName.isNullOrEmpty() && !info.name.isNullOrEmpty()) {
+                    return ComponentName(info.packageName, info.name)
+                }
+            }
+        } else {
+            @Suppress("DEPRECATION")
+            when (val extra = sourceIntent.getParcelableExtra<Parcelable>(EXTRA_MENU_COMPONENT)) {
+                is ComponentName -> return extra
+                is ComponentInfo -> {
+                    if (!extra.packageName.isNullOrEmpty() && !extra.name.isNullOrEmpty()) {
+                        return ComponentName(extra.packageName, extra.name)
+                    }
+                }
+            }
+        }
+        sourceIntent.getStringExtra(EXTRA_MENU_COMPONENT)?.let { flattened ->
+            return ComponentName.unflattenFromString(flattened)
+        }
+        return null
+    }
+
+    private fun getFullDisplayWidthDp(): Int {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            try {
+                val wm = getSystemService(Context.WINDOW_SERVICE) as? WindowManager
+                val maxBounds = wm?.maximumWindowMetrics?.bounds
+                val density = resources.displayMetrics.density
+                if (maxBounds != null && maxBounds.width() > 0 && density > 0f) {
+                    return (maxBounds.width() / density).toInt()
+                }
+            } catch (e: Exception) {
+                Log.w(tag, "[$activityName] Failed to inspect maximumWindowMetrics", e)
+            }
+        }
+        val appMetrics = applicationContext.resources.displayMetrics
+        if (appMetrics.widthPixels > 0 && appMetrics.density > 0f) {
+            return (appMetrics.widthPixels / appMetrics.density).toInt()
+        }
+        return resources.configuration.screenWidthDp
+    }
+
     private fun updateCategoryHeaderVisibility() {
         if (!::layoutCategoryHeader.isInitialized) return
-        val breakpoint = intent?.getIntExtra("extra_category_header_breakpoint_dp", 840) ?: 840
-        // If current window/screen width is smaller than breakpoint, we are in Narrow Overlay mode -> show header
-        val isNarrow = resources.configuration.screenWidthDp < breakpoint
-        layoutCategoryHeader.visibility = if (isNarrow) View.VISIBLE else View.GONE
-        Log.d(tag, "[$activityName] updateCategoryHeaderVisibility: screenWidthDp=${resources.configuration.screenWidthDp}, breakpoint=$breakpoint -> isNarrow=$isNarrow")
+        val isDetailOpen = ::layoutLightDetail.isInitialized && layoutLightDetail.visibility == View.VISIBLE
+        val fullWidthDp = getFullDisplayWidthDp()
+        val isNarrow = fullWidthDp < headerBreakpointDp
+        layoutCategoryHeader.visibility = if (isNarrow && !isDetailOpen) View.VISIBLE else View.GONE
+        Log.d(
+            tag,
+            "[$activityName] updateCategoryHeaderVisibility: fullWidthDp=$fullWidthDp (config=${resources.configuration.screenWidthDp}), breakpoint=$headerBreakpointDp, isDetailOpen=$isDetailOpen -> isNarrow=$isNarrow"
+        )
     }
 
     private fun updateSetting(key: String, value: String) {

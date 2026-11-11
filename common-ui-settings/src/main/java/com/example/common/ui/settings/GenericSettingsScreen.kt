@@ -60,6 +60,7 @@ fun GenericSettingsScreen(
     items: List<Item>,
     targetItemId: String? = null,
     showCategoryHeader: Boolean = LocalShowCategoryHeader.current,
+    onMenuClick: (() -> Unit)? = null,
     onNavigateBack: (() -> Unit)? = null,
     onItemClick: ((Item) -> Unit)? = null,
     viewModelRegistry: ItemViewModelRegistry = LocalItemViewModelRegistry.current
@@ -78,48 +79,17 @@ fun GenericSettingsScreen(
                 .fillMaxSize()
                 .padding(24.dp)
         ) {
-            if (showCategoryHeader) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                if (onNavigateBack != null) {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
-                            tint = Color(0xFF1E1E2E)
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                }
-                Column {
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.headlineMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF1E1E2E)
-                        )
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = subtitle,
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            color = Color(0xFF6B7280)
-                        )
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.height(12.dp))
-            } else if (onNavigateBack != null) {
-                IconButton(onClick = onNavigateBack) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back",
-                        tint = Color(0xFF1E1E2E)
-                    )
-                }
-                Spacer(modifier = Modifier.height(8.dp))
+            val effectiveMenuClick = if (showCategoryHeader) onMenuClick else null
+            if (showCategoryHeader || onNavigateBack != null) {
+                CategoryMainHeader(
+                    title = title,
+                    subtitle = subtitle,
+                    showMenuButton = effectiveMenuClick != null,
+                    showTitle = showCategoryHeader,
+                    onMenuClick = effectiveMenuClick,
+                    onNavigateBack = onNavigateBack
+                )
+                Spacer(modifier = Modifier.height(12.dp))
             }
             val context = androidx.compose.ui.platform.LocalContext.current
             androidx.compose.material3.Button(

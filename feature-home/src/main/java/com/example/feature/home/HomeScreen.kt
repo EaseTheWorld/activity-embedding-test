@@ -51,6 +51,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.example.common.ui.settings.CategoryMainHeader
 import com.example.core.item.ItemType
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -58,6 +59,8 @@ import com.example.core.item.ItemType
 fun HomeScreen(
     modifier: Modifier = Modifier,
     initialQuery: String = "",
+    showCategoryHeader: Boolean = false,
+    onMenuClick: (() -> Unit)? = null,
     onItemClick: (SearchableSettingItem) -> Unit
 ) {
     val context = LocalContext.current
@@ -96,17 +99,13 @@ fun HomeScreen(
                 .padding(24.dp)
         ) {
             // Header Section
-            Text(
-                text = stringResource(R.string.category_home_title),
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF1E1E2E)
-            )
-            Text(
-                text = stringResource(R.string.category_home_subtitle),
-                fontSize = 14.sp,
-                color = Color(0xFF6E6E82),
-                modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
+            CategoryMainHeader(
+                title = stringResource(R.string.category_home_title),
+                subtitle = stringResource(R.string.category_home_subtitle),
+                showMenuButton = showCategoryHeader && onMenuClick != null,
+                showTitle = true,
+                onMenuClick = onMenuClick,
+                modifier = Modifier.padding(bottom = 16.dp)
             )
 
             // Search Bar Input Field

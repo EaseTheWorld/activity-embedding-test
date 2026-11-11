@@ -16,9 +16,9 @@ import java.util.concurrent.atomic.AtomicBoolean
  * 1. Observes configuration/screen width changes and compares previous mode with new mode.
  * 2. When a mode transition occurs:
  *    a. Synchronously updates WindowManager embedding rules via [SplitInitializer.ensureInitialized].
- *    b. Toggles [FloatingMenuManager]:
- *       - Narrow Mode: Attaches the 80dp floating circular MENU button.
- *       - Wide Mode: Detaches the floating button and ensures [ListActivity] side-by-side view binding.
+ *    b. Updates [ListActivity] view binding when entering Wide Mode:
+ *       - Narrow Mode: Category main screens render their own top-left menu button directly.
+ *       - Wide Mode: Ensures [ListActivity] side-by-side 35% sidebar view binding.
  *    c. Preserves all existing Activity instances, scroll positions, search queries,
  *       and back stack depths completely intact (zero restart / zero state loss).
  */
@@ -123,17 +123,14 @@ object ModeTransitionManager {
             }
             SplitInitializer.ensureInitialized(activity, newIsOverlayMode)
 
-            // 2. Toggle FloatingMenuManager and ListActivity UI based on the new mode
+            // 2. Update ListActivity sidebar UI when transitioning between Narrow and Wide modes
             if (newIsOverlayMode) {
-                Log.i(TAG, "Transitioning to Narrow Mode: attaching FloatingMenuManager")
-                FloatingMenuManager.attach(activity)
+                Log.i(TAG, "Transitioning to Narrow Mode: category screens render inline top-left menu button")
             } else {
-                Log.i(TAG, "Transitioning to Wide Mode: detaching FloatingMenuManager and ensuring ListActivity content view")
-                FloatingMenuManager.detach()
-                val activeMenu = BaseCategoryMenuActivity.getActiveMenuActivity()
-                if (activeMenu is ListActivity) {
-                    activeMenu.ensureWideContentView()
-                }
+                Log.i(TAG, "Transitioning to Wide Mode: ensuring ListActivity content view")
+                val targetListActivity = ListActivity.getActiveInstance()
+                    ?: (BaseCategoryMenuActivity.getActiveMenuActivity() as? ListActivity)
+                targetListActivity?.ensureWideContentView()
             }
 
             return true

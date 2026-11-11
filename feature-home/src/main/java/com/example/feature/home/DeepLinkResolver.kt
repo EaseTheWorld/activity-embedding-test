@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import com.example.core.item.AppConfig
 
 data class ResolvedDeepLink(
     val categoryId: String,
@@ -24,7 +25,11 @@ object DeepLinkResolver {
         return intent.action == "com.example.lifecycleapp.open"
     }
 
-    fun resolve(context: Context, intent: Intent?): ResolvedDeepLink? {
+    fun resolve(
+        context: Context,
+        intent: Intent?,
+        menuComponent: ComponentName? = null
+    ): ResolvedDeepLink? {
         if (intent == null) return null
         val dataUri = intent.data
         val extras = intent.extras
@@ -40,7 +45,7 @@ object DeepLinkResolver {
             if (categoryId == "home") {
                 return ResolvedDeepLink(categoryId = "home", targetIntent = null)
             }
-            val targetIntent = buildCategoryTargetIntent(context, categoryId, dataUri, extras)
+            val targetIntent = buildCategoryTargetIntent(context, categoryId, dataUri, extras, menuComponent)
             return ResolvedDeepLink(categoryId = categoryId, targetIntent = targetIntent)
         }
 
@@ -57,7 +62,7 @@ object DeepLinkResolver {
                 return ResolvedDeepLink(categoryId = "home", targetIntent = null)
             }
             val syntheticUri = Uri.parse("myapp://navigate/$categoryId")
-            val targetIntent = buildCategoryTargetIntent(context, categoryId, syntheticUri, extras)
+            val targetIntent = buildCategoryTargetIntent(context, categoryId, syntheticUri, extras, menuComponent)
             return ResolvedDeepLink(categoryId = categoryId, targetIntent = targetIntent)
         }
 
@@ -68,10 +73,11 @@ object DeepLinkResolver {
         context: Context,
         categoryId: String,
         uri: Uri,
-        extras: Bundle?
+        extras: Bundle?,
+        menuComponent: ComponentName? = null
     ): Intent {
-        val breakpoint = com.example.core.item.AppConfig.OVERLAY_MODE_WIDTH_DP_BREAKPOINT
-        val breakpointExtraKey = com.example.core.item.AppConfig.EXTRA_CATEGORY_HEADER_BREAKPOINT_DP
+        val breakpoint = AppConfig.OVERLAY_MODE_WIDTH_DP_BREAKPOINT
+        val breakpointExtraKey = AppConfig.EXTRA_CATEGORY_HEADER_BREAKPOINT_DP
 
         return if (categoryId.equals("light", ignoreCase = true)) {
             Intent(ACTION_SETTINGS_EMBED).apply {
@@ -82,6 +88,9 @@ object DeepLinkResolver {
                 data = uri
                 putExtra("category_id", categoryId)
                 putExtra(breakpointExtraKey, breakpoint)
+                if (menuComponent != null) {
+                    putExtra(AppConfig.EXTRA_MENU_COMPONENT, menuComponent)
+                }
                 if (extras != null) putExtras(extras)
             }
         } else {
@@ -93,6 +102,9 @@ object DeepLinkResolver {
                 data = uri
                 putExtra("category_id", categoryId)
                 putExtra(breakpointExtraKey, breakpoint)
+                if (menuComponent != null) {
+                    putExtra(AppConfig.EXTRA_MENU_COMPONENT, menuComponent)
+                }
                 if (extras != null) putExtras(extras)
             }
         }

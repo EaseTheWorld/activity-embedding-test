@@ -1,5 +1,6 @@
 package com.example.lifecycleapp
 
+import android.content.ComponentName
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
@@ -7,6 +8,7 @@ import android.view.MotionEvent
 import com.example.core.item.AppConfig
 import com.example.feature.home.HomeActivity
 import com.example.feature.home.HomeNavigationBridge
+import java.lang.ref.WeakReference
 
 /**
  * Task Root Activity for the application.
@@ -17,20 +19,25 @@ import com.example.feature.home.HomeNavigationBridge
  *    - Pairs with Home/Category in the right 65% secondary container via [SplitInitializer].
  * 2. Narrow Mode (`AppConfig.isOverlayMode == true`):
  *    - Serves as the pristine Task Root beneath [HomeActivity].
- *    - Attaches the 80dp floating circular MENU button via [FloatingMenuManager].
- *    - Launches [HomeActivity] to cover the full screen.
+ *    - Launches [HomeActivity] with the menu drawer [ComponentName] extra so each category main screen
+ *      renders its top-left circular menu button + category title directly inside its layout.
  */
 class ListActivity : BaseCategoryMenuActivity() {
 
+    companion object {
+        private var activeInstanceRef: WeakReference<ListActivity>? = null
+
+        fun getActiveInstance(): ListActivity? =
+            activeInstanceRef?.get()?.takeIf { !it.isFinishing && !it.isDestroyed }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        activeInstanceRef = WeakReference(this)
         val isNarrow = AppConfig.isOverlayMode(this)
         SplitInitializer.ensureInitialized(this, isNarrow)
 
-        if (isNarrow) {
-            // Narrow Mode: Floating MENU button is attached via WindowManager
-            FloatingMenuManager.attach(this)
-        } else {
+        if (!isNarrow) {
             // Wide Mode: Static sidebar layout on the left 35%
             setContentView(R.layout.activity_list)
             initCategoryMenuViews()
@@ -45,8 +52,14 @@ class ListActivity : BaseCategoryMenuActivity() {
         }
 
         if (savedInstanceState == null) {
+            val menuComponent = ComponentName(this, ListWithTranslucentActivity::class.java)
             val homeIntent = Intent(this, HomeActivity::class.java).apply {
                 action = ACTION_SETTINGS_EMBED
+                putExtra(AppConfig.EXTRA_MENU_COMPONENT, menuComponent)
+                putExtra(
+                    AppConfig.EXTRA_CATEGORY_HEADER_BREAKPOINT_DP,
+                    AppConfig.OVERLAY_MODE_WIDTH_DP_BREAKPOINT
+                )
                 if (initialCategoryId != null) {
                     putExtra(HomeActivity.EXTRA_INITIAL_CATEGORY_ID, initialCategoryId)
                 }
@@ -97,7 +110,9 @@ class ListActivity : BaseCategoryMenuActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        FloatingMenuManager.detach()
+        if (activeInstanceRef?.get() === this) {
+            activeInstanceRef = null
+        }
     }
 
     private fun ensureSecondaryFocus() {

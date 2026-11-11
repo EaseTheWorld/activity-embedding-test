@@ -29,6 +29,14 @@ object AppConfig {
     const val EXTRA_CATEGORY_HEADER_BREAKPOINT_DP: String = "extra_category_header_breakpoint_dp"
 
     /**
+     * Intent extra key carrying the host category-menu drawer Activity target as a
+     * [android.content.ComponentName] (or [android.content.pm.ComponentInfo] / flattened String).
+     * Category main screens show the top-left menu button only when this target is provided
+     * alongside narrow mode.
+     */
+    const val EXTRA_MENU_COMPONENT: String = "extra_menu_component"
+
+    /**
      * Backward-compatible boolean extra key for explicit override.
      */
     const val EXTRA_SHOW_CATEGORY_HEADER: String = "extra_show_category_header"

@@ -70,5 +70,35 @@ class CoreContractInvariantsTest {
         assertNull(CategoryItemRegistry.getProvider(null))
         assertNull(CategoryItemRegistry.getProvider(""))
     }
+
+    @Test
+    fun `verify AppConfig menu extra constant and category header width breakpoint`() {
+        assertEquals("extra_menu_component", AppConfig.EXTRA_MENU_COMPONENT)
+
+        val prevOverride = AppConfig.OVERRIDE_OVERLAY_MODE
+        try {
+            AppConfig.OVERRIDE_OVERLAY_MODE = null
+
+            val narrowConfig = TestConfiguration(screenWidthDp = 800)
+            val wideConfig = TestConfiguration(screenWidthDp = 1280)
+            val intent = TestIntentWithBreakpoint(840)
+
+            assertEquals(true, AppConfig.shouldShowCategoryHeader(narrowConfig, intent))
+            assertEquals(false, AppConfig.shouldShowCategoryHeader(wideConfig, intent))
+        } finally {
+            AppConfig.OVERRIDE_OVERLAY_MODE = prevOverride
+        }
+    }
+
+    private class TestConfiguration(@JvmField var screenWidthDp: Int)
+
+    private class TestIntentWithBreakpoint(private val breakpoint: Int) {
+        @Suppress("unused")
+        fun hasExtra(name: String): Boolean = false
+
+        @Suppress("unused")
+        fun getIntExtra(name: String, defaultValue: Int): Int =
+            if (name == AppConfig.EXTRA_CATEGORY_HEADER_BREAKPOINT_DP) breakpoint else defaultValue
+    }
 }
 

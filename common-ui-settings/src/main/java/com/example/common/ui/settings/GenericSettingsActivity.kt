@@ -1,5 +1,6 @@
 package com.example.common.ui.settings
 
+import android.content.ComponentName
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -13,6 +14,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navOptions
+import com.example.core.item.AppConfig
 import com.example.core.item.ItemViewModelRegistry
 
 /**
@@ -30,6 +32,8 @@ open class GenericSettingsActivity : AppCompatActivity() {
     private var navTrigger = mutableStateOf(0)
     private var currentHighlightEvent = mutableStateOf<HighlightEvent?>(null)
     private var showCategoryHeader = mutableStateOf(true)
+    private var menuComponentState = mutableStateOf<ComponentName?>(null)
+    private var headerBreakpointDp: Int = AppConfig.OVERLAY_MODE_WIDTH_DP_BREAKPOINT
 
     protected open fun getViewModelRegistry(): ItemViewModelRegistry = defaultViewModelRegistry
 
@@ -42,7 +46,7 @@ open class GenericSettingsActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         pendingIntent.value = intent
-        showCategoryHeader.value = com.example.core.item.AppConfig.shouldShowCategoryHeader(this, intent)
+        updateHeaderAndMenuState(intent)
 
         val initialDestination = resolveInitialDestination(intent)
 
@@ -89,11 +93,17 @@ open class GenericSettingsActivity : AppCompatActivity() {
                 LocalHighlightEvent provides currentHighlightEvent.value,
                 LocalShowCategoryHeader provides showCategoryHeader.value
             ) {
+                val activeMenuComponent = menuComponentState.value
                 SettingsNavHost(
                     navController = navController,
                     startDestination = initialDestination,
                     viewModelRegistry = getViewModelRegistry(),
                     recentManager = recentManager,
+                    onMenuClick = activeMenuComponent?.let { component ->
+                        { categoryId ->
+                            launchMenuDrawer(this@GenericSettingsActivity, component, categoryId)
+                        }
+                    },
                     onNavigateExternal = { categoryId ->
                         launchExternalCategory(categoryId)
                     }
@@ -107,14 +117,36 @@ open class GenericSettingsActivity : AppCompatActivity() {
         setIntent(intent)
         Log.d(tag, "onNewIntent received: $intent, data=${intent?.data}, extras=${intent?.extras}")
         pendingIntent.value = intent
-        showCategoryHeader.value = com.example.core.item.AppConfig.shouldShowCategoryHeader(this, intent)
+        updateHeaderAndMenuState(intent)
         navTrigger.value++
     }
 
     override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
         super.onConfigurationChanged(newConfig)
-        showCategoryHeader.value = com.example.core.item.AppConfig.shouldShowCategoryHeader(this, intent)
+        showCategoryHeader.value = resolveShowCategoryHeader(intent)
         Log.d(tag, "onConfigurationChanged: newConfig=$newConfig, showCategoryHeader=${showCategoryHeader.value}")
+    }
+
+    private fun updateHeaderAndMenuState(sourceIntent: Intent?) {
+        if (sourceIntent?.hasExtra(AppConfig.EXTRA_CATEGORY_HEADER_BREAKPOINT_DP) == true) {
+            headerBreakpointDp = sourceIntent.getIntExtra(
+                AppConfig.EXTRA_CATEGORY_HEADER_BREAKPOINT_DP,
+                AppConfig.OVERLAY_MODE_WIDTH_DP_BREAKPOINT
+            )
+        }
+        extractMenuComponent(sourceIntent)?.let { menuComponentState.value = it }
+        showCategoryHeader.value = resolveShowCategoryHeader(sourceIntent)
+    }
+
+    private fun resolveShowCategoryHeader(sourceIntent: Intent?): Boolean {
+        val evalIntent = if (sourceIntent?.hasExtra(AppConfig.EXTRA_CATEGORY_HEADER_BREAKPOINT_DP) == true) {
+            sourceIntent
+        } else {
+            Intent().apply {
+                putExtra(AppConfig.EXTRA_CATEGORY_HEADER_BREAKPOINT_DP, headerBreakpointDp)
+            }
+        }
+        return AppConfig.shouldShowCategoryHeader(this, evalIntent)
     }
 
     protected fun resolveInitialDestination(intent: Intent?): String {
@@ -247,6 +279,8 @@ open class GenericSettingsActivity : AppCompatActivity() {
         if (categoryId.equals("light", ignoreCase = true)) {
             val extIntent = Intent("com.example.carsettings.light.OPEN").apply {
                 setClassName("com.example.carsettings.light", "com.example.feature.light.LightSettingsActivity")
+                putExtra(AppConfig.EXTRA_CATEGORY_HEADER_BREAKPOINT_DP, headerBreakpointDp)
+                menuComponentState.value?.let { putExtra(AppConfig.EXTRA_MENU_COMPONENT, it) }
             }
             try {
                 startActivity(extIntent)

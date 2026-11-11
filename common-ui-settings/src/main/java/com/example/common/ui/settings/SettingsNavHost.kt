@@ -60,6 +60,7 @@ fun SettingsNavHost(
     recentManager: RecentCategoryManager = RecentCategoryManager(
         initialKeys = listOf("auto_lock", "easy_entry_exit", "unlock_on_park", "driver_seat_heat")
     ),
+    onMenuClick: ((categoryId: String) -> Unit)? = null,
     onNavigateExternal: (categoryId: String) -> Unit = {}
 ) {
     val context: Context = LocalContext.current
@@ -89,6 +90,7 @@ fun SettingsNavHost(
                 providers = providers,
                 itemResolver = itemResolver,
                 viewModelRegistry = viewModelRegistry,
+                onMenuClick = onMenuClick?.let { callback -> { callback("dashboard") } },
                 onCategoryClick = { categoryId ->
                     if (categoryId.equals("light", ignoreCase = true)) {
                         onNavigateExternal(categoryId)
@@ -131,13 +133,16 @@ fun SettingsNavHost(
                 subtitle = "Settings for $titleText",
                 items = provider?.items ?: emptyList(),
                 viewModelRegistry = viewModelRegistry,
-                onNavigateBack = {
-                    if (!navController.popBackStack()) {
-                        navController.navigate(SettingsNavigation.ROUTE_DASHBOARD) {
-                            popUpTo(SettingsNavigation.ROUTE_DASHBOARD) { inclusive = true }
+                onMenuClick = onMenuClick?.let { callback -> { callback(categoryId) } },
+                onNavigateBack = if (navController.previousBackStackEntry != null) {
+                    {
+                        if (!navController.popBackStack()) {
+                            navController.navigate(SettingsNavigation.ROUTE_DASHBOARD) {
+                                popUpTo(SettingsNavigation.ROUTE_DASHBOARD) { inclusive = true }
+                            }
                         }
                     }
-                },
+                } else null,
                 onItemClick = { item ->
                     // Intra-category navigation: drill down into item detail
                     navController.navigate(SettingsNavigation.itemDetailRoute(categoryId, item.id))
@@ -213,13 +218,16 @@ fun SettingsNavHost(
                 items = provider?.items ?: emptyList(),
                 targetItemId = itemId,
                 viewModelRegistry = viewModelRegistry,
-                onNavigateBack = {
-                    if (!navController.popBackStack()) {
-                        navController.navigate(SettingsNavigation.ROUTE_DASHBOARD) {
-                            popUpTo(SettingsNavigation.ROUTE_DASHBOARD) { inclusive = true }
+                onMenuClick = onMenuClick?.let { callback -> { callback(categoryId) } },
+                onNavigateBack = if (navController.previousBackStackEntry != null) {
+                    {
+                        if (!navController.popBackStack()) {
+                            navController.navigate(SettingsNavigation.ROUTE_DASHBOARD) {
+                                popUpTo(SettingsNavigation.ROUTE_DASHBOARD) { inclusive = true }
+                            }
                         }
                     }
-                },
+                } else null,
                 onItemClick = { clickedItem ->
                     if (clickedItem.hasDetailScreen) {
                         navController.navigate(SettingsNavigation.itemDetailRoute(categoryId, clickedItem.id))

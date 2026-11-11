@@ -9,11 +9,14 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
+import androidx.compose.runtime.mutableStateOf
 import androidx.window.embedding.EmbeddingBounds
 import androidx.window.embedding.OverlayAttributes
 import androidx.window.embedding.OverlayCreateParams
 import androidx.window.embedding.setOverlayCreateParams
 import androidx.lifecycle.lifecycleScope
+import com.example.common.ui.settings.extractMenuComponent
+import com.example.common.ui.settings.launchMenuDrawer
 import com.example.core.item.AppConfig
 
 class HomeActivity : ComponentActivity() {
@@ -27,6 +30,9 @@ class HomeActivity : ComponentActivity() {
     }
 
     private val tag = "HomeActivity"
+    private val showCategoryHeader = mutableStateOf(true)
+    private val menuComponentState = mutableStateOf<ComponentName?>(null)
+    private var headerBreakpointDp: Int = AppConfig.OVERLAY_MODE_WIDTH_DP_BREAKPOINT
 
     @Suppress("DEPRECATION")
     private val taskRootLaunchListener: (Intent) -> Unit = { targetIntent ->
@@ -37,6 +43,7 @@ class HomeActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         HomeNavigationBridge.registerTaskRootLaunchListener(taskRootLaunchListener)
+        updateHeaderAndMenuState(intent)
 
         val isNarrowOverlayMode = AppConfig.isOverlayMode(this)
         HomeNavigationBridge.ensureSplitRules(this, isNarrowOverlayMode)
@@ -49,13 +56,17 @@ class HomeActivity : ComponentActivity() {
             override fun handleOnBackPressed() {
                 Log.d(tag, "Back pressed at Home (Root of App) -> finishAffinity to exit")
                 HomeNavigationBridge.notifyAppExit()
-                HomeNavigationBridge.dismissFloatingOverlay()
                 finishAffinity()
             }
         })
 
         setContent {
+            val activeMenuComponent = menuComponentState.value
             HomeScreen(
+                showCategoryHeader = showCategoryHeader.value,
+                onMenuClick = activeMenuComponent?.let { component ->
+                    { launchMenuDrawer(this@HomeActivity, component, categoryId = "home") }
+                },
                 onItemClick = { item ->
                     launchTargetSetting(item)
                 }
@@ -71,6 +82,9 @@ class HomeActivity : ComponentActivity() {
         }
 
         if (targetIntent != null) {
+            if (!targetIntent.hasExtra(AppConfig.EXTRA_MENU_COMPONENT)) {
+                menuComponentState.value?.let { targetIntent.putExtra(AppConfig.EXTRA_MENU_COMPONENT, it) }
+            }
             window.decorView.post {
                 if (!isFinishing && !isDestroyed) {
                     if (initialCategoryId != null && !initialCategoryId.equals("home", ignoreCase = true)) {
@@ -114,7 +128,6 @@ class HomeActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        HomeNavigationBridge.dismissFloatingOverlay()
         if (isFinishing) {
             HomeNavigationBridge.notifyAppExit()
         }
@@ -126,6 +139,7 @@ class HomeActivity : ComponentActivity() {
         super.onConfigurationChanged(newConfig)
         Log.d(tag, "HomeActivity onConfigurationChanged: $newConfig")
         HomeNavigationBridge.handleModeTransition(this, newConfig)
+        showCategoryHeader.value = resolveShowCategoryHeader(intent)
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -136,7 +150,30 @@ class HomeActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
         setIntent(intent)
+        updateHeaderAndMenuState(intent)
         handleTargetLaunch(intent)
+    }
+
+    private fun updateHeaderAndMenuState(sourceIntent: Intent?) {
+        if (sourceIntent?.hasExtra(AppConfig.EXTRA_CATEGORY_HEADER_BREAKPOINT_DP) == true) {
+            headerBreakpointDp = sourceIntent.getIntExtra(
+                AppConfig.EXTRA_CATEGORY_HEADER_BREAKPOINT_DP,
+                AppConfig.OVERLAY_MODE_WIDTH_DP_BREAKPOINT
+            )
+        }
+        extractMenuComponent(sourceIntent)?.let { menuComponentState.value = it }
+        showCategoryHeader.value = resolveShowCategoryHeader(sourceIntent)
+    }
+
+    private fun resolveShowCategoryHeader(sourceIntent: Intent?): Boolean {
+        val evalIntent = if (sourceIntent?.hasExtra(AppConfig.EXTRA_CATEGORY_HEADER_BREAKPOINT_DP) == true) {
+            sourceIntent
+        } else {
+            Intent().apply {
+                putExtra(AppConfig.EXTRA_CATEGORY_HEADER_BREAKPOINT_DP, headerBreakpointDp)
+            }
+        }
+        return AppConfig.shouldShowCategoryHeader(this, evalIntent)
     }
 
     private fun handleTargetLaunch(intent: Intent?) {
@@ -158,6 +195,9 @@ class HomeActivity : ComponentActivity() {
         }
 
         if (targetIntent != null) {
+            if (!targetIntent.hasExtra(AppConfig.EXTRA_MENU_COMPONENT)) {
+                menuComponentState.value?.let { targetIntent.putExtra(AppConfig.EXTRA_MENU_COMPONENT, it) }
+            }
             if (categoryId != null) {
                 HomeNavigationBridge.notifyCategorySelected(categoryId)
             }
@@ -185,7 +225,8 @@ class HomeActivity : ComponentActivity() {
             data = targetUri
             putExtra("category_id", item.categoryId)
             putExtra("target_item_id", item.itemId)
-            putExtra(AppConfig.EXTRA_CATEGORY_HEADER_BREAKPOINT_DP, AppConfig.OVERLAY_MODE_WIDTH_DP_BREAKPOINT)
+            putExtra(AppConfig.EXTRA_CATEGORY_HEADER_BREAKPOINT_DP, headerBreakpointDp)
+            menuComponentState.value?.let { putExtra(AppConfig.EXTRA_MENU_COMPONENT, it) }
         }
 
         Log.d(tag, "Launching target setting from Home search: $targetComponent, uri=$targetUri, categoryId=${item.categoryId}")

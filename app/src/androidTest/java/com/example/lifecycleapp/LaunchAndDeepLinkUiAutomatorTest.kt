@@ -13,6 +13,7 @@ import androidx.test.uiautomator.Until
 import com.example.core.item.AppConfig
 import org.junit.After
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.FixMethodOrder
 import org.junit.Test
@@ -175,9 +176,9 @@ class LaunchAndDeepLinkUiAutomatorTest {
     }
 
     private fun expandOverlayDrawerInNarrowMode() {
-        val btnMore = device.wait(Until.findObject(By.res(pkg, "btnMore")), timeout)
-        assertNotNull("Collapsed MENU button should be visible in Narrow Mode", btnMore)
-        btnMore!!.click()
+        val btnMenu = device.wait(Until.findObject(By.desc("Open Menu")), timeout)
+        assertNotNull("In-screen MENU button should be visible on category main screen in Narrow Mode", btnMenu)
+        btnMenu!!.click()
         device.waitForIdle()
         Thread.sleep(800)
     }
@@ -277,13 +278,12 @@ class LaunchAndDeepLinkUiAutomatorTest {
         // 3. Send app to background via Home button
         sendAppToBackground()
 
-        // 4. Warm start via MAIN/LAUNCHER from background -> must resume exact state (Lumbar Support + floating MENU button)
+        // 4. Warm start via MAIN/LAUNCHER from background -> must resume exact state (Lumbar Support sub-screen without menu button)
         startIntentAndWait(createLauncherIntent())
         assertLumbarDetailVisible(
             "Narrow Mode: Launching from Launcher while in background (after Launcher start) must preserve Lumbar Support detail screen"
         )
-        val btnMore = device.wait(Until.findObject(By.res(pkg, "btnMore")), timeout)
-        assertNotNull("Narrow Mode: Collapsed floating MENU button must remain visible after returning from background", btnMore)
+        assertNull("Narrow Mode: Sub-screen must NOT show the main-screen menu button", device.findObject(By.desc("Open Menu")))
     }
 
     @Test
@@ -293,8 +293,7 @@ class LaunchAndDeepLinkUiAutomatorTest {
         // 1. Cold start via DeepLink in Narrow Overlay Mode
         startIntentAndWait(createDeepLinkIntent("myapp://navigate/seat/seat_lumbar"))
         assertLumbarDetailVisible("Narrow Mode: Cold start DeepLink should open Seat -> Lumbar Support detail screen")
-        val btnMoreInitial = device.wait(Until.findObject(By.res(pkg, "btnMore")), timeout)
-        assertNotNull("Narrow Mode: Collapsed floating MENU button must be visible after DeepLink cold start", btnMoreInitial)
+        assertNull("Narrow Mode: Sub-screen must NOT show the main-screen menu button", device.findObject(By.desc("Open Menu")))
 
         // 2. Send app to background via Home button
         sendAppToBackground()
@@ -304,8 +303,7 @@ class LaunchAndDeepLinkUiAutomatorTest {
         assertLumbarDetailVisible(
             "Narrow Mode: Launching from Launcher while in background (after DeepLink cold start) must preserve Lumbar Support detail screen"
         )
-        val btnMoreAfterResume = device.wait(Until.findObject(By.res(pkg, "btnMore")), timeout)
-        assertNotNull("Narrow Mode: Collapsed floating MENU button must remain visible after Launcher warm start", btnMoreAfterResume)
+        assertNull("Narrow Mode: Sub-screen must NOT show the main-screen menu button", device.findObject(By.desc("Open Menu")))
     }
 
     @Test
@@ -331,8 +329,8 @@ class LaunchAndDeepLinkUiAutomatorTest {
             "Narrow Mode: Background Warm Start DeepLink to external Light category with value=ON should bring app to foreground and update status",
             onStatus
         )
-        val btnMore = device.wait(Until.findObject(By.res(pkg, "btnMore")), timeout)
-        assertNotNull("Narrow Mode: Collapsed floating MENU button must remain visible after DeepLink warm start", btnMore)
+        val btnMenu = device.wait(Until.findObject(By.desc("Open Menu")), timeout)
+        assertNotNull("Narrow Mode: Main-screen circular MENU button must be visible on external Light category", btnMenu)
     }
 
     private data class StartupMetric(
@@ -408,9 +406,9 @@ class LaunchAndDeepLinkUiAutomatorTest {
             intent = createLauncherIntent()
         ) {
             val homeText = device.wait(Until.findObject(By.textContains("Quick Access")), timeout)
-            val btnMore = device.wait(Until.findObject(By.res(pkg, "btnMore")), timeout)
+            val btnMenu = device.wait(Until.findObject(By.desc("Open Menu")), timeout)
             assertNotNull("Narrow Launcher cold start should display Home Quick Access", homeText)
-            assertNotNull("Narrow Launcher cold start should display floating MENU button", btnMore)
+            assertNotNull("Narrow Launcher cold start should display inline MENU button", btnMenu)
         }
 
         val narrowDeepLink = measureColdStart(
@@ -419,8 +417,7 @@ class LaunchAndDeepLinkUiAutomatorTest {
             intent = createDeepLinkIntent("myapp://navigate/seat/seat_lumbar")
         ) {
             assertLumbarDetailVisible("Narrow DeepLink cold start should display Lumbar Support detail")
-            val btnMore = device.wait(Until.findObject(By.res(pkg, "btnMore")), timeout)
-            assertNotNull("Narrow DeepLink cold start should display floating MENU button", btnMore)
+            assertNull("Narrow DeepLink detail sub-screen should NOT display main-screen MENU button", device.findObject(By.desc("Open Menu")))
         }
 
         android.util.Log.i(
@@ -473,12 +470,12 @@ class LaunchAndDeepLinkUiAutomatorTest {
         val leftSidebarList = device.wait(Until.findObject(By.res(pkg, "listViewCategories")), timeout)
         assertNotNull("Wide mode should show static left sidebar ListView", leftSidebarList)
 
-        // Navigate to Seat category detail (Lumbar Support)
-        startIntentAndWait(createDeepLinkIntent("myapp://navigate/seat/seat_lumbar"))
-        assertLumbarDetailVisible("Lumbar detail should be visible in Wide Split mode")
+        // Navigate to Seat main category screen
+        startIntentAndWait(createDeepLinkIntent("myapp://navigate/seat"))
+        assertSeatCategoryListVisible("Seat main screen should be visible in Wide Split mode")
 
-        // 2. Trigger Dynamic Transition to Narrow Overlay Mode via 'wm size 1200x1600' (1200px / 2 = 600dp < 840dp)
-        android.util.Log.i("DynamicModeTransitionTest", "Changing display size to 1200x1600 (Narrow Overlay Mode)")
+        // 2. Trigger Dynamic Transition to Narrow Mode via 'wm size 1200x1600' (1200px / 2 = 600dp < 840dp)
+        android.util.Log.i("DynamicModeTransitionTest", "Changing display size to 1200x1600 (Narrow Mode)")
         device.executeShellCommand("wm size 1200x1600")
         device.waitForIdle()
         Thread.sleep(1000L)
@@ -486,11 +483,10 @@ class LaunchAndDeepLinkUiAutomatorTest {
         val transitionTimeout = 15000L
 
         // Verify Narrow Mode UI is displayed:
-        // - Pinned Overlay floating hamburger button should appear first
-        val btnMore = device.wait(Until.findObject(By.res(pkg, "btnMore")), transitionTimeout)
-        assertNotNull("Narrow Overlay Mode must show floating MENU button", btnMore)
-        // - Lumbar detail should be preserved (State Preservation)
-        assertLumbarDetailVisible("Lumbar detail should be preserved after transition to Narrow Mode", transitionTimeout)
+        // - Inline circular MENU button should appear on the Seat main screen
+        val btnMenu = device.wait(Until.findObject(By.desc("Open Menu")), transitionTimeout)
+        assertNotNull("Narrow Mode must show inline MENU button on category main screen", btnMenu)
+        assertSeatCategoryListVisible("Seat main screen should be preserved after transition to Narrow Mode")
 
         // 3. Trigger Dynamic Transition back to Wide Split Mode via 'wm size reset'
         android.util.Log.i("DynamicModeTransitionTest", "Resetting display size to 2560x1600 (Wide Split Mode)")
@@ -502,7 +498,7 @@ class LaunchAndDeepLinkUiAutomatorTest {
         // - Left sidebar list should appear again (guarantees Wide Split mode reconstructed)
         val leftSidebarListRestored = device.wait(Until.findObject(By.res(pkg, "listViewCategories")), transitionTimeout)
         assertNotNull("Wide Split Mode must restore static left sidebar ListView", leftSidebarListRestored)
-        // - Lumbar detail should still be visible in Secondary
+        assertSeatCategoryListVisible("Seat main screen should still be visible in Secondary")
         assertLumbarDetailVisible("Lumbar detail should still be visible after returning to Wide Split mode", transitionTimeout)
 
         // 4. Verify Back key navigation after dynamic mode transitions

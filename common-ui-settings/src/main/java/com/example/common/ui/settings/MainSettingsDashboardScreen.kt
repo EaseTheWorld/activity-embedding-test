@@ -60,6 +60,8 @@ fun MainSettingsDashboardScreen(
     providers: List<CategoryItemProvider>,
     itemResolver: (String) -> Item?,
     onCategoryClick: ((String) -> Unit)? = null,
+    showCategoryHeader: Boolean = LocalShowCategoryHeader.current,
+    onMenuClick: (() -> Unit)? = null,
     viewModelRegistry: ItemViewModelRegistry = LocalItemViewModelRegistry.current,
     customCategoryLayouts: Map<String, CategoryLayoutSlot> = emptyMap(),
     modifier: Modifier = Modifier
@@ -78,17 +80,12 @@ fun MainSettingsDashboardScreen(
                 .padding(24.dp)
         ) {
             // Dashboard Header
-            Text(
-                text = "Vehicle Settings",
-                style = MaterialTheme.typography.headlineMedium.copy(
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF1E1E2E)
-                )
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "Quick Controls and Category Overview",
-                style = MaterialTheme.typography.bodyMedium.copy(color = Color(0xFF6B7280))
+            CategoryMainHeader(
+                title = "Vehicle Settings",
+                subtitle = "Quick Controls and Category Overview",
+                showMenuButton = showCategoryHeader && onMenuClick != null,
+                showTitle = true,
+                onMenuClick = onMenuClick
             )
             Spacer(modifier = Modifier.height(24.dp))
 

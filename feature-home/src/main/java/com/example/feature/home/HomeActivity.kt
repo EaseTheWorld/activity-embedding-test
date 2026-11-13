@@ -9,13 +9,14 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.mutableStateOf
 import androidx.window.embedding.EmbeddingBounds
 import androidx.window.embedding.OverlayAttributes
 import androidx.window.embedding.OverlayCreateParams
 import androidx.window.embedding.setOverlayCreateParams
 import androidx.lifecycle.lifecycleScope
-import com.example.common.ui.settings.extractMenuComponent
+import com.example.common.ui.settings.extractMenuIntent
 import com.example.common.ui.settings.launchMenuDrawer
 import com.example.core.item.AppConfig
 
@@ -27,22 +28,52 @@ class HomeActivity : ComponentActivity() {
         const val EXTRA_INITIAL_DEEPLINK_URI = "extra_initial_deeplink_uri"
         const val EXTRA_INITIAL_DEEPLINK_ACTION = "extra_initial_deeplink_action"
         const val EXTRA_INITIAL_DEEPLINK_EXTRAS = "extra_initial_deeplink_extras"
+        private const val KEY_IS_CATEGORY_RUNNING = "key_is_category_running"
+        private const val KEY_SUPPRESSED_RESULT_COUNT = "key_suppressed_result_count"
     }
 
     private val tag = "HomeActivity"
     private val showCategoryHeader = mutableStateOf(true)
-    private val menuComponentState = mutableStateOf<ComponentName?>(null)
+    private val menuIntentState = mutableStateOf<Intent?>(null)
     private var headerBreakpointDp: Int = AppConfig.OVERLAY_MODE_WIDTH_DP_BREAKPOINT
+    private val categoryResultTracker = CategoryResultTracker()
+
+    private val categorySwitchHandler: () -> Unit = {
+        categoryResultTracker.onPrepareSwitch()
+        Log.d(
+            tag,
+            "HomeActivity prepared for category switch: suppressedResultCount=${categoryResultTracker.suppressedResultCount}"
+        )
+    }
+
+    private val categoryLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val homeRevealed = categoryResultTracker.onResultDelivered()
+        Log.d(
+            tag,
+            "HomeActivity onActivityResult from category: resultCode=${result.resultCode}, " +
+                "homeRevealed=$homeRevealed, isCategoryRunning=${categoryResultTracker.isCategoryRunning}, " +
+                "suppressedResultCount=${categoryResultTracker.suppressedResultCount}"
+        )
+        if (homeRevealed) {
+            HomeNavigationBridge.notifyHomeRevealed()
+        }
+    }
 
     @Suppress("DEPRECATION")
     private val taskRootLaunchListener: (Intent) -> Unit = { targetIntent ->
-        startActivity(targetIntent)
-        overridePendingTransition(0, 0)
+        launchCategoryForResult(targetIntent)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (savedInstanceState != null) {
+            categoryResultTracker.isCategoryRunning = savedInstanceState.getBoolean(KEY_IS_CATEGORY_RUNNING, false)
+            categoryResultTracker.suppressedResultCount = savedInstanceState.getInt(KEY_SUPPRESSED_RESULT_COUNT, 0)
+        }
         HomeNavigationBridge.registerTaskRootLaunchListener(taskRootLaunchListener)
+        HomeNavigationBridge.registerCategorySwitchHandler(categorySwitchHandler)
         updateHeaderAndMenuState(intent)
 
         val isNarrowOverlayMode = AppConfig.isOverlayMode(this)
@@ -61,11 +92,11 @@ class HomeActivity : ComponentActivity() {
         })
 
         setContent {
-            val activeMenuComponent = menuComponentState.value
+            val activeMenuIntent = menuIntentState.value
             HomeScreen(
                 showCategoryHeader = showCategoryHeader.value,
-                onMenuClick = activeMenuComponent?.let { component ->
-                    { launchMenuDrawer(this@HomeActivity, component, categoryId = "home") }
+                onMenuClick = activeMenuIntent?.let { menuIntent ->
+                    { launchMenuDrawer(this@HomeActivity, menuIntent) }
                 },
                 onItemClick = { item ->
                     launchTargetSetting(item)
@@ -82,16 +113,22 @@ class HomeActivity : ComponentActivity() {
         }
 
         if (targetIntent != null) {
-            if (!targetIntent.hasExtra(AppConfig.EXTRA_MENU_COMPONENT)) {
-                menuComponentState.value?.let { targetIntent.putExtra(AppConfig.EXTRA_MENU_COMPONENT, it) }
+            if (!targetIntent.hasExtra(AppConfig.EXTRA_MENU_INTENT)) {
+                menuIntentState.value?.let { baseMenuIntent ->
+                    val targetMenuIntent = Intent(baseMenuIntent).apply {
+                        if (!initialCategoryId.isNullOrEmpty()) {
+                            putExtra(AppConfig.EXTRA_CATEGORY_ID, initialCategoryId)
+                        }
+                    }
+                    targetIntent.putExtra(AppConfig.EXTRA_MENU_INTENT, targetMenuIntent)
+                }
             }
             window.decorView.post {
                 if (!isFinishing && !isDestroyed) {
                     if (initialCategoryId != null && !initialCategoryId.equals("home", ignoreCase = true)) {
                         HomeNavigationBridge.notifyCategorySelected(initialCategoryId)
                     }
-                    startActivity(targetIntent)
-                    overridePendingTransition(0, 0)
+                    launchCategoryForResult(targetIntent)
                 }
             }
         }
@@ -104,12 +141,7 @@ class HomeActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        if (HomeNavigationBridge.isLaunchingCategory) {
-            Log.d(tag, "HomeActivity onResume: skipped bridge notification because target category is being launched")
-            return
-        }
-        Log.d(tag, "HomeActivity onResume: Home truly revealed")
-        HomeNavigationBridge.notifyHomeRevealed()
+        Log.d(tag, "HomeActivity onResume()")
     }
 
     override fun onPause() {
@@ -131,6 +163,7 @@ class HomeActivity : ComponentActivity() {
         if (isFinishing) {
             HomeNavigationBridge.notifyAppExit()
         }
+        HomeNavigationBridge.unregisterCategorySwitchHandler(categorySwitchHandler)
         HomeNavigationBridge.unregisterTaskRootLaunchListener(taskRootLaunchListener)
         Log.d(tag, "HomeActivity onDestroy()")
     }
@@ -144,6 +177,8 @@ class HomeActivity : ComponentActivity() {
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
+        outState.putBoolean(KEY_IS_CATEGORY_RUNNING, categoryResultTracker.isCategoryRunning)
+        outState.putInt(KEY_SUPPRESSED_RESULT_COUNT, categoryResultTracker.suppressedResultCount)
         Log.d(tag, "HomeActivity onSaveInstanceState()")
     }
 
@@ -161,7 +196,7 @@ class HomeActivity : ComponentActivity() {
                 AppConfig.OVERLAY_MODE_WIDTH_DP_BREAKPOINT
             )
         }
-        extractMenuComponent(sourceIntent)?.let { menuComponentState.value = it }
+        extractMenuIntent(sourceIntent)?.let { menuIntentState.value = it }
         showCategoryHeader.value = resolveShowCategoryHeader(sourceIntent)
     }
 
@@ -195,19 +230,33 @@ class HomeActivity : ComponentActivity() {
         }
 
         if (targetIntent != null) {
-            if (!targetIntent.hasExtra(AppConfig.EXTRA_MENU_COMPONENT)) {
-                menuComponentState.value?.let { targetIntent.putExtra(AppConfig.EXTRA_MENU_COMPONENT, it) }
+            if (!targetIntent.hasExtra(AppConfig.EXTRA_MENU_INTENT)) {
+                menuIntentState.value?.let { baseMenuIntent ->
+                    val targetMenuIntent = Intent(baseMenuIntent).apply {
+                        if (!categoryId.isNullOrEmpty()) {
+                            putExtra(AppConfig.EXTRA_CATEGORY_ID, categoryId)
+                        }
+                    }
+                    targetIntent.putExtra(AppConfig.EXTRA_MENU_INTENT, targetMenuIntent)
+                }
             }
             if (categoryId != null) {
                 HomeNavigationBridge.notifyCategorySelected(categoryId)
             }
-            try {
-                Log.d(tag, "HomeActivity launching target category: $targetIntent")
-                startActivity(targetIntent)
-                overridePendingTransition(0, 0)
-            } catch (e: Exception) {
-                Log.e(tag, "Failed to launch target intent: $e")
-            }
+            launchCategoryForResult(targetIntent)
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    internal fun launchCategoryForResult(targetIntent: Intent) {
+        try {
+            Log.d(tag, "HomeActivity launching target category for result: $targetIntent")
+            categoryResultTracker.onLaunchStarted()
+            categoryLauncher.launch(targetIntent)
+            overridePendingTransition(0, 0)
+        } catch (e: Exception) {
+            categoryResultTracker.onLaunchFailed()
+            Log.e(tag, "Failed to launch target intent: $e")
         }
     }
 
@@ -226,7 +275,12 @@ class HomeActivity : ComponentActivity() {
             putExtra("category_id", item.categoryId)
             putExtra("target_item_id", item.itemId)
             putExtra(AppConfig.EXTRA_CATEGORY_HEADER_BREAKPOINT_DP, headerBreakpointDp)
-            menuComponentState.value?.let { putExtra(AppConfig.EXTRA_MENU_COMPONENT, it) }
+            menuIntentState.value?.let { baseMenuIntent ->
+                val targetMenuIntent = Intent(baseMenuIntent).apply {
+                    putExtra(AppConfig.EXTRA_CATEGORY_ID, item.categoryId)
+                }
+                putExtra(AppConfig.EXTRA_MENU_INTENT, targetMenuIntent)
+            }
         }
 
         Log.d(tag, "Launching target setting from Home search: $targetComponent, uri=$targetUri, categoryId=${item.categoryId}")

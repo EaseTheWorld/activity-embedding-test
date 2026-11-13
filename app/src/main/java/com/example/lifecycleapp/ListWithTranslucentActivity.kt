@@ -26,6 +26,7 @@ class ListWithTranslucentActivity : BaseCategoryMenuActivity() {
     private lateinit var viewDimScrim: View
     private lateinit var btnCollapse: View
     private var isClosing = false
+    private var activeCategoryId: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -38,8 +39,10 @@ class ListWithTranslucentActivity : BaseCategoryMenuActivity() {
 
         initCategoryMenuViews()
 
-        val initialCategoryId = intent?.getStringExtra("extra_category_id")
+        val initialCategoryId = savedInstanceState?.getString(KEY_ACTIVE_CATEGORY_ID)
+            ?: intent?.getStringExtra("extra_category_id")
             ?: intent?.getStringExtra("category_id")
+        activeCategoryId = initialCategoryId
         if (!initialCategoryId.isNullOrEmpty()) {
             val matchedIndex = categories.indexOfFirst { it.id.equals(initialCategoryId, ignoreCase = true) }
             if (matchedIndex >= 0) {
@@ -111,7 +114,19 @@ class ListWithTranslucentActivity : BaseCategoryMenuActivity() {
             .start()
     }
 
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        val currentId = currentSelectedCategoryId ?: activeCategoryId
+        if (!currentId.isNullOrEmpty()) {
+            outState.putString(KEY_ACTIVE_CATEGORY_ID, currentId)
+        }
+    }
+
     override fun onBeforeCategoryLaunch() {
         closeMenu()
+    }
+
+    private companion object {
+        const val KEY_ACTIVE_CATEGORY_ID = "key_active_category_id"
     }
 }

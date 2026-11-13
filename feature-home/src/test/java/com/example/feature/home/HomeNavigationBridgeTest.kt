@@ -80,4 +80,36 @@ class HomeNavigationBridgeTest {
         simulateOnResume()
         assertEquals(1, homeRevealedCount) // MUST notify!
     }
+
+    @Test
+    fun `CategoryResultTracker notifies only on genuine return regardless of CLEAR_TOP callback order`() {
+        val tracker = CategoryResultTracker()
+
+        // 1. Launch Doors from Home (no active category before)
+        tracker.onPrepareSwitch()
+        assertEquals(0, tracker.suppressedResultCount)
+        tracker.onLaunchStarted()
+        assertTrue(tracker.isCategoryRunning)
+
+        // 2a. Switch Doors -> Seats when onActivityResult(Doors) arrives BEFORE onNewIntent(Seats)
+        tracker.onPrepareSwitch()
+        assertEquals(1, tracker.suppressedResultCount)
+        assertFalse(tracker.onResultDelivered())
+        assertEquals(0, tracker.suppressedResultCount)
+        tracker.onLaunchStarted()
+        assertTrue(tracker.isCategoryRunning)
+
+        // 2b. Switch Seats -> Light when onNewIntent(Light) arrives BEFORE onActivityResult(Seats)
+        tracker.onPrepareSwitch()
+        assertEquals(1, tracker.suppressedResultCount)
+        tracker.onLaunchStarted()
+        assertTrue(tracker.isCategoryRunning)
+        assertFalse(tracker.onResultDelivered())
+        assertEquals(0, tracker.suppressedResultCount)
+        assertTrue(tracker.isCategoryRunning)
+
+        // 3. User presses Back on Light (without calling setResult) -> genuine Home reveal
+        assertTrue(tracker.onResultDelivered())
+        assertFalse(tracker.isCategoryRunning)
+    }
 }

@@ -73,7 +73,8 @@ class CoreContractInvariantsTest {
 
     @Test
     fun `verify AppConfig menu extra constant and category header width breakpoint`() {
-        assertEquals("extra_menu_component", AppConfig.EXTRA_MENU_COMPONENT)
+        assertEquals("extra_menu_intent", AppConfig.EXTRA_MENU_INTENT)
+        assertEquals("extra_category_id", AppConfig.EXTRA_CATEGORY_ID)
 
         val prevOverride = AppConfig.OVERRIDE_OVERLAY_MODE
         try {

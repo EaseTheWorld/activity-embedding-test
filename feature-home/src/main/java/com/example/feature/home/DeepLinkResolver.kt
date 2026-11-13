@@ -78,6 +78,12 @@ object DeepLinkResolver {
     ): Intent {
         val breakpoint = AppConfig.OVERLAY_MODE_WIDTH_DP_BREAKPOINT
         val breakpointExtraKey = AppConfig.EXTRA_CATEGORY_HEADER_BREAKPOINT_DP
+        val menuIntent = menuComponent?.let { component ->
+            Intent().apply {
+                this.component = component
+                putExtra(AppConfig.EXTRA_CATEGORY_ID, categoryId)
+            }
+        }
 
         return if (categoryId.equals("light", ignoreCase = true)) {
             Intent(ACTION_SETTINGS_EMBED).apply {
@@ -88,8 +94,8 @@ object DeepLinkResolver {
                 data = uri
                 putExtra("category_id", categoryId)
                 putExtra(breakpointExtraKey, breakpoint)
-                if (menuComponent != null) {
-                    putExtra(AppConfig.EXTRA_MENU_COMPONENT, menuComponent)
+                if (menuIntent != null) {
+                    putExtra(AppConfig.EXTRA_MENU_INTENT, menuIntent)
                 }
                 if (extras != null) putExtras(extras)
             }
@@ -102,8 +108,8 @@ object DeepLinkResolver {
                 data = uri
                 putExtra("category_id", categoryId)
                 putExtra(breakpointExtraKey, breakpoint)
-                if (menuComponent != null) {
-                    putExtra(AppConfig.EXTRA_MENU_COMPONENT, menuComponent)
+                if (menuIntent != null) {
+                    putExtra(AppConfig.EXTRA_MENU_INTENT, menuIntent)
                 }
                 if (extras != null) putExtras(extras)
             }

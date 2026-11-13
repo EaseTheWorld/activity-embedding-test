@@ -52,10 +52,12 @@ class ListActivity : BaseCategoryMenuActivity() {
         }
 
         if (savedInstanceState == null) {
-            val menuComponent = ComponentName(this, ListWithTranslucentActivity::class.java)
+            val menuIntent = Intent(this, ListWithTranslucentActivity::class.java).apply {
+                putExtra(AppConfig.EXTRA_CATEGORY_ID, "home")
+            }
             val homeIntent = Intent(this, HomeActivity::class.java).apply {
                 action = ACTION_SETTINGS_EMBED
-                putExtra(AppConfig.EXTRA_MENU_COMPONENT, menuComponent)
+                putExtra(AppConfig.EXTRA_MENU_INTENT, menuIntent)
                 putExtra(
                     AppConfig.EXTRA_CATEGORY_HEADER_BREAKPOINT_DP,
                     AppConfig.OVERLAY_MODE_WIDTH_DP_BREAKPOINT

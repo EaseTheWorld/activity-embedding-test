@@ -49,10 +49,14 @@ class DeepLinkRouterActivity : Activity() {
 
             if (resolved != null) {
                 if (resolved.categoryId.equals("home", ignoreCase = true)) {
+                    val homeMenuIntent = Intent().apply {
+                        component = menuComponent
+                        putExtra(AppConfig.EXTRA_CATEGORY_ID, "home")
+                    }
                     val homeIntent = Intent(this, HomeActivity::class.java).apply {
                         flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
                         putExtra(HomeActivity.EXTRA_INITIAL_CATEGORY_ID, "home")
-                        putExtra(AppConfig.EXTRA_MENU_COMPONENT, menuComponent)
+                        putExtra(AppConfig.EXTRA_MENU_INTENT, homeMenuIntent)
                         putExtra(
                             AppConfig.EXTRA_CATEGORY_HEADER_BREAKPOINT_DP,
                             AppConfig.OVERLAY_MODE_WIDTH_DP_BREAKPOINT
@@ -70,11 +74,15 @@ class DeepLinkRouterActivity : Activity() {
         } else {
             Log.i(tag, "Cold start detected -> launching ListActivity as pristine Task Root")
             val targetIntent = resolved?.targetIntent
+            val listMenuIntent = Intent().apply {
+                component = menuComponent
+                putExtra(AppConfig.EXTRA_CATEGORY_ID, resolved?.categoryId ?: "home")
+            }
             val listIntent = Intent(this, ListActivity::class.java).apply {
                 action = Intent.ACTION_MAIN
                 addCategory(Intent.CATEGORY_LAUNCHER)
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                putExtra(AppConfig.EXTRA_MENU_COMPONENT, menuComponent)
+                putExtra(AppConfig.EXTRA_MENU_INTENT, listMenuIntent)
                 putExtra(
                     AppConfig.EXTRA_CATEGORY_HEADER_BREAKPOINT_DP,
                     AppConfig.OVERLAY_MODE_WIDTH_DP_BREAKPOINT

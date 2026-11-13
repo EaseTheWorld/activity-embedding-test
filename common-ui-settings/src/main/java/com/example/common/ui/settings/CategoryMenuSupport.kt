@@ -1,11 +1,8 @@
 package com.example.common.ui.settings
 
 import android.app.Activity
-import android.content.ComponentName
 import android.content.Intent
-import android.content.pm.ComponentInfo
 import android.os.Build
-import android.os.Parcelable
 import android.util.Log
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -43,58 +40,34 @@ import com.example.core.item.AppConfig
 private const val MENU_SUPPORT_TAG = "CategoryMenuSupport"
 
 /**
- * Extracts the host-provided category menu drawer target [ComponentName] from [intent].
- * Supports [ComponentName], [ComponentInfo] (e.g. ActivityInfo), or flattened String extras.
+ * Extracts the host-provided category menu drawer [Intent] from [intent].
  */
-fun extractMenuComponent(
+fun extractMenuIntent(
     intent: Intent?,
-    extraKey: String = AppConfig.EXTRA_MENU_COMPONENT
-): ComponentName? {
+    extraKey: String = AppConfig.EXTRA_MENU_INTENT
+): Intent? {
     if (intent == null) return null
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        intent.getParcelableExtra(extraKey, ComponentName::class.java)?.let { return it }
-        intent.getParcelableExtra(extraKey, ComponentInfo::class.java)?.let { info ->
-            if (!info.packageName.isNullOrEmpty() && !info.name.isNullOrEmpty()) {
-                return ComponentName(info.packageName, info.name)
-            }
-        }
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        intent.getParcelableExtra(extraKey, Intent::class.java)
     } else {
         @Suppress("DEPRECATION")
-        when (val extra = intent.getParcelableExtra<Parcelable>(extraKey)) {
-            is ComponentName -> return extra
-            is ComponentInfo -> {
-                if (!extra.packageName.isNullOrEmpty() && !extra.name.isNullOrEmpty()) {
-                    return ComponentName(extra.packageName, extra.name)
-                }
-            }
-        }
+        intent.getParcelableExtra(extraKey)
     }
-    intent.getStringExtra(extraKey)?.let { flattened ->
-        return ComponentName.unflattenFromString(flattened)
-    }
-    return null
 }
 
 /**
- * Launches the host category menu drawer identified by [menuComponent] on top of [activity].
+ * Launches the host-provided category menu drawer [menuIntent] on top of [activity].
  */
 fun launchMenuDrawer(
     activity: Activity,
-    menuComponent: ComponentName,
-    categoryId: String? = null
+    menuIntent: Intent
 ) {
-    val menuIntent = Intent().apply {
-        component = menuComponent
-        if (!categoryId.isNullOrEmpty()) {
-            putExtra("extra_category_id", categoryId)
-        }
-    }
     try {
-        activity.startActivity(menuIntent)
+        activity.startActivity(Intent(menuIntent))
         @Suppress("DEPRECATION")
         activity.overridePendingTransition(0, 0)
     } catch (e: Exception) {
-        Log.e(MENU_SUPPORT_TAG, "Failed to launch menu drawer component=$menuComponent: $e")
+        Log.e(MENU_SUPPORT_TAG, "Failed to launch menu drawer intent=$menuIntent: $e")
     }
 }
 

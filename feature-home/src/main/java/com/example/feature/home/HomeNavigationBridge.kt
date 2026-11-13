@@ -3,9 +3,6 @@ package com.example.feature.home
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
-import android.os.Handler
-import android.os.Looper
-import com.example.core.item.AppConfig
 import java.util.concurrent.CopyOnWriteArraySet
 
 /**
@@ -92,6 +89,7 @@ object HomeNavigationBridge {
     private val categoryDismissListeners = CopyOnWriteArraySet<() -> Unit>()
     private var categoryDismissHandler: ((Int) -> Unit)? = null
     private var taskRootLaunchListener: ((Intent) -> Unit)? = null
+    private var categorySwitchHandler: (() -> Unit)? = null
     private var menuLauncher: (() -> Activity?)? = null
 
     fun registerMenuLauncher(launcher: () -> Activity?) {
@@ -102,12 +100,15 @@ object HomeNavigationBridge {
         menuLauncher = null
     }
 
-    private val mainHandler by lazy { Handler(Looper.getMainLooper()) }
-    private val clearLaunchingRunnable = Runnable { isLaunchingCategory = false }
+    fun registerCategorySwitchHandler(handler: () -> Unit) {
+        categorySwitchHandler = handler
+    }
 
-    @Volatile
-    var isLaunchingCategory: Boolean = false
-        private set
+    fun unregisterCategorySwitchHandler(handler: () -> Unit) {
+        if (categorySwitchHandler === handler) {
+            categorySwitchHandler = null
+        }
+    }
 
     fun notifyHomeRevealed() {
         onHomeRevealed?.invoke()
@@ -184,14 +185,10 @@ object HomeNavigationBridge {
      */
     @Suppress("DEPRECATION")
     fun launchCategory(caller: Context, targetIntent: Intent) {
-        isLaunchingCategory = true
-        mainHandler.removeCallbacks(clearLaunchingRunnable)
-        mainHandler.postDelayed(clearLaunchingRunnable, 400L)
-
         if (caller is HomeActivity) {
-            caller.startActivity(targetIntent)
-            caller.overridePendingTransition(0, 0)
+            caller.launchCategoryForResult(targetIntent)
         } else {
+            categorySwitchHandler?.invoke()
             val categoryId = targetIntent.getStringExtra("category_id")
             val homeIntent = Intent(caller, HomeActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
@@ -205,5 +202,38 @@ object HomeNavigationBridge {
                 caller.overridePendingTransition(0, 0)
             }
         }
+    }
+}
+
+/**
+ * Tracks active StartActivityForResult category launches on [HomeActivity] so cancelled results
+ * caused by `CLEAR_TOP` category switches are suppressed regardless of callback arrival order.
+ */
+internal class CategoryResultTracker(
+    var isCategoryRunning: Boolean = false,
+    var suppressedResultCount: Int = 0
+) {
+    fun onPrepareSwitch() {
+        if (isCategoryRunning) {
+            suppressedResultCount++
+            isCategoryRunning = false
+        }
+    }
+
+    fun onLaunchStarted() {
+        isCategoryRunning = true
+    }
+
+    fun onLaunchFailed() {
+        isCategoryRunning = false
+    }
+
+    fun onResultDelivered(): Boolean {
+        if (suppressedResultCount > 0) {
+            suppressedResultCount--
+            return false
+        }
+        isCategoryRunning = false
+        return true
     }
 }

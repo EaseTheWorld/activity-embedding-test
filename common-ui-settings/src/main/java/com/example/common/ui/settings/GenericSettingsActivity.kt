@@ -1,6 +1,5 @@
 package com.example.common.ui.settings
 
-import android.content.ComponentName
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -32,7 +31,7 @@ open class GenericSettingsActivity : AppCompatActivity() {
     private var navTrigger = mutableStateOf(0)
     private var currentHighlightEvent = mutableStateOf<HighlightEvent?>(null)
     private var showCategoryHeader = mutableStateOf(true)
-    private var menuComponentState = mutableStateOf<ComponentName?>(null)
+    private var menuIntentState = mutableStateOf<Intent?>(null)
     private var headerBreakpointDp: Int = AppConfig.OVERLAY_MODE_WIDTH_DP_BREAKPOINT
 
     protected open fun getViewModelRegistry(): ItemViewModelRegistry = defaultViewModelRegistry
@@ -93,15 +92,15 @@ open class GenericSettingsActivity : AppCompatActivity() {
                 LocalHighlightEvent provides currentHighlightEvent.value,
                 LocalShowCategoryHeader provides showCategoryHeader.value
             ) {
-                val activeMenuComponent = menuComponentState.value
+                val activeMenuIntent = menuIntentState.value
                 SettingsNavHost(
                     navController = navController,
                     startDestination = initialDestination,
                     viewModelRegistry = getViewModelRegistry(),
                     recentManager = recentManager,
-                    onMenuClick = activeMenuComponent?.let { component ->
-                        { categoryId ->
-                            launchMenuDrawer(this@GenericSettingsActivity, component, categoryId)
+                    onMenuClick = activeMenuIntent?.let { menuIntent ->
+                        { _ ->
+                            launchMenuDrawer(this@GenericSettingsActivity, menuIntent)
                         }
                     },
                     onNavigateExternal = { categoryId ->
@@ -134,7 +133,7 @@ open class GenericSettingsActivity : AppCompatActivity() {
                 AppConfig.OVERLAY_MODE_WIDTH_DP_BREAKPOINT
             )
         }
-        extractMenuComponent(sourceIntent)?.let { menuComponentState.value = it }
+        extractMenuIntent(sourceIntent)?.let { menuIntentState.value = it }
         showCategoryHeader.value = resolveShowCategoryHeader(sourceIntent)
     }
 
@@ -185,6 +184,12 @@ open class GenericSettingsActivity : AppCompatActivity() {
             val extrasMap = mutableMapOf<String, String>()
             intent.extras?.let { bundle ->
                 for (key in bundle.keySet()) {
+                    if (key == AppConfig.EXTRA_MENU_INTENT ||
+                        key == AppConfig.EXTRA_CATEGORY_HEADER_BREAKPOINT_DP ||
+                        key == AppConfig.EXTRA_SHOW_CATEGORY_HEADER
+                    ) {
+                        continue
+                    }
                     bundle.get(key)?.let { value ->
                         extrasMap[key] = value.toString()
                     }
@@ -193,7 +198,7 @@ open class GenericSettingsActivity : AppCompatActivity() {
 
             if (itemId != null) {
                 if (extrasMap.isNotEmpty()) {
-                    intent.replaceExtras(Bundle())
+                    extrasMap.keys.forEach { intent.removeExtra(it) }
                 }
 
                 currentHighlightEvent.value = HighlightEvent(
@@ -280,7 +285,12 @@ open class GenericSettingsActivity : AppCompatActivity() {
             val extIntent = Intent("com.example.carsettings.light.OPEN").apply {
                 setClassName("com.example.carsettings.light", "com.example.feature.light.LightSettingsActivity")
                 putExtra(AppConfig.EXTRA_CATEGORY_HEADER_BREAKPOINT_DP, headerBreakpointDp)
-                menuComponentState.value?.let { putExtra(AppConfig.EXTRA_MENU_COMPONENT, it) }
+                menuIntentState.value?.let { baseMenuIntent ->
+                    val targetMenuIntent = Intent(baseMenuIntent).apply {
+                        putExtra(AppConfig.EXTRA_CATEGORY_ID, categoryId)
+                    }
+                    putExtra(AppConfig.EXTRA_MENU_INTENT, targetMenuIntent)
+                }
             }
             try {
                 startActivity(extIntent)

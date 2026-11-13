@@ -279,16 +279,21 @@ abstract class BaseCategoryMenuActivity : BaseLoggingActivity() {
         return (listOf(homeCategory, dashboardCategory) + discovered).sortedBy { it.order }
     }
 
+    private fun buildMenuIntent(categoryId: String): Intent {
+        return Intent(this, ListWithTranslucentActivity::class.java).apply {
+            putExtra(AppConfig.EXTRA_CATEGORY_ID, categoryId)
+        }
+    }
+
     protected fun launchCategory(category: SettingCategory, deepLinkUri: Uri? = null, extras: Bundle? = null) {
         onBeforeCategoryLaunch()
 
-        val menuComponent = ComponentName(this, ListWithTranslucentActivity::class.java)
         if (category.id == "home") {
             Log.d(tag, "[$activityName] Navigating to HomeActivity via CLEAR_TOP")
             val homeIntent = Intent(this, HomeActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
                 putExtra(HomeActivity.EXTRA_INITIAL_CATEGORY_ID, "home")
-                putExtra(AppConfig.EXTRA_MENU_COMPONENT, menuComponent)
+                putExtra(AppConfig.EXTRA_MENU_INTENT, buildMenuIntent("home"))
                 putExtra(
                     AppConfig.EXTRA_CATEGORY_HEADER_BREAKPOINT_DP,
                     AppConfig.OVERLAY_MODE_WIDTH_DP_BREAKPOINT
@@ -314,7 +319,7 @@ abstract class BaseCategoryMenuActivity : BaseLoggingActivity() {
             targetIntent.putExtra(GenericSettingsActivity.EXTRA_CATEGORY_ID, category.id)
             targetIntent.putExtra(GenericSettingsActivity.EXTRA_AUTHORITY, category.authority)
             targetIntent.putExtra(GenericSettingsActivity.EXTRA_TITLE, category.title)
-            targetIntent.putExtra(AppConfig.EXTRA_MENU_COMPONENT, menuComponent)
+            targetIntent.putExtra(AppConfig.EXTRA_MENU_INTENT, buildMenuIntent(category.id))
             targetIntent.putExtra(
                 AppConfig.EXTRA_CATEGORY_HEADER_BREAKPOINT_DP,
                 AppConfig.OVERLAY_MODE_WIDTH_DP_BREAKPOINT
@@ -387,12 +392,12 @@ abstract class BaseCategoryMenuActivity : BaseLoggingActivity() {
             return
         }
 
-        val menuComponent = ComponentName(this, ListWithTranslucentActivity::class.java)
+        val menuIntent = buildMenuIntent(categoryId)
         val fallbackIntent = if (categoryId.equals("light", ignoreCase = true)) {
             Intent(ACTION_SETTINGS_EMBED).apply {
                 setClassName("com.example.carsettings.light", "com.example.feature.light.LightSettingsActivity")
                 data = uri
-                putExtra(AppConfig.EXTRA_MENU_COMPONENT, menuComponent)
+                putExtra(AppConfig.EXTRA_MENU_INTENT, menuIntent)
                 putExtra(
                     AppConfig.EXTRA_CATEGORY_HEADER_BREAKPOINT_DP,
                     AppConfig.OVERLAY_MODE_WIDTH_DP_BREAKPOINT
@@ -404,7 +409,7 @@ abstract class BaseCategoryMenuActivity : BaseLoggingActivity() {
                 action = ACTION_SETTINGS_EMBED
                 data = uri
                 putExtra(GenericSettingsActivity.EXTRA_CATEGORY_ID, categoryId)
-                putExtra(AppConfig.EXTRA_MENU_COMPONENT, menuComponent)
+                putExtra(AppConfig.EXTRA_MENU_INTENT, menuIntent)
                 putExtra(
                     AppConfig.EXTRA_CATEGORY_HEADER_BREAKPOINT_DP,
                     AppConfig.OVERLAY_MODE_WIDTH_DP_BREAKPOINT

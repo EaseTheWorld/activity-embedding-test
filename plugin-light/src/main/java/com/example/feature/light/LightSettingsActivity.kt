@@ -1,14 +1,11 @@
 package com.example.feature.light
 
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.content.pm.ComponentInfo
 import android.content.res.Configuration
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.os.Parcelable
 import android.util.Log
 import android.view.View
 import android.view.WindowManager
@@ -23,7 +20,8 @@ class LightSettingsActivity : AppCompatActivity() {
 
     private companion object {
         const val EXTRA_CATEGORY_HEADER_BREAKPOINT_DP = "extra_category_header_breakpoint_dp"
-        const val EXTRA_MENU_COMPONENT = "extra_menu_component"
+        const val EXTRA_MENU_INTENT = "extra_menu_intent"
+        const val KEY_IS_DETAIL_OPEN = "key_is_detail_open"
     }
 
     private val tag = "LifecycleLog"
@@ -39,7 +37,7 @@ class LightSettingsActivity : AppCompatActivity() {
     private lateinit var frameMenuIcon: View
     private lateinit var layoutLightDetail: View
 
-    private var menuComponent: ComponentName? = null
+    private var menuIntent: Intent? = null
     private var headerBreakpointDp: Int = 840
 
     private val providerUri by lazy {
@@ -65,13 +63,9 @@ class LightSettingsActivity : AppCompatActivity() {
         updateHeaderAndMenuState(intent)
 
         btnMenu.setOnClickListener {
-            val targetMenu = menuComponent ?: return@setOnClickListener
-            val menuIntent = Intent().apply {
-                component = targetMenu
-                putExtra("extra_category_id", "light")
-            }
+            val targetMenu = menuIntent ?: return@setOnClickListener
             try {
-                startActivity(menuIntent)
+                startActivity(Intent(targetMenu))
                 @Suppress("DEPRECATION")
                 overridePendingTransition(0, 0)
             } catch (e: Exception) {
@@ -85,7 +79,13 @@ class LightSettingsActivity : AppCompatActivity() {
         val btnAuto = findViewById<Button>(R.id.btnHeadlightAuto)
         val btnOpenLightDetail = findViewById<Button>(R.id.btnOpenLightDetail)
 
-        val detailBackCallback = object : OnBackPressedCallback(false) {
+        val isDetailRestored = savedInstanceState?.getBoolean(KEY_IS_DETAIL_OPEN, false) == true
+        if (isDetailRestored) {
+            layoutLightDetail.visibility = View.VISIBLE
+            updateCategoryHeaderVisibility()
+        }
+
+        val detailBackCallback = object : OnBackPressedCallback(isDetailRestored) {
             override fun handleOnBackPressed() {
                 Log.d(tag, "[$activityName] Popping internal light detail back stack")
                 layoutLightDetail.visibility = View.GONE
@@ -241,6 +241,12 @@ class LightSettingsActivity : AppCompatActivity() {
         Log.d(tag, "[$activityName] onDestroy()")
     }
 
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        val isDetailOpen = ::layoutLightDetail.isInitialized && layoutLightDetail.visibility == View.VISIBLE
+        outState.putBoolean(KEY_IS_DETAIL_OPEN, isDetailOpen)
+    }
+
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
         Log.d(tag, "[$activityName] onConfigurationChanged(newConfig = $newConfig)")
@@ -251,9 +257,9 @@ class LightSettingsActivity : AppCompatActivity() {
         if (sourceIntent?.hasExtra(EXTRA_CATEGORY_HEADER_BREAKPOINT_DP) == true) {
             headerBreakpointDp = sourceIntent.getIntExtra(EXTRA_CATEGORY_HEADER_BREAKPOINT_DP, 840)
         }
-        extractMenuComponent(sourceIntent)?.let { menuComponent = it }
+        extractMenuIntent(sourceIntent)?.let { menuIntent = it }
         if (::btnMenu.isInitialized && ::frameMenuIcon.isInitialized) {
-            val hasMenu = menuComponent != null
+            val hasMenu = menuIntent != null
             frameMenuIcon.visibility = if (hasMenu) View.VISIBLE else View.GONE
             btnMenu.isClickable = hasMenu
             btnMenu.isFocusable = hasMenu
@@ -261,30 +267,14 @@ class LightSettingsActivity : AppCompatActivity() {
         updateCategoryHeaderVisibility()
     }
 
-    private fun extractMenuComponent(sourceIntent: Intent?): ComponentName? {
+    private fun extractMenuIntent(sourceIntent: Intent?): Intent? {
         if (sourceIntent == null) return null
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            sourceIntent.getParcelableExtra(EXTRA_MENU_COMPONENT, ComponentName::class.java)?.let { return it }
-            sourceIntent.getParcelableExtra(EXTRA_MENU_COMPONENT, ComponentInfo::class.java)?.let { info ->
-                if (!info.packageName.isNullOrEmpty() && !info.name.isNullOrEmpty()) {
-                    return ComponentName(info.packageName, info.name)
-                }
-            }
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            sourceIntent.getParcelableExtra(EXTRA_MENU_INTENT, Intent::class.java)
         } else {
             @Suppress("DEPRECATION")
-            when (val extra = sourceIntent.getParcelableExtra<Parcelable>(EXTRA_MENU_COMPONENT)) {
-                is ComponentName -> return extra
-                is ComponentInfo -> {
-                    if (!extra.packageName.isNullOrEmpty() && !extra.name.isNullOrEmpty()) {
-                        return ComponentName(extra.packageName, extra.name)
-                    }
-                }
-            }
+            sourceIntent.getParcelableExtra(EXTRA_MENU_INTENT)
         }
-        sourceIntent.getStringExtra(EXTRA_MENU_COMPONENT)?.let { flattened ->
-            return ComponentName.unflattenFromString(flattened)
-        }
-        return null
     }
 
     private fun getFullDisplayWidthDp(): Int {

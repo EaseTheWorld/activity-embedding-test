@@ -49,6 +49,7 @@ class DeepLinkRouterActivity : Activity() {
 
             if (resolved != null) {
                 if (resolved.categoryId.equals("home", ignoreCase = true)) {
+                    HomeNavigationBridge.prepareCategorySwitch()
                     val homeMenuIntent = Intent().apply {
                         component = menuComponent
                         putExtra(AppConfig.EXTRA_CATEGORY_ID, "home")

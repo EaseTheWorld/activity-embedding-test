@@ -63,19 +63,27 @@ ListWithTranslucentActivity
 
 ---
 
-## 4. Back Navigation Detection (`StartActivityForResult` + `CategoryResultTracker`)
+## 4. Back Navigation Detection (`ActivityResultRegistry` + Generation Keys in `CategoryResultTracker`)
 
 When a category is launched from `HomeActivity`, the user can return to `HomeActivity` in two ways:
 1. **Back key** from a category Activity (including external APKs like `LightSettingsActivity` that finish without calling `setResult()`).
-2. **Switching to `Home`** via `CLEAR_TOP | SINGLE_TOP` from the sidebar (`ListActivity`) or drawer (`ListWithTranslucentActivity`).
+2. **Switching categories or returning to `Home`** via `CLEAR_TOP | SINGLE_TOP` from the sidebar (`ListActivity`) or drawer (`ListWithTranslucentActivity`).
 
-[`HomeActivity.kt`](file:///c:/Users/user/Documents/antigravity/kind-curie/feature-home/src/main/java/com/example/feature/home/HomeActivity.kt) launches categories via `registerForActivityResult(ActivityResultContracts.StartActivityForResult())` and coordinates state through `CategoryResultTracker` in [`HomeNavigationBridge.kt`](file:///c:/Users/user/Documents/antigravity/kind-curie/feature-home/src/main/java/com/example/feature/home/HomeNavigationBridge.kt):
+[`HomeActivity.kt`](file:///c:/Users/user/Documents/antigravity/kind-curie/feature-home/src/main/java/com/example/feature/home/HomeActivity.kt) registers dynamic per-launch keys (`category_result_gen_<N>`) on `activityResultRegistry` and coordinates generation numbers through `CategoryResultTracker` in [`HomeNavigationBridge.kt`](file:///c:/Users/user/Documents/antigravity/kind-curie/feature-home/src/main/java/com/example/feature/home/HomeNavigationBridge.kt):
 
-- `onLaunchStarted()`: Marks `isCategoryRunning = true`.
-- `onPrepareSwitch()`: Called before switching from one category to another (`CLEAR_TOP` or replacing top); increments `suppressedResultCount` and resets `isCategoryRunning = false`.
-- `onActivityResult()`:
-  - If `suppressedResultCount > 0`, decrements `suppressedResultCount` and ignores the result (covers both **early arrival** before the new launch and **late arrival** after the new category starts).
-  - Otherwise, if `isCategoryRunning` is `true`, resets `isCategoryRunning = false` and returns `true` so `HomeActivity` calls `HomeNavigationBridge.notifyHomeRevealed()` and `ListActivity` resets its selection to `Home (0)`.
+- `nextLaunchGen()`: Increments `currentGen`, sets `activeLaunchGen = currentGen`, and registers `activityResultRegistry.register("category_result_gen_$gen", StartActivityForResult())`.
+- `onPrepareSwitch()`: Called before switching categories or navigating to `Home` via `CLEAR_TOP`; resets `activeLaunchGen = 0` and increments `currentGen` so any in-flight result from a previous generation becomes stale immediately.
+- `onResultDelivered(gen)`:
+  - Only returns `true` when `gen == currentGen && gen == activeLaunchGen` (genuine Back return from the active category), advancing `currentGen` and notifying `HomeNavigationBridge.notifyHomeRevealed()`.
+  - Superseded generations (early arrival, late arrival, rapid multi-switching, or dropped intermediate results) simply fail the `gen == currentGen` check without any counter drift.
+- **Registry Cleanup (`doDispatch` Execution Order)**:
+  In `androidx.activity.result.ActivityResultRegistry.doDispatch()`, `mLaunchedKeys.remove(key)` executes **after** `callback.onActivityResult()` returns:
+  ```java
+  // ActivityResultRegistry.doDispatch()
+  callback.onActivityResult(contract.parseResult(resultCode, data)); // 1) Callback invoked first
+  mLaunchedKeys.remove(key);                                         // 2) Removed from mLaunchedKeys after callback returns
+  ```
+  Because `ActivityResultRegistry.unregister(key)` only removes `key` from `mKeyToRc` and `mRcToKey` when `!mLaunchedKeys.contains(key)`, calling `launcher.unregister()` synchronously inside `onActivityResult()` would leave stale `mKeyToRc`/`mRcToKey` entries behind. `HomeActivity` therefore queues `launcher` in `pendingUnregisterLaunchers` and invokes `drainPendingUnregisters()` via `mainHandler.post` (as well as before the next launch and in `onSaveInstanceState`) after `doDispatch()` completes, ensuring `mKeyToRc`, `mRcToKey`, `mLaunchedKeys`, and `mPendingResults` all return to `0` completed entries.
 
 ---
 
@@ -83,7 +91,17 @@ When a category is launched from `HomeActivity`, the user can return to `HomeAct
 
 Android automatically restores each Activity's launching `Intent` (and its extras) across Process Death. To avoid duplicating `Intent` extras into `savedInstanceState`:
 - **`GenericSettingsActivity.kt`** no longer calls `intent.replaceExtras(Bundle())` when consuming deep-link mutation parameters. Instead, it skips host UI extras (`EXTRA_MENU_INTENT`, `EXTRA_CATEGORY_HEADER_BREAKPOINT_DP`, `EXTRA_SHOW_CATEGORY_HEADER`) and calls `intent.removeExtra(key)` only for consumed setting-mutation keys.
+- **`HomeActivity.kt`** removes `EXTRA_TARGET_INTENT` and `EXTRA_INITIAL_CATEGORY_ID` once consumed (and gates initial `targetIntent` launch with `savedInstanceState == null`) so process-death recreation of `HomeActivity` on Back return does not re-launch the finished category.
 - **`onSaveInstanceState`** is used strictly for **runtime state** not present in the original `Intent`:
-  - `HomeActivity`: `KEY_IS_CATEGORY_RUNNING`, `KEY_SUPPRESSED_RESULT_COUNT` (`CategoryResultTracker`)
+  - `HomeActivity`: `KEY_CURRENT_GEN`, `KEY_ACTIVE_LAUNCH_GEN` (`CategoryResultTracker`)
   - `ListWithTranslucentActivity`: `KEY_ACTIVE_CATEGORY_ID`
   - `LightSettingsActivity`: `KEY_IS_DETAIL_OPEN`
+
+### Process Death Restoration Lifecycle Sequence (`HomeActivity`)
+When `HomeActivity` is killed in the background while a category (e.g., `LightSettingsActivity`) is on top and the user presses Back:
+1. `ComponentActivity.onCreate(savedInstanceState)` (`OnContextAvailableListener`) restores `ActivityResultRegistry`'s saved `mKeyToRc` and `mLaunchedKeys` mappings.
+2. `HomeActivity.onCreate(savedInstanceState)` restores `currentGen` and `activeLaunchGen`, and when `isCategoryRunning` is `true`, calls `registerCategoryLauncher(activeLaunchGen)` to re-bind the callback for `category_result_gen_<activeLaunchGen>`.
+3. `HomeActivity.onStart()` runs.
+4. Before `onResume()`, Android's `ActivityThread` dispatches the pending `ActivityResult` (`deliverResults`) to `ActivityResultRegistry.doDispatch()`, invoking the re-registered callback (`onResultDelivered(activeLaunchGen) == true` -> `HomeNavigationBridge.notifyHomeRevealed()`).
+5. `HomeActivity.onResume()` runs.
+6. The posted `drainPendingUnregisters()` runs on the main thread looper, unregistering `category_result_gen_<activeLaunchGen>` after `mLaunchedKeys.remove(key)` has completed.

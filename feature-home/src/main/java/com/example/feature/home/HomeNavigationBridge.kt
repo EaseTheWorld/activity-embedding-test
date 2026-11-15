@@ -180,6 +180,14 @@ object HomeNavigationBridge {
     }
 
     /**
+     * Notifies [HomeActivity] to invalidate any in-flight category launch generation
+     * right before a `CLEAR_TOP` switch or return to Home.
+     */
+    fun prepareCategorySwitch() {
+        categorySwitchHandler?.invoke()
+    }
+
+    /**
      * Launches [targetIntent] via unified CLEAR_TOP | SINGLE_TOP on [HomeActivity].
      * Works identically and cleanly in both Wide Mode and Narrow Mode!
      */
@@ -188,7 +196,7 @@ object HomeNavigationBridge {
         if (caller is HomeActivity) {
             caller.launchCategoryForResult(targetIntent)
         } else {
-            categorySwitchHandler?.invoke()
+            prepareCategorySwitch()
             val categoryId = targetIntent.getStringExtra("category_id")
             val homeIntent = Intent(caller, HomeActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
@@ -206,34 +214,49 @@ object HomeNavigationBridge {
 }
 
 /**
- * Tracks active StartActivityForResult category launches on [HomeActivity] so cancelled results
- * caused by `CLEAR_TOP` category switches are suppressed regardless of callback arrival order.
+ * Tracks active category launches on [HomeActivity] using monotonically increasing generation
+ * numbers (`category_result_gen_<N>`). Only a result matching both [currentGen] and [activeLaunchGen]
+ * is treated as a genuine Back return to Home; results from superseded generations (`CLEAR_TOP`
+ * switches, early/late callback arrivals, or dropped results) are ignored without counter drift.
  */
 internal class CategoryResultTracker(
-    var isCategoryRunning: Boolean = false,
-    var suppressedResultCount: Int = 0
+    var currentGen: Int = 0,
+    var activeLaunchGen: Int = 0
 ) {
-    fun onPrepareSwitch() {
-        if (isCategoryRunning) {
-            suppressedResultCount++
-            isCategoryRunning = false
+    companion object {
+        private const val KEY_PREFIX = "category_result_gen_"
+        fun keyOf(gen: Int): String = "$KEY_PREFIX$gen"
+    }
+
+    val isCategoryRunning: Boolean
+        get() = activeLaunchGen > 0 && activeLaunchGen == currentGen
+
+    fun onPrepareSwitch(): Int {
+        activeLaunchGen = 0
+        return ++currentGen
+    }
+
+    fun nextLaunchGen(): Int {
+        val gen = ++currentGen
+        activeLaunchGen = gen
+        return gen
+    }
+
+    fun onLaunchFailed(gen: Int) {
+        if (activeLaunchGen == gen) {
+            activeLaunchGen = 0
+        }
+        if (currentGen == gen) {
+            currentGen++
         }
     }
 
-    fun onLaunchStarted() {
-        isCategoryRunning = true
-    }
-
-    fun onLaunchFailed() {
-        isCategoryRunning = false
-    }
-
-    fun onResultDelivered(): Boolean {
-        if (suppressedResultCount > 0) {
-            suppressedResultCount--
+    fun onResultDelivered(gen: Int): Boolean {
+        if (gen <= 0 || gen != currentGen || gen != activeLaunchGen) {
             return false
         }
-        isCategoryRunning = false
+        activeLaunchGen = 0
+        currentGen++
         return true
     }
 }

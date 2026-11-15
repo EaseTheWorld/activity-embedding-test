@@ -290,6 +290,7 @@ abstract class BaseCategoryMenuActivity : BaseLoggingActivity() {
 
         if (category.id == "home") {
             Log.d(tag, "[$activityName] Navigating to HomeActivity via CLEAR_TOP")
+            HomeNavigationBridge.prepareCategorySwitch()
             val homeIntent = Intent(this, HomeActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
                 putExtra(HomeActivity.EXTRA_INITIAL_CATEGORY_ID, "home")

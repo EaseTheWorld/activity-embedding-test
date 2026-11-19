@@ -8,9 +8,8 @@ import android.app.Application
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
-import com.example.common.ui.settings.CategoryMenuTracker
+import com.example.common.ui.settings.onExternalCategoryLaunchedHook
 import com.example.core.item.CategoryItemRegistry
-import com.example.core.item.GetCurrentMenuId
 import com.example.core.item.ItemViewModelRegistry
 import com.example.feature.door.DoorItemRegistry
 import com.example.feature.seat.SeatItemRegistry
@@ -62,6 +61,9 @@ class LifecycleApp : Application() {
         HomeNavigationBridge.registerModeTransitionHandler { activity, newConfig ->
             ModeTransitionManager.checkAndHandleTransition(activity, newConfig)
         }
+        onExternalCategoryLaunchedHook = { categoryId ->
+            HomeNavigationBridge.notifyCategorySelected(categoryId)
+        }
 
         registerComponentCallbacks(object : android.content.ComponentCallbacks2 {
             override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
@@ -78,19 +80,7 @@ class LifecycleApp : Application() {
         })
 
         registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
-            private fun isNonContentActivity(activity: Activity): Boolean {
-                return activity is BaseCategoryMenuActivity ||
-                    activity is BoundaryActivity ||
-                    activity is DeepLinkRouterActivity
-            }
-
-            override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {
-                if (!isNonContentActivity(activity)) {
-                    val explicitId = (activity as? GetCurrentMenuId)?.getCurrentMenuId()
-                    CategoryMenuTracker.onInternalActivityCreated(activity, explicitId)
-                }
-            }
-
+            override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {}
             override fun onActivityStarted(activity: Activity) {}
 
             override fun onActivityResumed(activity: Activity) {
@@ -103,16 +93,6 @@ class LifecycleApp : Application() {
                     secondaryActivities.addFirst(WeakReference(activity))
                     Log.d("LifecycleLog", "[LifecycleApp] Top secondary activity registered: ${activity.javaClass.simpleName}")
                 }
-
-                if (!isNonContentActivity(activity)) {
-                    val directMenuId = (activity as? GetCurrentMenuId)?.getCurrentMenuId()
-                    CategoryMenuTracker.onInternalActivityResumed(activity, directMenuId)
-                    Log.d(
-                        "LifecycleLog",
-                        "[LifecycleApp] Synced menu on resume: activity=${activity.javaClass.simpleName}, " +
-                            "menuId=${CategoryMenuTracker.activeMenuId}, directMenuId=$directMenuId"
-                    )
-                }
             }
 
             override fun onActivityPaused(activity: Activity) {}
@@ -121,7 +101,6 @@ class LifecycleApp : Application() {
 
             override fun onActivityDestroyed(activity: Activity) {
                 secondaryActivities.removeAll { it.get() === activity || it.get() == null }
-                CategoryMenuTracker.onInternalActivityDestroyed(activity)
             }
         })
     }

@@ -17,7 +17,6 @@ import android.widget.ListView
 import android.widget.TextView
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.core.content.res.ResourcesCompat
-import com.example.common.ui.settings.CategoryMenuTracker
 import com.example.core.item.AppConfig
 import com.example.feature.home.HomeActivity
 import com.example.feature.home.HomeNavigationBridge
@@ -117,12 +116,6 @@ abstract class BaseCategoryMenuActivity : BaseLoggingActivity() {
 
     protected open fun onHomeRevealed() {}
 
-    private val menuTrackerListener: (String) -> Unit = { categoryId ->
-        runOnUiThread {
-            selectCategoryInList(categoryId)
-        }
-    }
-
     protected fun selectCategoryInList(categoryId: String) {
         val matchedIndex = categories.indexOfFirst { it.id.equals(categoryId, ignoreCase = true) }
         if (matchedIndex >= 0 && categoryAdapter?.selectedPosition != matchedIndex) {
@@ -138,14 +131,8 @@ abstract class BaseCategoryMenuActivity : BaseLoggingActivity() {
 
     private val categorySelectedListener: (String) -> Unit = { categoryId ->
         runOnUiThread {
-            val matchedIndex = categories.indexOfFirst { it.id.equals(categoryId, ignoreCase = true) }
-            if (matchedIndex >= 0 && categoryAdapter?.selectedPosition != matchedIndex) {
-                Log.d(tag, "[$activityName] Category selected from Home search -> updating selectedPosition to $matchedIndex ($categoryId)")
-                categoryAdapter?.selectedPosition = matchedIndex
-                categoryAdapter?.notifyDataSetChanged()
-                listViewCategories.smoothScrollToPosition(matchedIndex)
-                onBeforeCategoryLaunch()
-            }
+            selectCategoryInList(categoryId)
+            onBeforeCategoryLaunch()
         }
     }
 
@@ -168,11 +155,11 @@ abstract class BaseCategoryMenuActivity : BaseLoggingActivity() {
 
         categoryAdapter = CategoryAdapter(this, categories)
         listViewCategories.adapter = categoryAdapter
-        selectCategoryInList(CategoryMenuTracker.activeMenuId)
 
         listViewCategories.setOnItemClickListener { _, _, position, _ ->
             val selectedCategory = categories[position]
-            if (selectedCategory.id.equals(CategoryMenuTracker.activeMenuId, ignoreCase = true)) {
+            val prevMenuId = currentSelectedCategoryId
+            if (selectedCategory.id.equals(prevMenuId, ignoreCase = true)) {
                 Log.d(tag, "[$activityName] Category '${selectedCategory.id}' is already active -> skipping duplicate stack push")
                 onBeforeCategoryLaunch()
                 return@setOnItemClickListener
@@ -180,10 +167,9 @@ abstract class BaseCategoryMenuActivity : BaseLoggingActivity() {
             categoryAdapter?.selectedPosition = position
             categoryAdapter?.notifyDataSetChanged()
             onBeforeCategoryLaunch()
-            launchCategory(selectedCategory)
+            launchCategory(selectedCategory, previousMenuId = prevMenuId)
         }
 
-        CategoryMenuTracker.registerListener(menuTrackerListener)
         HomeNavigationBridge.registerHomeRevealedListener(homeRevealedListener)
         HomeNavigationBridge.registerCategorySelectedListener(categorySelectedListener)
         HomeNavigationBridge.registerAppExitListener(appExitListener)
@@ -192,7 +178,6 @@ abstract class BaseCategoryMenuActivity : BaseLoggingActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        CategoryMenuTracker.unregisterListener(menuTrackerListener)
         HomeNavigationBridge.unregisterAppExitListener(appExitListener)
         HomeNavigationBridge.unregisterMenuLauncher()
         HomeNavigationBridge.unregisterHomeRevealedListener(homeRevealedListener)
@@ -342,9 +327,10 @@ abstract class BaseCategoryMenuActivity : BaseLoggingActivity() {
     protected fun dispatchCategoryIntent(
         targetIntent: Intent,
         categoryId: String,
-        isTargetExternal: Boolean
+        isTargetExternal: Boolean,
+        previousMenuId: String? = currentSelectedCategoryId
     ) {
-        val boundaryMenuId = CategoryMenuTracker.activeMenuId
+        val boundaryMenuId = previousMenuId.orEmpty()
         if (isTopActivityExternal() && boundaryMenuId.isNotEmpty()) {
             Log.d(
                 tag,
@@ -360,16 +346,18 @@ abstract class BaseCategoryMenuActivity : BaseLoggingActivity() {
             @Suppress("DEPRECATION")
             overridePendingTransition(0, 0)
         } else {
-            if (isTargetExternal) {
-                CategoryMenuTracker.onExternalCategoryLaunched(categoryId)
-            }
             startActivity(targetIntent)
             @Suppress("DEPRECATION")
             overridePendingTransition(0, 0)
         }
     }
 
-    protected fun launchCategory(category: SettingCategory, deepLinkUri: Uri? = null, extras: Bundle? = null) {
+    protected fun launchCategory(
+        category: SettingCategory,
+        deepLinkUri: Uri? = null,
+        extras: Bundle? = null,
+        previousMenuId: String? = currentSelectedCategoryId
+    ) {
         onBeforeCategoryLaunch()
 
         if (category.id == "home") {
@@ -382,7 +370,7 @@ abstract class BaseCategoryMenuActivity : BaseLoggingActivity() {
                     AppConfig.OVERLAY_MODE_WIDTH_DP_BREAKPOINT
                 )
             }
-            dispatchCategoryIntent(homeIntent, "home", isTargetExternal = false)
+            dispatchCategoryIntent(homeIntent, "home", isTargetExternal = false, previousMenuId = previousMenuId)
             return
         }
 
@@ -417,7 +405,7 @@ abstract class BaseCategoryMenuActivity : BaseLoggingActivity() {
 
             val isTargetExternal = !category.targetPackage.isNullOrEmpty() && category.targetPackage != packageName
             Log.d(tag, "[$activityName] Launching stacked category ${category.title} (isExternal=$isTargetExternal)")
-            dispatchCategoryIntent(targetIntent, category.id, isTargetExternal)
+            dispatchCategoryIntent(targetIntent, category.id, isTargetExternal, previousMenuId = previousMenuId)
         } else {
             Log.w(tag, "[$activityName] No target intent for category ${category.title}")
         }
@@ -468,10 +456,11 @@ abstract class BaseCategoryMenuActivity : BaseLoggingActivity() {
 
         val matchedIndex = categories.indexOfFirst { it.id.equals(categoryId, ignoreCase = true) }
         if (matchedIndex >= 0) {
+            val prevMenuId = currentSelectedCategoryId
             categoryAdapter?.selectedPosition = matchedIndex
             categoryAdapter?.notifyDataSetChanged()
             listViewCategories.smoothScrollToPosition(matchedIndex)
-            launchCategory(categories[matchedIndex], deepLinkUri = uri, extras = extras)
+            launchCategory(categories[matchedIndex], deepLinkUri = uri, extras = extras, previousMenuId = prevMenuId)
             return
         }
 

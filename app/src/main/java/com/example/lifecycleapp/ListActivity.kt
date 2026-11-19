@@ -1,14 +1,14 @@
 package com.example.lifecycleapp
 
-import android.content.ComponentName
+import android.app.Activity
+import android.app.Application
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.view.MotionEvent
-import com.example.common.ui.settings.CategoryMenuTracker
 import com.example.core.item.AppConfig
+import com.example.core.item.GetCurrentMenuId
 import com.example.feature.home.HomeActivity
-import com.example.feature.home.HomeNavigationBridge
 import java.lang.ref.WeakReference
 
 /**
@@ -18,10 +18,9 @@ import java.lang.ref.WeakReference
  * 1. Wide Mode (`AppConfig.isOverlayMode == false`):
  *    - Serves as the Task Root and primary left 35% sidebar.
  *    - Pairs with Home/Category in the right 65% secondary container via [SplitInitializer].
- * 2. Narrow Mode (`AppConfig.isOverlayMode == true`):
- *    - Serves as the pristine Task Root beneath [HomeActivity].
- *    - Launches [HomeActivity] with the menu drawer [ComponentName] extra so each category main screen
- *      renders its top-left circular menu button + category title directly inside its layout.
+ *    - Observes in-process content Activities ([GetCurrentMenuId]) directly via
+ *      [Application.ActivityLifecycleCallbacks] to keep menu selection synchronized across
+ *      stacked navigation and Back returns (including `BoundaryActivity`).
  */
 class ListActivity : BaseCategoryMenuActivity() {
 
@@ -33,14 +32,26 @@ class ListActivity : BaseCategoryMenuActivity() {
             activeInstanceRef?.get()?.takeIf { !it.isFinishing && !it.isDestroyed }
     }
 
+    private val contentLifecycleCallback = object : Application.ActivityLifecycleCallbacks {
+        override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {}
+        override fun onActivityStarted(activity: Activity) {}
+
+        override fun onActivityResumed(activity: Activity) {
+            val menuId = (activity as? GetCurrentMenuId)?.getCurrentMenuId() ?: return
+            selectCategoryInList(menuId)
+        }
+
+        override fun onActivityPaused(activity: Activity) {}
+        override fun onActivityStopped(activity: Activity) {}
+        override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {}
+        override fun onActivityDestroyed(activity: Activity) {}
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         activeInstanceRef = WeakReference(this)
-        if (savedInstanceState != null) {
-            CategoryMenuTracker.restoreState(
-                menuId = savedInstanceState.getString(KEY_ACTIVE_MENU_ID)
-            )
-        }
+        application.registerActivityLifecycleCallbacks(contentLifecycleCallback)
+
         val isNarrow = AppConfig.isOverlayMode(this)
         SplitInitializer.ensureInitialized(this, isNarrow)
 
@@ -48,6 +59,9 @@ class ListActivity : BaseCategoryMenuActivity() {
             // Wide Mode: Static sidebar layout on the left 35%
             setContentView(R.layout.activity_list)
             initCategoryMenuViews()
+            savedInstanceState?.getString(KEY_ACTIVE_MENU_ID)?.let { savedMenuId ->
+                selectCategoryInList(savedMenuId)
+            }
         }
 
         val initialCategoryId = intent?.getStringExtra(HomeActivity.EXTRA_INITIAL_CATEGORY_ID)
@@ -97,7 +111,7 @@ class ListActivity : BaseCategoryMenuActivity() {
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
-        outState.putString(KEY_ACTIVE_MENU_ID, CategoryMenuTracker.activeMenuId)
+        currentSelectedCategoryId?.let { outState.putString(KEY_ACTIVE_MENU_ID, it) }
     }
 
     /**
@@ -126,6 +140,7 @@ class ListActivity : BaseCategoryMenuActivity() {
     }
 
     override fun onDestroy() {
+        application.unregisterActivityLifecycleCallbacks(contentLifecycleCallback)
         super.onDestroy()
         if (activeInstanceRef?.get() === this) {
             activeInstanceRef = null

@@ -20,35 +20,38 @@ Example flow in Wide Split Mode:
 
 ## 2. Core Components
 
-### 2.1 `GetCurrentMenuId` Contract
-Defined in [`GetCurrentMenuId.kt`](file:///c:/Users/user/Documents/antigravity/kind-curie/core-item-contract/src/main/java/com/example/core/item/GetCurrentMenuId.kt):
-- Implemented by in-process content Activities associated with a category menu item:
+### 2.1 `GetCurrentMenuId` & `BaseMenuContentActivity` Abstraction
+- [`GetCurrentMenuId.kt`](file:///c:/Users/user/Documents/antigravity/kind-curie/core-item-contract/src/main/java/com/example/core/item/GetCurrentMenuId.kt) defines `fun getCurrentMenuId(): String?`.
+- [`BaseMenuContentActivity.kt`](file:///c:/Users/user/Documents/antigravity/kind-curie/common-ui-settings/src/main/java/com/example/common/ui/settings/BaseMenuContentActivity.kt) is the shared `AppCompatActivity` base class implementing `GetCurrentMenuId` for all in-process content Activities:
   - [`HomeActivity`](file:///c:/Users/user/Documents/antigravity/kind-curie/feature-home/src/main/java/com/example/feature/home/HomeActivity.kt): returns `"home"`. Distinguishes initial root Home (`EXTRA_IS_ROOT_HOME = true`, calls `finishAffinity()` and `notifyAppExit()` on Back) from stacked Home instances (`EXTRA_IS_ROOT_HOME = false`, calls `finish()` on Back).
   - [`GenericSettingsActivity`](file:///c:/Users/user/Documents/antigravity/kind-curie/common-ui-settings/src/main/java/com/example/common/ui/settings/GenericSettingsActivity.kt): returns `resolveCategoryId(intent)` (from deep link URI `myapp://navigate/{categoryId}`, `EXTRA_CATEGORY_ID`, `"category_id"`, or intent action). Configured with `android:launchMode="standard"` in [`AndroidManifest.xml`](file:///c:/Users/user/Documents/antigravity/kind-curie/app/src/main/AndroidManifest.xml) so switching between internal categories pushes separate stacked instances.
-  - [`GenericSubActivity`](file:///c:/Users/user/Documents/antigravity/kind-curie/common-ui-settings/src/main/java/com/example/common/ui/settings/GenericSubActivity.kt): captures its parent category's menu ID (`EXTRA_CATEGORY_ID` or `CategoryMenuTracker.activeMenuId`) and persists it in `savedInstanceState`.
-  - [`BoundaryActivity`](file:///c:/Users/user/Documents/antigravity/kind-curie/app/src/main/java/com/example/lifecycleapp/BoundaryActivity.kt): returns `EXTRA_BOUNDARY_MENU_ID` of the external category directly beneath it.
+  - [`GenericSubActivity`](file:///c:/Users/user/Documents/antigravity/kind-curie/common-ui-settings/src/main/java/com/example/common/ui/settings/GenericSubActivity.kt): returns its parent category's menu ID (`EXTRA_CATEGORY_ID`, persisted in `savedInstanceState`).
+  - [`BoundaryActivity`](file:///c:/Users/user/Documents/antigravity/kind-curie/app/src/main/java/com/example/lifecycleapp/BoundaryActivity.kt): returns `null` during forward launch (`isReturningFromChild == false`), and returns `EXTRA_BOUNDARY_MENU_ID` upon Back return (`isReturningFromChild == true`).
 
-### 2.2 `CategoryMenuTracker` & `LifecycleApp` Lifecycle Observer
-- [`CategoryMenuTracker.kt`](file:///c:/Users/user/Documents/antigravity/kind-curie/common-ui-settings/src/main/java/com/example/common/ui/settings/CategoryMenuTracker.kt) holds:
-  - `activeMenuId`: currently selected menu category ID.
-  - `inheritedMenuIds`: `WeakHashMap` fallback for any internal sub-activity that does not implement `GetCurrentMenuId`.
-- [`LifecycleApp.kt`](file:///c:/Users/user/Documents/antigravity/kind-curie/app/src/main/java/com/example/lifecycleapp/LifecycleApp.kt) registers `Application.ActivityLifecycleCallbacks`:
-  - Skips menu/router/relay chrome (`BaseCategoryMenuActivity`, `BoundaryActivity`, `DeepLinkRouterActivity`).
-  - On `onActivityCreated`: records inherited fallback menu ID for internal sub-activities.
-  - On `onActivityResumed`: reads `GetCurrentMenuId.getCurrentMenuId()` (or inherited fallback) and updates `activeMenuId` -> notifies menu listeners (`BaseCategoryMenuActivity.selectCategoryInList`).
-  - On `onActivityDestroyed`: cleans up `inheritedMenuIds`.
+### 2.2 Direct `ActivityLifecycleCallbacks` in `ListActivity`
+- [`ListActivity.kt`](file:///c:/Users/user/Documents/antigravity/kind-curie/app/src/main/java/com/example/lifecycleapp/ListActivity.kt) registers `Application.ActivityLifecycleCallbacks` directly in `onCreate()` and unregisters in `onDestroy()`.
+- `onActivityResumed(activity)` is a single uniform handler with zero special cases for `BoundaryActivity`:
+  ```kotlin
+  override fun onActivityResumed(activity: Activity) {
+      val menuId = (activity as? GetCurrentMenuId)?.getCurrentMenuId() ?: return
+      selectCategoryInList(menuId)
+  }
+  ```
 
 ### 2.3 `BoundaryActivity` & External Category Detection (`ActivityManager.getAppTasks`)
 - Because Android `ActivityLifecycleCallbacks` only fire inside the host process, returning via Back from a child category back onto an external-process Activity (either an external category like `LightSettingsActivity` or an external sub-activity launched by an internal category) would otherwise go unnoticed by `ListActivity`.
 - Right before launching a new category, [`BaseCategoryMenuActivity.isTopActivityExternal()`](file:///c:/Users/user/Documents/antigravity/kind-curie/app/src/main/java/com/example/lifecycleapp/BaseCategoryMenuActivity.kt) queries `ActivityManager.appTasks` for the matching `taskId` and checks `taskInfo.topActivity.packageName != packageName`:
-  - **When `false`** (top Activity is in the host package): starts `targetIntent` directly (calling `CategoryMenuTracker.onExternalCategoryLaunched(categoryId)` if `targetPackage != packageName`).
-  - **When `true`** (top Activity is in an external package — whether an external category or an external sub-activity launched from an internal category): starts [`BoundaryActivity`](file:///c:/Users/user/Documents/antigravity/kind-curie/app/src/main/java/com/example/lifecycleapp/BoundaryActivity.kt) with `EXTRA_BOUNDARY_MENU_ID`, `EXTRA_NEXT_TARGET_INTENT`, `EXTRA_NEXT_CATEGORY_ID`, and `EXTRA_NEXT_IS_EXTERNAL`.
-- [`BoundaryActivity`](file:///c:/Users/user/Documents/antigravity/kind-curie/app/src/main/java/com/example/lifecycleapp/BoundaryActivity.kt) launches `EXTRA_NEXT_TARGET_INTENT` via `registerForActivityResult(StartActivityForResult())` in `onCreate` (guarded by `KEY_HAS_LAUNCHED_NEXT` for Process Death safety). When the child finishes via Back, the result callback runs before `onResume()`, calls `CategoryMenuTracker.onReturnedToExternalBoundary(boundaryMenuId)`, and immediately calls `finish()` with `overridePendingTransition(0, 0)`.
+  - **When `false`** (top Activity is in the host package): starts `targetIntent` directly.
+  - **When `true`** (top Activity is in an external package — whether an external category or an external sub-activity launched from an internal category): starts [`BoundaryActivity`](file:///c:/Users/user/Documents/antigravity/kind-curie/app/src/main/java/com/example/lifecycleapp/BoundaryActivity.kt) with `EXTRA_BOUNDARY_MENU_ID` (captured from `currentSelectedCategoryId` before updating the adapter), `EXTRA_NEXT_TARGET_INTENT`, `EXTRA_NEXT_CATEGORY_ID`, and `EXTRA_NEXT_IS_EXTERNAL`.
+- [`BoundaryActivity`](file:///c:/Users/user/Documents/antigravity/kind-curie/app/src/main/java/com/example/lifecycleapp/BoundaryActivity.kt) launches `EXTRA_NEXT_TARGET_INTENT` via `registerForActivityResult(StartActivityForResult())` in `onCreate` (guarded by `KEY_HAS_LAUNCHED_NEXT` for Process Death safety). When the child finishes via Back:
+  1. `nextLauncher` callback sets `isReturningFromChild = true`.
+  2. `onResume()` runs `super.onResume()` -> triggers `ListActivity`'s `onActivityResumed` -> `BoundaryActivity.getCurrentMenuId()` returns `boundaryMenuId` -> `ListActivity` highlights the external category.
+  3. Immediately after `super.onResume()`, `if (isReturningFromChild) finish()` + `overridePendingTransition(0, 0)` finishes `BoundaryActivity` before `handleResumeActivity()` adds/draws a window (0 flicker).
 
 ### 2.4 Non-Menu Entry Points & Process Death
-- **Home Quick Access / Search** ([`HomeActivity.launchTargetSetting`](file:///c:/Users/user/Documents/antigravity/kind-curie/feature-home/src/main/java/com/example/feature/home/HomeActivity.kt)) & **Dashboard External Launch** ([`GenericSettingsActivity.launchExternalCategory`](file:///c:/Users/user/Documents/antigravity/kind-curie/common-ui-settings/src/main/java/com/example/common/ui/settings/GenericSettingsActivity.kt)): launch directly on top without `BoundaryActivity` (caller is already an internal host Activity) and call `CategoryMenuTracker.onExternalCategoryLaunched(...)` when targeting an external package.
+- **Home Quick Access / Search** ([`HomeActivity.launchTargetSetting`](file:///c:/Users/user/Documents/antigravity/kind-curie/feature-home/src/main/java/com/example/feature/home/HomeActivity.kt)) & **Dashboard External Launch** ([`GenericSettingsActivity.launchExternalCategory`](file:///c:/Users/user/Documents/antigravity/kind-curie/common-ui-settings/src/main/java/com/example/common/ui/settings/GenericSettingsActivity.kt)): launch directly on top without `BoundaryActivity` (caller is already an internal host Activity) and notify `HomeNavigationBridge.notifyCategorySelected(...)` when targeting an external package.
 - **Warm Deep Links** ([`DeepLinkRouterActivity.kt`](file:///c:/Users/user/Documents/antigravity/kind-curie/app/src/main/java/com/example/lifecycleapp/DeepLinkRouterActivity.kt)): route through `ListActivity` (`FLAG_ACTIVITY_NEW_TASK or FLAG_ACTIVITY_SINGLE_TOP`) -> `handleIntent()` -> `dispatchCategoryIntent()` so deep links participate cleanly in stacked history.
-- **Process Death**: [`ListActivity.kt`](file:///c:/Users/user/Documents/antigravity/kind-curie/app/src/main/java/com/example/lifecycleapp/ListActivity.kt) persists `KEY_ACTIVE_MENU_ID` in `onSaveInstanceState` and restores `CategoryMenuTracker` state on `onCreate`, while `BoundaryActivity` persists `KEY_HAS_LAUNCHED_NEXT` so recreating `BoundaryActivity` does not re-launch the child category. Because `isTopActivityExternal()` queries `ActivityManager.appTasks` directly from the OS, no external-top flag needs to be persisted.
+- **Process Death**: [`ListActivity.kt`](file:///c:/Users/user/Documents/antigravity/kind-curie/app/src/main/java/com/example/lifecycleapp/ListActivity.kt) persists `KEY_ACTIVE_MENU_ID` in `onSaveInstanceState` and restores selection on `onCreate`, while `BoundaryActivity` persists `KEY_HAS_LAUNCHED_NEXT` so recreating `BoundaryActivity` does not re-launch the child category. Because `isTopActivityExternal()` queries `ActivityManager.appTasks` directly from the OS, no external-top flag needs to be persisted.
 
 ---
 

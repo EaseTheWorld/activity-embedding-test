@@ -7,5 +7,9 @@ package com.example.core.item
  * menu selection synchronized across stacked category transitions and Back returns.
  */
 interface GetCurrentMenuId {
-    fun getCurrentMenuId(): String
+    /**
+     * Returns the menu category ID to highlight when this Activity resumes,
+     * or `null` to skip menu synchronization (e.g. `BoundaryActivity` during forward launch).
+     */
+    fun getCurrentMenuId(): String?
 }

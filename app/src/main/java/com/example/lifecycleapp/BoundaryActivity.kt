@@ -5,20 +5,22 @@ import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AppCompatActivity
-import com.example.common.ui.settings.CategoryMenuTracker
-import com.example.core.item.GetCurrentMenuId
+import com.example.common.ui.settings.BaseMenuContentActivity
+import com.example.feature.home.HomeNavigationBridge
 
 /**
- * Translucent host-owned boundary Activity placed immediately above an external-process category
- * (e.g. `LightSettingsActivity`) whenever switching from an external category to another category.
+ * Translucent host-owned boundary Activity placed immediately above an external-process Activity
+ * (either an external category or an external sub-activity launched by an internal category).
  *
- * Implements [GetCurrentMenuId] with the underlying external category's menu ID so that when the
- * stacked child category finishes via Back, [nextLauncher]'s result callback restores the menu
- * selection to [boundaryMenuId] (with `isExternalCategoryOnTop = true`) and immediately finishes
- * itself before exposing the underlying external Activity.
+ * Extends [BaseMenuContentActivity] so `ListActivity`'s single `ActivityLifecycleCallbacks`
+ * handles both internal category returns and external boundary returns uniformly:
+ * - Forward launch (`isReturningFromChild == false`): [getCurrentMenuId] returns `null` so
+ *   initial creation does not overwrite the upcoming category's menu selection.
+ * - Back return (`isReturningFromChild == true`): [nextLauncher] sets `isReturningFromChild = true`,
+ *   [onResume] triggers `ListActivity`'s `onActivityResumed` with [boundaryMenuId], and immediately
+ *   calls [finish] before SurfaceFlinger draws a window (0 flicker).
  */
-class BoundaryActivity : AppCompatActivity(), GetCurrentMenuId {
+class BoundaryActivity : BaseMenuContentActivity() {
 
     companion object {
         const val EXTRA_BOUNDARY_MENU_ID = "extra_boundary_menu_id"
@@ -30,6 +32,7 @@ class BoundaryActivity : AppCompatActivity(), GetCurrentMenuId {
 
     private var boundaryMenuId: String = ""
     private var hasLaunchedNext: Boolean = false
+    private var isReturningFromChild: Boolean = false
 
     private val nextLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -37,17 +40,13 @@ class BoundaryActivity : AppCompatActivity(), GetCurrentMenuId {
         Log.d(
             "LifecycleLog",
             "[BoundaryActivity] Returned from child (resultCode=${result.resultCode}) -> " +
-                "restoring external menuId='$boundaryMenuId' and finishing"
+                "marking return for external menuId='$boundaryMenuId'"
         )
-        if (boundaryMenuId.isNotEmpty()) {
-            CategoryMenuTracker.onReturnedToExternalBoundary(boundaryMenuId)
-        }
-        finish()
-        @Suppress("DEPRECATION")
-        overridePendingTransition(0, 0)
+        isReturningFromChild = true
     }
 
-    override fun getCurrentMenuId(): String = boundaryMenuId
+    override fun getCurrentMenuId(): String? =
+        if (isReturningFromChild && boundaryMenuId.isNotEmpty()) boundaryMenuId else null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -70,7 +69,7 @@ class BoundaryActivity : AppCompatActivity(), GetCurrentMenuId {
             if (nextIntent != null) {
                 hasLaunchedNext = true
                 if (nextIsExternal && !nextCategoryId.isNullOrEmpty()) {
-                    CategoryMenuTracker.onExternalCategoryLaunched(nextCategoryId)
+                    HomeNavigationBridge.notifyCategorySelected(nextCategoryId)
                 }
                 try {
                     Log.d(
@@ -83,15 +82,21 @@ class BoundaryActivity : AppCompatActivity(), GetCurrentMenuId {
                     overridePendingTransition(0, 0)
                 } catch (e: Exception) {
                     Log.e("LifecycleLog", "[BoundaryActivity] Failed to launch next category: $e")
-                    if (boundaryMenuId.isNotEmpty()) {
-                        CategoryMenuTracker.onReturnedToExternalBoundary(boundaryMenuId)
-                    }
-                    finish()
+                    isReturningFromChild = true
                 }
             } else {
                 Log.w("LifecycleLog", "[BoundaryActivity] Missing EXTRA_NEXT_TARGET_INTENT -> finishing")
                 finish()
             }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (isReturningFromChild) {
+            finish()
+            @Suppress("DEPRECATION")
+            overridePendingTransition(0, 0)
         }
     }
 

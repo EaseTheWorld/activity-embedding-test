@@ -5,17 +5,15 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
-import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.mutableStateOf
-import com.example.common.ui.settings.CategoryMenuTracker
+import com.example.common.ui.settings.BaseMenuContentActivity
 import com.example.common.ui.settings.extractMenuIntent
 import com.example.common.ui.settings.launchMenuDrawer
 import com.example.core.item.AppConfig
-import com.example.core.item.GetCurrentMenuId
 
-class HomeActivity : ComponentActivity(), GetCurrentMenuId {
+class HomeActivity : BaseMenuContentActivity() {
 
     companion object {
         const val EXTRA_TARGET_INTENT = "extra_target_intent"
@@ -211,7 +209,7 @@ class HomeActivity : ComponentActivity(), GetCurrentMenuId {
         val targetPkg = targetIntent.component?.packageName ?: targetIntent.`package`
         val isExternal = !targetPkg.isNullOrEmpty() && targetPkg != packageName
         if (isExternal && !categoryId.isNullOrEmpty()) {
-            CategoryMenuTracker.onExternalCategoryLaunched(categoryId)
+            HomeNavigationBridge.notifyCategorySelected(categoryId)
         }
         try {
             Log.d(tag, "HomeActivity launching stacked category (isExternal=$isExternal): $targetIntent")

@@ -2,7 +2,6 @@ package com.example.common.ui.settings
 
 import android.os.Bundle
 import android.util.Log
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -20,24 +19,22 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.core.item.AppConfig
-import com.example.core.item.GetCurrentMenuId
 
-class GenericSubActivity : ComponentActivity(), GetCurrentMenuId {
+class GenericSubActivity : BaseMenuContentActivity() {
 
     companion object {
         const val EXTRA_PARENT_TITLE = "extra_parent_title"
         private const val KEY_MENU_ID = "key_menu_id"
     }
 
-    private var menuId: String = ""
+    private var menuId: String? = null
 
-    override fun getCurrentMenuId(): String = menuId
+    override fun getCurrentMenuId(): String? = menuId
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         menuId = savedInstanceState?.getString(KEY_MENU_ID)
             ?: intent?.getStringExtra(AppConfig.EXTRA_CATEGORY_ID)
-            ?: CategoryMenuTracker.activeMenuId
         val parentTitle = intent.getStringExtra(EXTRA_PARENT_TITLE) ?: "Settings"
         Log.d("LifecycleLog", "[GenericSubActivity] onCreate(parentTitle=$parentTitle, menuId=$menuId)")
 

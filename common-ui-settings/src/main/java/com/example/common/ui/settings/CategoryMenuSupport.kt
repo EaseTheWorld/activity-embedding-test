@@ -40,6 +40,13 @@ import com.example.core.item.AppConfig
 private const val MENU_SUPPORT_TAG = "CategoryMenuSupport"
 
 /**
+ * Optional hook registered by the host app so in-process screens (such as `GenericSettingsActivity`)
+ * can notify the menu host when launching an external-process category directly.
+ */
+@Volatile
+var onExternalCategoryLaunchedHook: ((String) -> Unit)? = null
+
+/**
  * Extracts the host-provided category menu drawer [Intent] from [intent].
  */
 fun extractMenuIntent(

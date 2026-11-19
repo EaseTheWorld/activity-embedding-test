@@ -6,7 +6,6 @@ import android.os.Bundle
 import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
-import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
@@ -14,7 +13,6 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navOptions
 import com.example.core.item.AppConfig
-import com.example.core.item.GetCurrentMenuId
 import com.example.core.item.ItemViewModelRegistry
 
 /**
@@ -25,7 +23,7 @@ import com.example.core.item.ItemViewModelRegistry
  * 3. Deep link parsing for `myapp://navigate/{categoryId}/{itemId}`.
  * 4. External Activity Embedding delegation for external apps (e.g. Lights).
  */
-open class GenericSettingsActivity : AppCompatActivity(), GetCurrentMenuId {
+open class GenericSettingsActivity : BaseMenuContentActivity() {
 
     override fun getCurrentMenuId(): String = resolveCategoryId(intent)
 
@@ -300,7 +298,7 @@ open class GenericSettingsActivity : AppCompatActivity(), GetCurrentMenuId {
                 }
             }
             try {
-                CategoryMenuTracker.onExternalCategoryLaunched(categoryId)
+                onExternalCategoryLaunchedHook?.invoke(categoryId)
                 startActivity(extIntent)
                 Log.d(tag, "Launched external category activity for $categoryId")
             } catch (e: Exception) {

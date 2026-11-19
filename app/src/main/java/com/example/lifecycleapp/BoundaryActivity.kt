@@ -6,7 +6,6 @@ import android.os.Bundle
 import android.util.Log
 import androidx.activity.result.contract.ActivityResultContracts
 import com.example.common.ui.settings.BaseMenuContentActivity
-import com.example.feature.home.HomeNavigationBridge
 
 /**
  * Translucent host-owned boundary Activity placed immediately above an external-process Activity
@@ -26,7 +25,6 @@ class BoundaryActivity : BaseMenuContentActivity() {
         const val EXTRA_BOUNDARY_MENU_ID = "extra_boundary_menu_id"
         const val EXTRA_NEXT_TARGET_INTENT = "extra_next_target_intent"
         const val EXTRA_NEXT_CATEGORY_ID = "extra_next_category_id"
-        const val EXTRA_NEXT_IS_EXTERNAL = "extra_next_is_external"
         private const val KEY_HAS_LAUNCHED_NEXT = "key_has_launched_next"
     }
 
@@ -64,18 +62,14 @@ class BoundaryActivity : BaseMenuContentActivity() {
                 intent?.getParcelableExtra(EXTRA_NEXT_TARGET_INTENT)
             }
             val nextCategoryId = intent?.getStringExtra(EXTRA_NEXT_CATEGORY_ID)
-            val nextIsExternal = intent?.getBooleanExtra(EXTRA_NEXT_IS_EXTERNAL, false) ?: false
 
             if (nextIntent != null) {
                 hasLaunchedNext = true
-                if (nextIsExternal && !nextCategoryId.isNullOrEmpty()) {
-                    HomeNavigationBridge.notifyCategorySelected(nextCategoryId)
-                }
                 try {
                     Log.d(
                         "LifecycleLog",
                         "[BoundaryActivity] Launching next category '$nextCategoryId' " +
-                            "(isExternal=$nextIsExternal) above boundary '$boundaryMenuId'"
+                            "above boundary '$boundaryMenuId'"
                     )
                     nextLauncher.launch(nextIntent)
                     @Suppress("DEPRECATION")

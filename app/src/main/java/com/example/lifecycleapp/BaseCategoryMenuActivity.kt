@@ -327,7 +327,6 @@ abstract class BaseCategoryMenuActivity : BaseLoggingActivity() {
     protected fun dispatchCategoryIntent(
         targetIntent: Intent,
         categoryId: String,
-        isTargetExternal: Boolean,
         previousMenuId: String? = currentSelectedCategoryId
     ) {
         val boundaryMenuId = previousMenuId.orEmpty()
@@ -340,7 +339,6 @@ abstract class BaseCategoryMenuActivity : BaseLoggingActivity() {
                 putExtra(BoundaryActivity.EXTRA_BOUNDARY_MENU_ID, boundaryMenuId)
                 putExtra(BoundaryActivity.EXTRA_NEXT_TARGET_INTENT, targetIntent)
                 putExtra(BoundaryActivity.EXTRA_NEXT_CATEGORY_ID, categoryId)
-                putExtra(BoundaryActivity.EXTRA_NEXT_IS_EXTERNAL, isTargetExternal)
             }
             startActivity(boundaryIntent)
             @Suppress("DEPRECATION")
@@ -370,7 +368,7 @@ abstract class BaseCategoryMenuActivity : BaseLoggingActivity() {
                     AppConfig.OVERLAY_MODE_WIDTH_DP_BREAKPOINT
                 )
             }
-            dispatchCategoryIntent(homeIntent, "home", isTargetExternal = false, previousMenuId = previousMenuId)
+            dispatchCategoryIntent(homeIntent, "home", previousMenuId = previousMenuId)
             return
         }
 
@@ -403,9 +401,8 @@ abstract class BaseCategoryMenuActivity : BaseLoggingActivity() {
             }
             targetIntent.data = uriToPass
 
-            val isTargetExternal = !category.targetPackage.isNullOrEmpty() && category.targetPackage != packageName
-            Log.d(tag, "[$activityName] Launching stacked category ${category.title} (isExternal=$isTargetExternal)")
-            dispatchCategoryIntent(targetIntent, category.id, isTargetExternal, previousMenuId = previousMenuId)
+            Log.d(tag, "[$activityName] Launching stacked category ${category.title}")
+            dispatchCategoryIntent(targetIntent, category.id, previousMenuId = previousMenuId)
         } else {
             Log.w(tag, "[$activityName] No target intent for category ${category.title}")
         }
@@ -491,8 +488,7 @@ abstract class BaseCategoryMenuActivity : BaseLoggingActivity() {
         }
         dispatchCategoryIntent(
             targetIntent = fallbackIntent,
-            categoryId = categoryId,
-            isTargetExternal = categoryId.equals("light", ignoreCase = true)
+            categoryId = categoryId
         )
     }
 }

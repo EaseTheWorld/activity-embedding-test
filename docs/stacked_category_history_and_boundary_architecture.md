@@ -11,7 +11,7 @@ Example flow in Wide Split Mode:
 4. Select `Doors & Locks` -> wraps with `BoundaryActivity("light")` -> `[Home, Seats, GenericSubActivity, Light, BoundaryActivity("light"), Doors]` (menu selects `Doors & Locks`)
 5. Press Back repeatedly:
    - `Doors` finishes -> `BoundaryActivity` restores `Vehicle Lights` menu selection and finishes -> `Light` appears (no flicker)
-   - `Light` finishes -> `GenericSubActivity` resumes -> `LifecycleApp` syncs menu to `Seats`
+   - `Light` finishes -> `GenericSubActivity` resumes -> `ListActivity` syncs menu to `Seats`
    - `GenericSubActivity` finishes -> `Seats` resumes -> menu remains `Seats`
    - `Seats` finishes -> `Home (root)` resumes -> menu selects `Home`
    - Back on `Home (root)` -> `finishAffinity()` exits app cleanly
@@ -42,7 +42,7 @@ Example flow in Wide Split Mode:
 - Because Android `ActivityLifecycleCallbacks` only fire inside the host process, returning via Back from a child category back onto an external-process Activity (either an external category like `LightSettingsActivity` or an external sub-activity launched by an internal category) would otherwise go unnoticed by `ListActivity`.
 - Right before launching a new category, [`BaseCategoryMenuActivity.isTopActivityExternal()`](file:///c:/Users/user/Documents/antigravity/kind-curie/app/src/main/java/com/example/lifecycleapp/BaseCategoryMenuActivity.kt) queries `ActivityManager.appTasks` for the matching `taskId` and checks `taskInfo.topActivity.packageName != packageName`:
   - **When `false`** (top Activity is in the host package): starts `targetIntent` directly.
-  - **When `true`** (top Activity is in an external package — whether an external category or an external sub-activity launched from an internal category): starts [`BoundaryActivity`](file:///c:/Users/user/Documents/antigravity/kind-curie/app/src/main/java/com/example/lifecycleapp/BoundaryActivity.kt) with `EXTRA_BOUNDARY_MENU_ID` (captured from `currentSelectedCategoryId` before updating the adapter), `EXTRA_NEXT_TARGET_INTENT`, `EXTRA_NEXT_CATEGORY_ID`, and `EXTRA_NEXT_IS_EXTERNAL`.
+  - **When `true`** (top Activity is in an external package — whether an external category or an external sub-activity launched from an internal category): starts [`BoundaryActivity`](file:///c:/Users/user/Documents/antigravity/kind-curie/app/src/main/java/com/example/lifecycleapp/BoundaryActivity.kt) with `EXTRA_BOUNDARY_MENU_ID` (captured from `currentSelectedCategoryId` before updating the adapter), `EXTRA_NEXT_TARGET_INTENT`, and `EXTRA_NEXT_CATEGORY_ID`.
 - [`BoundaryActivity`](file:///c:/Users/user/Documents/antigravity/kind-curie/app/src/main/java/com/example/lifecycleapp/BoundaryActivity.kt) launches `EXTRA_NEXT_TARGET_INTENT` via `registerForActivityResult(StartActivityForResult())` in `onCreate` (guarded by `KEY_HAS_LAUNCHED_NEXT` for Process Death safety). When the child finishes via Back:
   1. `nextLauncher` callback sets `isReturningFromChild = true`.
   2. `onResume()` runs `super.onResume()` -> triggers `ListActivity`'s `onActivityResumed` -> `BoundaryActivity.getCurrentMenuId()` returns `boundaryMenuId` -> `ListActivity` highlights the external category.
@@ -59,5 +59,5 @@ Example flow in Wide Split Mode:
 
 Inspected `BoundaryActivity` transitions (`Vehicle Lights -> BoundaryActivity -> Doors & Locks` and `Doors & Locks -> Back -> BoundaryActivity -> Vehicle Lights`) via `adb shell screenrecord` + `ffmpeg` frame extraction on `emulator-5554`:
 - `BoundaryActivity` uses `Theme.LifecycleApp.Translucent` with no layout inflation (`setContentView` is never called) and `overridePendingTransition(0, 0)`.
-- Calling `finish()` inside `nextLauncher`'s `ActivityResult` callback finishes `BoundaryActivity` before rendering a resumed frame to SurfaceFlinger.
+- Setting `isReturningFromChild = true` in `nextLauncher` and calling `finish()` inside `onResume()` immediately after `super.onResume()` finishes `BoundaryActivity` before `handleResumeActivity()` renders a resumed frame to SurfaceFlinger.
 - Frame-by-frame analysis across `Doors -> Back -> Light` showed direct transition between consecutive SurfaceFlinger frames with zero intermediate black, white, or blank frames.

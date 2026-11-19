@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.view.MotionEvent
+import com.example.common.ui.settings.CategoryMenuTracker
 import com.example.core.item.AppConfig
 import com.example.feature.home.HomeActivity
 import com.example.feature.home.HomeNavigationBridge
@@ -25,6 +26,7 @@ import java.lang.ref.WeakReference
 class ListActivity : BaseCategoryMenuActivity() {
 
     companion object {
+        private const val KEY_ACTIVE_MENU_ID = "key_active_menu_id"
         private var activeInstanceRef: WeakReference<ListActivity>? = null
 
         fun getActiveInstance(): ListActivity? =
@@ -34,6 +36,11 @@ class ListActivity : BaseCategoryMenuActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         activeInstanceRef = WeakReference(this)
+        if (savedInstanceState != null) {
+            CategoryMenuTracker.restoreState(
+                menuId = savedInstanceState.getString(KEY_ACTIVE_MENU_ID)
+            )
+        }
         val isNarrow = AppConfig.isOverlayMode(this)
         SplitInitializer.ensureInitialized(this, isNarrow)
 
@@ -57,6 +64,7 @@ class ListActivity : BaseCategoryMenuActivity() {
             }
             val homeIntent = Intent(this, HomeActivity::class.java).apply {
                 action = ACTION_SETTINGS_EMBED
+                putExtra(HomeActivity.EXTRA_IS_ROOT_HOME, true)
                 putExtra(AppConfig.EXTRA_MENU_INTENT, menuIntent)
                 putExtra(
                     AppConfig.EXTRA_CATEGORY_HEADER_BREAKPOINT_DP,
@@ -73,16 +81,23 @@ class ListActivity : BaseCategoryMenuActivity() {
             overridePendingTransition(0, 0)
         }
 
-        if (!initialCategoryId.isNullOrEmpty() && !isNarrow) {
-            val matchedIndex = categories.indexOfFirst { it.id.equals(initialCategoryId, ignoreCase = true) }
-            if (matchedIndex >= 0) {
-                categoryAdapter?.selectedPosition = matchedIndex
-                categoryAdapter?.notifyDataSetChanged()
-                listViewCategories.smoothScrollToPosition(matchedIndex)
+        if (savedInstanceState == null) {
+            if (!initialCategoryId.isNullOrEmpty() && !isNarrow) {
+                val matchedIndex = categories.indexOfFirst { it.id.equals(initialCategoryId, ignoreCase = true) }
+                if (matchedIndex >= 0) {
+                    categoryAdapter?.selectedPosition = matchedIndex
+                    categoryAdapter?.notifyDataSetChanged()
+                    listViewCategories.smoothScrollToPosition(matchedIndex)
+                }
+            } else if (intent?.data != null || intent?.action == "com.example.lifecycleapp.open") {
+                handleIntent(intent)
             }
-        } else if (intent?.data != null || intent?.action == "com.example.lifecycleapp.open") {
-            handleIntent(intent)
         }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putString(KEY_ACTIVE_MENU_ID, CategoryMenuTracker.activeMenuId)
     }
 
     /**

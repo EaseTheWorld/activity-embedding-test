@@ -100,9 +100,15 @@
             android:label="@string/title_secondary2" />
 
         <activity
+            android:name=".BoundaryActivity"
+            android:exported="false"
+            android:theme="@style/Theme.LifecycleApp.Translucent"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density" />
+
+        <activity
             android:name=".GenericSettingsActivity"
             android:exported="true"
-            android:launchMode="singleTop"
+            android:launchMode="standard"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density"
             android:label="Settings">
             <intent-filter>

@@ -17,6 +17,7 @@ import android.widget.ListView
 import android.widget.TextView
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.core.content.res.ResourcesCompat
+import com.example.common.ui.settings.CategoryMenuTracker
 import com.example.core.item.AppConfig
 import com.example.feature.home.HomeActivity
 import com.example.feature.home.HomeNavigationBridge
@@ -116,6 +117,25 @@ abstract class BaseCategoryMenuActivity : BaseLoggingActivity() {
 
     protected open fun onHomeRevealed() {}
 
+    private val menuTrackerListener: (String) -> Unit = { categoryId ->
+        runOnUiThread {
+            selectCategoryInList(categoryId)
+        }
+    }
+
+    protected fun selectCategoryInList(categoryId: String) {
+        val matchedIndex = categories.indexOfFirst { it.id.equals(categoryId, ignoreCase = true) }
+        if (matchedIndex >= 0 && categoryAdapter?.selectedPosition != matchedIndex) {
+            Log.d(tag, "[$activityName] Menu selection updated -> '$categoryId' (position=$matchedIndex)")
+            categoryAdapter?.selectedPosition = matchedIndex
+            categoryAdapter?.notifyDataSetChanged()
+            listViewCategories.smoothScrollToPosition(matchedIndex)
+        }
+        if (categoryId.equals("home", ignoreCase = true)) {
+            onHomeRevealed()
+        }
+    }
+
     private val categorySelectedListener: (String) -> Unit = { categoryId ->
         runOnUiThread {
             val matchedIndex = categories.indexOfFirst { it.id.equals(categoryId, ignoreCase = true) }
@@ -148,15 +168,22 @@ abstract class BaseCategoryMenuActivity : BaseLoggingActivity() {
 
         categoryAdapter = CategoryAdapter(this, categories)
         listViewCategories.adapter = categoryAdapter
+        selectCategoryInList(CategoryMenuTracker.activeMenuId)
 
         listViewCategories.setOnItemClickListener { _, _, position, _ ->
+            val selectedCategory = categories[position]
+            if (selectedCategory.id.equals(CategoryMenuTracker.activeMenuId, ignoreCase = true)) {
+                Log.d(tag, "[$activityName] Category '${selectedCategory.id}' is already active -> skipping duplicate stack push")
+                onBeforeCategoryLaunch()
+                return@setOnItemClickListener
+            }
             categoryAdapter?.selectedPosition = position
             categoryAdapter?.notifyDataSetChanged()
             onBeforeCategoryLaunch()
-            val selectedCategory = categories[position]
             launchCategory(selectedCategory)
         }
 
+        CategoryMenuTracker.registerListener(menuTrackerListener)
         HomeNavigationBridge.registerHomeRevealedListener(homeRevealedListener)
         HomeNavigationBridge.registerCategorySelectedListener(categorySelectedListener)
         HomeNavigationBridge.registerAppExitListener(appExitListener)
@@ -165,6 +192,7 @@ abstract class BaseCategoryMenuActivity : BaseLoggingActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        CategoryMenuTracker.unregisterListener(menuTrackerListener)
         HomeNavigationBridge.unregisterAppExitListener(appExitListener)
         HomeNavigationBridge.unregisterMenuLauncher()
         HomeNavigationBridge.unregisterHomeRevealedListener(homeRevealedListener)
@@ -285,14 +313,68 @@ abstract class BaseCategoryMenuActivity : BaseLoggingActivity() {
         }
     }
 
+    private fun isTopActivityExternal(): Boolean {
+        val am = getSystemService(Context.ACTIVITY_SERVICE) as? android.app.ActivityManager ?: return false
+        val currentTask = am.appTasks.firstOrNull { appTask ->
+            try {
+                val info = appTask.taskInfo
+                val appTaskId = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                    info.taskId
+                } else {
+                    @Suppress("DEPRECATION")
+                    info.id
+                }
+                appTaskId == taskId
+            } catch (_: Exception) {
+                false
+            }
+        } ?: return false
+        val topComponent = currentTask.taskInfo.topActivity ?: return false
+        val isExternal = topComponent.packageName != packageName
+        Log.d(
+            tag,
+            "[$activityName] isTopActivityExternal: topActivity=${topComponent.flattenToShortString()}, " +
+                "hostPkg=$packageName -> isExternal=$isExternal"
+        )
+        return isExternal
+    }
+
+    protected fun dispatchCategoryIntent(
+        targetIntent: Intent,
+        categoryId: String,
+        isTargetExternal: Boolean
+    ) {
+        val boundaryMenuId = CategoryMenuTracker.activeMenuId
+        if (isTopActivityExternal() && boundaryMenuId.isNotEmpty()) {
+            Log.d(
+                tag,
+                "[$activityName] External topActivity detected (menuId='$boundaryMenuId') -> wrapping '$categoryId' with BoundaryActivity"
+            )
+            val boundaryIntent = Intent(this, BoundaryActivity::class.java).apply {
+                putExtra(BoundaryActivity.EXTRA_BOUNDARY_MENU_ID, boundaryMenuId)
+                putExtra(BoundaryActivity.EXTRA_NEXT_TARGET_INTENT, targetIntent)
+                putExtra(BoundaryActivity.EXTRA_NEXT_CATEGORY_ID, categoryId)
+                putExtra(BoundaryActivity.EXTRA_NEXT_IS_EXTERNAL, isTargetExternal)
+            }
+            startActivity(boundaryIntent)
+            @Suppress("DEPRECATION")
+            overridePendingTransition(0, 0)
+        } else {
+            if (isTargetExternal) {
+                CategoryMenuTracker.onExternalCategoryLaunched(categoryId)
+            }
+            startActivity(targetIntent)
+            @Suppress("DEPRECATION")
+            overridePendingTransition(0, 0)
+        }
+    }
+
     protected fun launchCategory(category: SettingCategory, deepLinkUri: Uri? = null, extras: Bundle? = null) {
         onBeforeCategoryLaunch()
 
         if (category.id == "home") {
-            Log.d(tag, "[$activityName] Navigating to HomeActivity via CLEAR_TOP")
-            HomeNavigationBridge.prepareCategorySwitch()
+            Log.d(tag, "[$activityName] Pushing stacked HomeActivity onto category stack")
             val homeIntent = Intent(this, HomeActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
                 putExtra(HomeActivity.EXTRA_INITIAL_CATEGORY_ID, "home")
                 putExtra(AppConfig.EXTRA_MENU_INTENT, buildMenuIntent("home"))
                 putExtra(
@@ -300,8 +382,7 @@ abstract class BaseCategoryMenuActivity : BaseLoggingActivity() {
                     AppConfig.OVERLAY_MODE_WIDTH_DP_BREAKPOINT
                 )
             }
-            startActivity(homeIntent)
-            overridePendingTransition(0, 0)
+            dispatchCategoryIntent(homeIntent, "home", isTargetExternal = false)
             return
         }
 
@@ -334,8 +415,9 @@ abstract class BaseCategoryMenuActivity : BaseLoggingActivity() {
             }
             targetIntent.data = uriToPass
 
-            Log.d(tag, "[$activityName] Launching category ${category.title} via HomeNavigationBridge.launchCategory()")
-            HomeNavigationBridge.launchCategory(this, targetIntent)
+            val isTargetExternal = !category.targetPackage.isNullOrEmpty() && category.targetPackage != packageName
+            Log.d(tag, "[$activityName] Launching stacked category ${category.title} (isExternal=$isTargetExternal)")
+            dispatchCategoryIntent(targetIntent, category.id, isTargetExternal)
         } else {
             Log.w(tag, "[$activityName] No target intent for category ${category.title}")
         }
@@ -418,7 +500,11 @@ abstract class BaseCategoryMenuActivity : BaseLoggingActivity() {
                 if (extras != null) putExtras(extras)
             }
         }
-        HomeNavigationBridge.launchCategory(this, fallbackIntent)
+        dispatchCategoryIntent(
+            targetIntent = fallbackIntent,
+            categoryId = categoryId,
+            isTargetExternal = categoryId.equals("light", ignoreCase = true)
+        )
     }
 }
 

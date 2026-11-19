@@ -35,43 +35,18 @@ class DeepLinkRouterActivity : Activity() {
         val resolved = DeepLinkResolver.resolve(this, intent, menuComponent)
         Log.i(tag, "onCreate: intent=$intent, resolved=$resolved")
 
-        val isWarmStart = HomeNavigationBridge.isSessionActive()
+        val isWarmStart = ListActivity.getActiveInstance() != null
 
         if (isWarmStart) {
-            Log.i(tag, "Warm start detected -> bringing task to front and delegating deep link")
-            // Bring main app task to foreground
-            val bringToFrontIntent = Intent(this, ListActivity::class.java).apply {
-                action = Intent.ACTION_MAIN
+            Log.i(tag, "Warm start detected -> routing deep link through ListActivity to preserve stacked history")
+            val warmIntent = Intent(this, ListActivity::class.java).apply {
+                action = intent.action ?: Intent.ACTION_MAIN
                 addCategory(Intent.CATEGORY_LAUNCHER)
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                data = intent.data
+                intent.extras?.let { putExtras(it) }
             }
-            startActivity(bringToFrontIntent)
-
-            if (resolved != null) {
-                if (resolved.categoryId.equals("home", ignoreCase = true)) {
-                    HomeNavigationBridge.prepareCategorySwitch()
-                    val homeMenuIntent = Intent().apply {
-                        component = menuComponent
-                        putExtra(AppConfig.EXTRA_CATEGORY_ID, "home")
-                    }
-                    val homeIntent = Intent(this, HomeActivity::class.java).apply {
-                        flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-                        putExtra(HomeActivity.EXTRA_INITIAL_CATEGORY_ID, "home")
-                        putExtra(AppConfig.EXTRA_MENU_INTENT, homeMenuIntent)
-                        putExtra(
-                            AppConfig.EXTRA_CATEGORY_HEADER_BREAKPOINT_DP,
-                            AppConfig.OVERLAY_MODE_WIDTH_DP_BREAKPOINT
-                        )
-                    }
-                    startActivity(homeIntent)
-                } else {
-                    val targetIntent = resolved.targetIntent
-                    if (targetIntent != null) {
-                        HomeNavigationBridge.notifyCategorySelected(resolved.categoryId)
-                        HomeNavigationBridge.launchCategory(this, targetIntent)
-                    }
-                }
-            }
+            startActivity(warmIntent)
         } else {
             Log.i(tag, "Cold start detected -> launching ListActivity as pristine Task Root")
             val targetIntent = resolved?.targetIntent

@@ -96,6 +96,10 @@ fun GenericSettingsScreen(
                 onClick = {
                     val subIntent = android.content.Intent(context, GenericSubActivity::class.java).apply {
                         putExtra(GenericSubActivity.EXTRA_PARENT_TITLE, title)
+                        val parentMenuId = (context as? com.example.core.item.GetCurrentMenuId)?.getCurrentMenuId()
+                        if (!parentMenuId.isNullOrEmpty()) {
+                            putExtra(com.example.core.item.AppConfig.EXTRA_CATEGORY_ID, parentMenuId)
+                        }
                     }
                     context.startActivity(subIntent)
                 }

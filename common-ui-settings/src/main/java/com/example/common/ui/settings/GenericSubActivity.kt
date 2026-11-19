@@ -19,17 +19,27 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.core.item.AppConfig
+import com.example.core.item.GetCurrentMenuId
 
-class GenericSubActivity : ComponentActivity() {
+class GenericSubActivity : ComponentActivity(), GetCurrentMenuId {
 
     companion object {
         const val EXTRA_PARENT_TITLE = "extra_parent_title"
+        private const val KEY_MENU_ID = "key_menu_id"
     }
+
+    private var menuId: String = ""
+
+    override fun getCurrentMenuId(): String = menuId
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        menuId = savedInstanceState?.getString(KEY_MENU_ID)
+            ?: intent?.getStringExtra(AppConfig.EXTRA_CATEGORY_ID)
+            ?: CategoryMenuTracker.activeMenuId
         val parentTitle = intent.getStringExtra(EXTRA_PARENT_TITLE) ?: "Settings"
-        Log.d("LifecycleLog", "[GenericSubActivity] onCreate(parentTitle=$parentTitle)")
+        Log.d("LifecycleLog", "[GenericSubActivity] onCreate(parentTitle=$parentTitle, menuId=$menuId)")
 
         setContent {
             Surface(
@@ -64,6 +74,11 @@ class GenericSubActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putString(KEY_MENU_ID, menuId)
     }
 
     override fun onDestroy() {

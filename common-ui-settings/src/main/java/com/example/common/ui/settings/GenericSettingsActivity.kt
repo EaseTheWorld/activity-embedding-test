@@ -14,6 +14,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navOptions
 import com.example.core.item.AppConfig
+import com.example.core.item.GetCurrentMenuId
 import com.example.core.item.ItemViewModelRegistry
 
 /**
@@ -24,7 +25,9 @@ import com.example.core.item.ItemViewModelRegistry
  * 3. Deep link parsing for `myapp://navigate/{categoryId}/{itemId}`.
  * 4. External Activity Embedding delegation for external apps (e.g. Lights).
  */
-open class GenericSettingsActivity : AppCompatActivity() {
+open class GenericSettingsActivity : AppCompatActivity(), GetCurrentMenuId {
+
+    override fun getCurrentMenuId(): String = resolveCategoryId(intent)
 
     private val tag = "GenericSettingsActivity"
     private var pendingIntent = mutableStateOf<Intent?>(null)
@@ -148,25 +151,29 @@ open class GenericSettingsActivity : AppCompatActivity() {
         return AppConfig.shouldShowCategoryHeader(this, evalIntent)
     }
 
-    protected fun resolveInitialDestination(intent: Intent?): String {
-        if (intent == null) return SettingsNavigation.ROUTE_DASHBOARD
-        val uri = intent.data
+    private fun resolveCategoryId(sourceIntent: Intent?): String {
+        if (sourceIntent == null) return "dashboard"
+        val uri: Uri? = sourceIntent.data
         if (uri != null && uri.scheme == SettingsNavigation.DEEP_LINK_SCHEME) {
-            val segments = uri.pathSegments
-            val categoryId = segments.firstOrNull()
-            if (!categoryId.isNullOrEmpty() && !categoryId.equals("dashboard", ignoreCase = true) && !categoryId.equals("home", ignoreCase = true)) {
-                return SettingsNavigation.categoryRoute(categoryId)
+            val cat = uri.pathSegments.firstOrNull()
+            if (!cat.isNullOrEmpty() && !cat.equals("home", ignoreCase = true)) {
+                return cat
             }
         }
-        val extraCat = intent.getStringExtra(EXTRA_CATEGORY_ID)
-        val action = intent.action
-        val categoryId = when {
+        val extraCat = sourceIntent.getStringExtra(EXTRA_CATEGORY_ID)
+            ?: sourceIntent.getStringExtra("category_id")
+        val action = sourceIntent.action
+        return when {
             !extraCat.isNullOrEmpty() -> extraCat
             action == "com.example.carsettings.door.OPEN" -> "door"
             action == "com.example.carsettings.seat.OPEN" -> "seat"
-            else -> null
+            else -> "dashboard"
         }
-        if (!categoryId.isNullOrEmpty() && !categoryId.equals("dashboard", ignoreCase = true) && !categoryId.equals("home", ignoreCase = true)) {
+    }
+
+    protected fun resolveInitialDestination(intent: Intent?): String {
+        val categoryId = resolveCategoryId(intent)
+        if (!categoryId.equals("dashboard", ignoreCase = true) && !categoryId.equals("home", ignoreCase = true)) {
             return SettingsNavigation.categoryRoute(categoryId)
         }
         return SettingsNavigation.ROUTE_DASHBOARD
@@ -293,6 +300,7 @@ open class GenericSettingsActivity : AppCompatActivity() {
                 }
             }
             try {
+                CategoryMenuTracker.onExternalCategoryLaunched(categoryId)
                 startActivity(extIntent)
                 Log.d(tag, "Launched external category activity for $categoryId")
             } catch (e: Exception) {
